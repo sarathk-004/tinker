@@ -18,6 +18,7 @@ export type AWSServiceIcon =
   | 'ec2'
   | 'lambda'
   | 'ecs'
+  | 'eks'
   | 'rds'
   | 'dynamodb'
   | 'elasticache'
@@ -26,6 +27,14 @@ export type AWSServiceIcon =
   | 'sns'
   | 's3'
   | 'cloudfront'
+  | 'cognito'
+  | 'route53'
+  | 'waf'
+  | 'eventbridge'
+  | 'kinesis'
+  | 'opensearch'
+  | 'secrets-manager'
+  | 'step-functions'
   | 'generic';
 
 export interface DiagramNodeData extends Record<string, unknown> {
@@ -46,7 +55,9 @@ export interface DiagramState {
   nodes: DiagramNode[];
   edges: DiagramEdge[];
   highlightedIds: string[];
+  selectedNodeIds: string[];
   activeAction: string | null;
+  isPlayingFlow: boolean;
 
   history: Array<{ nodes: DiagramNode[]; edges: DiagramEdge[] }>;
 
@@ -60,9 +71,12 @@ export interface DiagramState {
     description?: string;
   }) => string;
   removeNode: (id: string, options?: { reconnectBridge?: boolean }) => void;
+  deleteSelected: () => void;
+  setSelectedNodeIds: (ids: string[]) => void;
   connect: (source: string, target: string, label?: string, bidirectional?: boolean) => void;
   disconnect: (source: string, target: string) => void;
   renameNode: (id: string, newLabel: string) => void;
+  updateNode: (id: string, updates: Partial<DiagramNodeData>) => void;
   insertBetween: (
     source: string,
     target: string,
@@ -76,6 +90,7 @@ export interface DiagramState {
   ) => string;
   highlight: (ids: string[]) => void;
   clearHighlight: () => void;
+  playFlow: (sequence?: string[]) => Promise<void>;
   reset: () => void;
   undo: () => void;
   groupNodes: (ids: string[], groupName: string) => void;

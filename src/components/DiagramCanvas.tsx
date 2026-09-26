@@ -12,7 +12,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { AWSArchitectureNode } from './AWSArchitectureNode';
 import { useDiagramStore } from '../diagram/store';
-import { Sparkles, Layers } from 'lucide-react';
+import { TypewriterPrompt } from './TypewriterPrompt';
 
 const nodeTypes = {
   awsNode: AWSArchitectureNode,
@@ -26,10 +26,10 @@ const InnerCanvas: React.FC = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(storeNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(storeEdges);
 
-  // Keyboard shortcut for Undo (Ctrl+Z or Cmd+Z)
+  // Keyboard shortcuts: Undo (Ctrl+Z) and Delete (Delete/Backspace)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger undo when typing in an input or textarea
+      // Don't trigger shortcuts when typing in an input or textarea
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
@@ -39,6 +39,9 @@ const InnerCanvas: React.FC = () => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         useDiagramStore.getState().undo();
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        useDiagramStore.getState().deleteSelected();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -89,25 +92,7 @@ const InnerCanvas: React.FC = () => {
 
   return (
     <div className="relative w-full h-full bg-[#f7f7f4]">
-      {isEmpty && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
-          <div className="flex flex-col items-center max-w-md text-center px-8 py-8 rounded-lg bg-white border border-[#e6e5e0]">
-            <div className="w-10 h-10 rounded-md bg-[#fafaf7] border border-[#e6e5e0] flex items-center justify-center text-[#f54e00] mb-4">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <h2 className="text-xl font-normal tracking-[-0.5px] text-[#26251e] mb-2 font-sans">
-              Talk through what you're building
-            </h2>
-            <p className="text-sm text-[#5a5852] leading-relaxed mb-5">
-              Describe your architecture verbally or run interactive commands. Tinker constructs and restructures the AWS system in real time.
-            </p>
-            <div className="flex items-center gap-2 text-xs text-[#5a5852] bg-[#fafaf7] border border-[#e6e5e0] px-3.5 py-1.5 rounded-full font-mono">
-              <Layers className="w-3.5 h-3.5 text-[#f54e00]" />
-              <span>Try: <span className="text-[#26251e] italic">"Client talks to API Gateway, then to Orders and Auth"</span></span>
-            </div>
-          </div>
-        </div>
-      )}
+      {isEmpty && <TypewriterPrompt />}
 
       <ReactFlow
         nodes={nodes}
@@ -115,6 +100,9 @@ const InnerCanvas: React.FC = () => {
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onSelectionChange={({ nodes: selNodes }) => {
+          useDiagramStore.getState().setSelectedNodeIds(selNodes.map((n) => n.id));
+        }}
         onConnect={onConnect}
         onNodesDelete={onNodesDelete}
         onEdgesDelete={onEdgesDelete}

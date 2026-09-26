@@ -4,7 +4,7 @@ import { DiagramCanvas } from './components/DiagramCanvas';
 import { ManualToolbar } from './components/ManualToolbar';
 import { CommandBar } from './components/CommandBar';
 import { SettingsModal } from './components/SettingsModal';
-import { RightPanel } from './components/RightPanel';
+import { SidebarPanel } from './components/SidebarPanel';
 import { useDiagramStore } from './diagram/store';
 
 export const App: React.FC = () => {
@@ -27,9 +27,9 @@ export const App: React.FC = () => {
       />
 
       <main className="relative flex-1 w-full h-full overflow-hidden">
+        <SidebarPanel />
         <DiagramCanvas />
         <ManualToolbar />
-        <RightPanel />
         <CommandBar onOpenSettings={() => setSettingsOpen(true)} />
       </main>
 

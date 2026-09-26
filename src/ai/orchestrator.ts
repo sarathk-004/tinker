@@ -95,9 +95,11 @@ export async function processArchitectureInstruction(
       (a) => !/^(?:Added|Removed|Connected|Disconnected|Inserted|Renamed|Highlighted)/i.test(a)
     );
 
-    // Only speak aloud when answering architectural questions or simulations
+    // Only speak aloud and animate flow when answering architectural questions or simulations
     if (explanations.length > 0) {
       speakWithGeminiVoice(explanations.join('. '));
+      // Automatically show the flow sequentially across the diagram
+      store.playFlow();
     }
   }
 

@@ -14,6 +14,7 @@ const ICONIFY_AWS_MAP: Record<string, string> = {
   'alb': 'logos:aws-elastic-load-balancing',
   'ec2': 'logos:aws-ec2',
   'ecs': 'logos:aws-ecs',
+  'eks': 'logos:aws-eks',
   'lambda': 'logos:aws-lambda',
   'rds': 'logos:aws-rds',
   'dynamodb': 'logos:aws-dynamodb',
@@ -23,6 +24,14 @@ const ICONIFY_AWS_MAP: Record<string, string> = {
   'sns': 'logos:aws-sns',
   's3': 'logos:aws-s3',
   'cloudfront': 'logos:aws-cloudfront',
+  'cognito': 'logos:aws-cognito',
+  'route53': 'logos:aws-route53',
+  'waf': 'logos:aws-waf',
+  'eventbridge': 'logos:aws-eventbridge',
+  'kinesis': 'logos:aws-kinesis',
+  'opensearch': 'logos:aws-opensearch',
+  'secrets-manager': 'logos:aws-secrets-manager',
+  'step-functions': 'logos:aws-step-functions',
 };
 
 export const AWSIcon: React.FC<AWSIconProps> = ({
@@ -52,7 +61,7 @@ export const AWSIcon: React.FC<AWSIconProps> = ({
     );
   }
 
-  // High-fidelity fallback SVG
+  // High-fidelity fallback SVG icons
   switch (resolvedName) {
     case 'api-gateway':
       return (
@@ -77,6 +86,7 @@ export const AWSIcon: React.FC<AWSIconProps> = ({
 
     case 'ec2':
     case 'ecs':
+    case 'eks':
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
           <rect width="24" height="24" rx="4" fill="#FF9900" fillOpacity="0.15" />
@@ -100,8 +110,8 @@ export const AWSIcon: React.FC<AWSIconProps> = ({
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
           <rect width="24" height="24" rx="4" fill="#3B82F6" fillOpacity="0.15" />
           <ellipse cx="12" cy="6" rx="7" ry="2.5" stroke="#3B82F6" strokeWidth="1.8" />
-          <path d="M5 6V12C5 13.38 8.13 14.5 12 14.5C15.87 14.5 19 13.38 19 12V6" stroke="#60A5FA" strokeWidth="1.8" />
-          <path d="M5 12V18C5 19.38 8.13 20.5 12 20.5C15.87 20.5 19 19.38 19 18V12" stroke="#93C5FD" strokeWidth="1.8" />
+          <path d="M5 6v6c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5V6" stroke="#60A5FA" strokeWidth="1.8" />
+          <path d="M5 12v6c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5v-6" stroke="#93C5FD" strokeWidth="1.8" />
         </svg>
       );
 
@@ -109,21 +119,20 @@ export const AWSIcon: React.FC<AWSIconProps> = ({
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
           <rect width="24" height="24" rx="4" fill="#3B82F6" fillOpacity="0.15" />
-          <ellipse cx="12" cy="7" rx="6" ry="2.5" stroke="#3B82F6" strokeWidth="1.8" />
-          <path d="M6 7V17C6 18.38 8.69 19.5 12 19.5C15.31 19.5 18 18.38 18 17V7" stroke="#60A5FA" strokeWidth="1.8" />
-          <path d="M12 7V19.5" stroke="#93C5FD" strokeWidth="1.5" strokeDasharray="2 2" />
+          <rect x="5" y="4" width="14" height="5" rx="1.5" stroke="#3B82F6" strokeWidth="1.8" />
+          <rect x="5" y="10" width="14" height="5" rx="1.5" stroke="#60A5FA" strokeWidth="1.8" />
+          <rect x="5" y="16" width="14" height="4" rx="1.5" stroke="#93C5FD" strokeWidth="1.8" />
         </svg>
       );
 
-    case 'elasticache':
     case 'redis':
+    case 'elasticache':
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
           <rect width="24" height="24" rx="4" fill="#EF4444" fillOpacity="0.15" />
-          <path d="M12 3L4 7.5L12 12L20 7.5L12 3Z" fill="#DC2626" fillOpacity="0.8" stroke="#EF4444" strokeWidth="1.5" />
-          <path d="M4 11.5L12 16L20 11.5" stroke="#F87171" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M4 15.5L12 20L20 15.5" stroke="#FCA5A5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="12" cy="7.5" r="1.5" fill="#FFFFFF" />
+          <path d="M12 3L4 7.5L12 12L20 7.5L12 3Z" fill="#EF4444" fillOpacity="0.4" stroke="#EF4444" strokeWidth="1.5" />
+          <path d="M4 11.5L12 16L20 11.5" stroke="#F87171" strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M4 15.5L12 20L20 15.5" stroke="#FCA5A5" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       );
 
@@ -131,10 +140,10 @@ export const AWSIcon: React.FC<AWSIconProps> = ({
     case 'sns':
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
-          <rect width="24" height="24" rx="4" fill="#EC4899" fillOpacity="0.15" />
-          <rect x="4" y="6" width="16" height="12" rx="2" stroke="#EC4899" strokeWidth="1.8" />
-          <path d="M8 10H16M8 14H13" stroke="#F472B6" strokeWidth="1.8" strokeLinecap="round" />
-          <circle cx="16" cy="14" r="1" fill="#F472B6" />
+          <rect width="24" height="24" rx="4" fill="#F97316" fillOpacity="0.15" />
+          <rect x="4" y="6" width="6" height="12" rx="1" stroke="#F97316" strokeWidth="1.8" />
+          <rect x="14" y="6" width="6" height="12" rx="1" stroke="#FB923C" strokeWidth="1.8" />
+          <path d="M10 12H14" stroke="#FDBA74" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       );
 
@@ -142,18 +151,58 @@ export const AWSIcon: React.FC<AWSIconProps> = ({
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
           <rect width="24" height="24" rx="4" fill="#10B981" fillOpacity="0.15" />
-          <path d="M4 7C4 5.9 7.58 5 12 5C16.42 5 20 5.9 20 7M4 7V17C4 18.1 7.58 19 12 19C16.42 19 20 18.1 20 17V7M4 7C4 8.1 7.58 9 12 9C16.42 9 20 8.1 20 7" stroke="#10B981" strokeWidth="1.8" />
-          <path d="M4 12C4 13.1 7.58 14 12 14C16.42 14 20 13.1 20 12" stroke="#34D399" strokeWidth="1.8" />
+          <path d="M4 7L12 3L20 7L12 11L4 7Z" stroke="#10B981" strokeWidth="1.8" strokeLinejoin="round" />
+          <path d="M4 7V17L12 21V11" stroke="#34D399" strokeWidth="1.8" strokeLinejoin="round" />
+          <path d="M20 7V17L12 21" stroke="#6EE7B7" strokeWidth="1.8" strokeLinejoin="round" />
         </svg>
       );
 
     case 'cloudfront':
+    case 'route53':
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
           <rect width="24" height="24" rx="4" fill="#8B5CF6" fillOpacity="0.15" />
           <circle cx="12" cy="12" r="8" stroke="#8B5CF6" strokeWidth="1.8" />
           <ellipse cx="12" cy="12" rx="3.5" ry="8" stroke="#A78BFA" strokeWidth="1.5" />
           <line x1="4" y1="12" x2="20" y2="12" stroke="#A78BFA" strokeWidth="1.5" />
+        </svg>
+      );
+
+    case 'cognito':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+          <rect width="24" height="24" rx="4" fill="#EC4899" fillOpacity="0.15" />
+          <circle cx="12" cy="8" r="4" stroke="#EC4899" strokeWidth="1.8" />
+          <path d="M5 19C5 15.5 8.1 14 12 14C15.9 14 19 15.5 19 19" stroke="#F472B6" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'waf':
+    case 'secrets-manager':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+          <rect width="24" height="24" rx="4" fill="#EF4444" fillOpacity="0.15" />
+          <path d="M12 3L4 6.5V11C4 16 7.4 20.3 12 21.5C16.6 20.3 20 16 20 11V6.5L12 3Z" stroke="#EF4444" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M9 12L11 14L15 10" stroke="#F87171" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+
+    case 'eventbridge':
+    case 'step-functions':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+          <rect width="24" height="24" rx="4" fill="#F59E0B" fillOpacity="0.15" />
+          <path d="M13 2L4 13H11L10 22L20 10H13L13 2Z" stroke="#F59E0B" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+
+    case 'kinesis':
+    case 'opensearch':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+          <rect width="24" height="24" rx="4" fill="#06B6D4" fillOpacity="0.15" />
+          <path d="M3 17L9 11L13 15L21 7" stroke="#06B6D4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M16 7H21V12" stroke="#22D3EE" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
 
