@@ -52,8 +52,9 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
     }
   };
 
-  // Speech recognition without interim UI flicker
+  // Speech recognition: keeps listening until user presses Stop Mic
   const accumulatedTranscriptRef = useRef('');
+  const isListeningRef = useRef(false);
 
   const startListening = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,64 +67,57 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
 
     try {
       accumulatedTranscriptRef.current = '';
+      setInput('');
+      isListeningRef.current = true;
+      setIsListening(true);
+      setMicNotice('Listening continuously... Click mic when finished to generate.');
+
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
 
-      let silenceTimer: ReturnType<typeof setTimeout> | null = null;
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        setMicNotice('Listening... Speak your architecture command.');
-      };
-
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recognition.onresult = (event: any) => {
         let transcript = '';
-        let hasFinal = false;
         for (let i = 0; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript + ' ';
-          if (event.results[i].isFinal) hasFinal = true;
         }
         const clean = transcript.trim();
         accumulatedTranscriptRef.current = clean;
-
-        // Auto-submit quickly after speech pauses (350ms if finalized sentence, 750ms if interim)
-        if (silenceTimer) clearTimeout(silenceTimer);
-        if (clean.length > 2) {
-          silenceTimer = setTimeout(() => {
-            stopListening();
-          }, hasFinal ? 350 : 750);
-        }
+        setInput(clean);
       };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recognition.onerror = (event: any) => {
-        if (silenceTimer) clearTimeout(silenceTimer);
         if (event.error !== 'no-speech') {
           console.warn('SpeechRecognition error:', event.error);
-          setIsListening(false);
-          setMicNotice(null);
         }
       };
 
       recognition.onend = () => {
-        if (silenceTimer) clearTimeout(silenceTimer);
-        setIsListening(false);
-        setMicNotice(null);
+        // Keep listening until user explicitly presses stop mic
+        if (isListeningRef.current) {
+          try {
+            recognition.start();
+          } catch (_) {
+            // Already restarted
+          }
+        }
       };
 
       recognitionRef.current = recognition;
       recognition.start();
     } catch (err) {
       console.warn('Failed to start speech recognition:', err);
+      isListeningRef.current = false;
       setIsListening(false);
       setMicNotice(null);
     }
   };
 
   const stopListening = () => {
+    isListeningRef.current = false;
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -132,7 +126,7 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
     }
     setIsListening(false);
     setMicNotice(null);
-    const spokenText = accumulatedTranscriptRef.current;
+    const spokenText = accumulatedTranscriptRef.current || input;
     if (spokenText && spokenText.trim()) {
       executeCommand(spokenText.trim());
     }
@@ -150,6 +144,7 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
     if (e) e.preventDefault();
     if (isListening) {
       stopListening();
+      return;
     }
     await executeCommand(input);
   };
@@ -204,14 +199,14 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
         </div>
 
         {isListening ? (
-          <div className="flex-1 flex items-center gap-2 py-1 select-none">
-            <div className="flex items-center gap-1">
+          <div className="flex-1 flex items-center gap-2 py-1 select-none overflow-hidden">
+            <div className="flex items-center gap-1 flex-shrink-0">
               <span className="w-1.5 h-3 bg-[#f54e00] rounded-full animate-bounce [animation-delay:-0.3s]"></span>
               <span className="w-1.5 h-4 bg-[#f54e00] rounded-full animate-bounce [animation-delay:-0.15s]"></span>
               <span className="w-1.5 h-3 bg-[#f54e00] rounded-full animate-bounce"></span>
             </div>
-            <span className="text-xs font-mono font-medium text-[#26251e]">
-              Recording voice... Click mic to generate
+            <span className="text-xs font-mono font-medium text-[#26251e] truncate">
+              {input ? input : 'Recording voice... Click mic to submit'}
             </span>
           </div>
         ) : (
