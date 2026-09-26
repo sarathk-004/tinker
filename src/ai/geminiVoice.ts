@@ -40,11 +40,13 @@ export const GEMINI_VOICES = [
 let currentAudioSource: AudioBufferSourceNode | null = null;
 let currentAudioContext: AudioContext | null = null;
 
+const audioBufferCache = new Map<string, AudioBuffer>();
+
 export function getSelectedGeminiAudioModel(): string {
-  if (typeof window === 'undefined') return 'gemini-3.8-flash-tts';
+  if (typeof window === 'undefined') return 'gemini-3.8-flash-lite-tts';
   const stored = localStorage.getItem('tinker_gemini_audio_model');
   if (stored && stored.endsWith('-tts')) return stored;
-  return 'gemini-3.8-flash-tts';
+  return 'gemini-3.8-flash-lite-tts';
 }
 
 export function setSelectedGeminiAudioModel(modelId: string): void {
@@ -64,7 +66,7 @@ export function setSelectedGeminiVoice(voiceName: string): void {
 
 /**
  * Clean text for natural speech synthesis.
- * For low latency, extracts the punchy core answer (1-2 sentences, max 35 words).
+ * For ultra-low latency, extracts the punchy core answer (first sentence, max 20 words).
  * Full explanations remain visible in the left history chat for reading.
  */
 export function cleanTextForSpeech(text: string): string {
@@ -82,14 +84,14 @@ export function cleanTextForSpeech(text: string): string {
     .replace(/\n/g, ' ')
     .trim();
 
-  // Extract first 1-2 punchy sentences (up to ~35 words) so TTS synthesizes rapidly in < 2 seconds
+  // Extract first punchy sentence (up to ~20 words) so TTS synthesizes rapidly with minimal latency
   const sentences = cleaned.match(/[^.!?]+[.!?]+/g) || [cleaned];
-  const summary = sentences.slice(0, 2).join(' ').trim();
-  const words = summary.split(/\s+/);
-  if (words.length > 35) {
-    return words.slice(0, 35).join(' ') + '.';
+  const firstSentence = (sentences[0] || cleaned).trim();
+  const words = firstSentence.split(/\s+/);
+  if (words.length > 20) {
+    return words.slice(0, 20).join(' ') + '.';
   }
-  return summary || cleaned;
+  return firstSentence;
 }
 
 /**
@@ -165,6 +167,40 @@ export async function speakWithGeminiVoice(
   // Stop any active audio
   stopVoice();
 
+  const selectedVoice = getSelectedGeminiVoice();
+  const cacheKey = `${selectedVoice}_${clean}`;
+
+  // Check in-memory audio cache for instant sub-millisecond replay
+  if (audioBufferCache.has(cacheKey)) {
+    const cachedBuffer = audioBufferCache.get(cacheKey)!;
+    const AudioCtxClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!currentAudioContext || currentAudioContext.state === 'closed') {
+      currentAudioContext = new AudioCtxClass();
+    }
+    if (currentAudioContext.state === 'suspended') {
+      await currentAudioContext.resume();
+    }
+    const source = currentAudioContext.createBufferSource();
+    source.buffer = cachedBuffer;
+
+    const biquadFilter = currentAudioContext.createBiquadFilter();
+    biquadFilter.type = 'lowpass';
+    biquadFilter.frequency.value = 14000;
+
+    const gainNode = currentAudioContext.createGain();
+    gainNode.gain.value = 1.0;
+
+    source.connect(biquadFilter);
+    biquadFilter.connect(gainNode);
+    gainNode.connect(currentAudioContext.destination);
+
+    currentAudioSource = source;
+    source.start();
+    return;
+  }
+
   const apiKey =
     localStorage.getItem('tinker_gemini_api_key') ||
     localStorage.getItem('tinker_gemini_key') ||
@@ -177,17 +213,15 @@ export async function speakWithGeminiVoice(
     return;
   }
 
-  // Only Gemini TTS audio models — primary and fallback
+  // Only Gemini TTS audio models — prioritizing lowest-latency flash-lite-tts
   const chosenModel = preferredModelId || getSelectedGeminiAudioModel();
-  const primaryModel = chosenModel.endsWith('-tts') ? chosenModel : 'gemini-3.8-flash-tts';
+  const primaryModel = chosenModel.endsWith('-tts') ? chosenModel : 'gemini-3.8-flash-lite-tts';
   const modelCandidates = [
     primaryModel,
-    'gemini-3.8-flash-tts',
     'gemini-3.8-flash-lite-tts',
+    'gemini-3.8-flash-tts',
     'gemini-3.1-flash-tts-preview',
   ].filter((v, i, a) => a.indexOf(v) === i && v.endsWith('-tts'));
-
-  const selectedVoice = getSelectedGeminiVoice();
 
   for (const model of modelCandidates) {
     try {
@@ -253,6 +287,12 @@ export async function speakWithGeminiVoice(
           currentAudioContext,
           sampleRate
         );
+
+        // Cache buffer in memory for instant reuse
+        if (audioBufferCache.size > 50) {
+          audioBufferCache.clear();
+        }
+        audioBufferCache.set(cacheKey, audioBuffer);
 
         const source = currentAudioContext.createBufferSource();
         source.buffer = audioBuffer;

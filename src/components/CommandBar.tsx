@@ -32,11 +32,13 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
   const executeCommand = async (commandText: string) => {
     if (!commandText.trim() || loading) return;
     setLoading(true);
+    setMicNotice(`Thinking with Gemini 3.8 Flash...`);
 
     try {
       const result = await processArchitectureInstruction(commandText.trim());
       if (result.success) {
         setInput('');
+        setMicNotice(null);
       } else if (result.error) {
         setMicNotice(result.error);
         setTimeout(() => setMicNotice(null), 3500);
@@ -87,12 +89,12 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
         const clean = transcript.trim();
         accumulatedTranscriptRef.current = clean;
 
-        // Auto-submit after 1.1s of silence (or 800ms if finalized), avoiding 10-20s pauses
+        // Auto-submit quickly after speech pauses (350ms if finalized sentence, 750ms if interim)
         if (silenceTimer) clearTimeout(silenceTimer);
         if (clean.length > 2) {
           silenceTimer = setTimeout(() => {
             stopListening();
-          }, hasFinal ? 800 : 1200);
+          }, hasFinal ? 350 : 750);
         }
       };
 

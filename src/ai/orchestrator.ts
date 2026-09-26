@@ -116,11 +116,9 @@ async function callGeminiAPI(
   edges: Array<{ source: string; target: string }>
 ): Promise<ExecutionResult> {
   const candidateModels = [
-    (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_MODEL : ''),
+    (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_MODEL : '') || 'gemini-3.8-flash',
     'gemini-3.8-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-  ].filter(Boolean) as string[];
+  ].filter((v, i, a) => Boolean(v) && a.indexOf(v) === i) as string[];
 
   const systemPrompt = buildSystemPrompt({ nodes, edges });
   const history = useConversationStore.getState().getHistory();
@@ -132,6 +130,13 @@ async function callGeminiAPI(
     contents,
     systemInstruction: {
       parts: [{ text: systemPrompt }],
+    },
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 300,
+      thinkingConfig: {
+        thinkingBudget: 0,
+      },
     },
     tools: [
       {

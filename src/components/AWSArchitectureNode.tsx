@@ -90,8 +90,8 @@ export const AWSArchitectureNode: React.FC<NodeProps<DiagramNode>> = memo(({ dat
 
       <div className="flex items-center gap-3">
         {/* AWS Icon Container */}
-        <div className="flex-shrink-0 p-2 rounded-md bg-[#fafaf7] border border-[#e6e5e0] group-hover:border-[#cfcdc4] transition-colors">
-          <AWSIcon name={awsIcon} type={type} size={24} />
+        <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 p-1.5 rounded-md bg-[#fafaf7] border border-[#e6e5e0] group-hover:border-[#cfcdc4] transition-colors">
+          <AWSIcon name={awsIcon} type={type} size={26} />
         </div>
 
         {/* Node Labels */}
