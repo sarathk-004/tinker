@@ -26,12 +26,17 @@ export const App: React.FC = () => {
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      <main className="relative flex-1 w-full h-full overflow-hidden">
+      <div className="flex flex-1 w-full h-[calc(100vh-3.5rem)] overflow-hidden relative">
+        {/* Left Resizable Non-Overlapping Sidechat & Advisor */}
         <SidebarPanel />
-        <DiagramCanvas />
-        <ManualToolbar />
-        <CommandBar onOpenSettings={() => setSettingsOpen(true)} />
-      </main>
+
+        {/* Diagram Area - flex-1 adapts to remaining width with zero overlap */}
+        <main className="relative flex-1 h-full overflow-hidden bg-[#f7f7f4]">
+          <DiagramCanvas />
+          <ManualToolbar />
+          <CommandBar onOpenSettings={() => setSettingsOpen(true)} />
+        </main>
+      </div>
 
       <SettingsModal
         isOpen={settingsOpen}

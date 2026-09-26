@@ -42,7 +42,9 @@ let currentAudioContext: AudioContext | null = null;
 
 export function getSelectedGeminiAudioModel(): string {
   if (typeof window === 'undefined') return 'gemini-3.8-flash-tts';
-  return localStorage.getItem('tinker_gemini_audio_model') || 'gemini-3.8-flash-tts';
+  const stored = localStorage.getItem('tinker_gemini_audio_model');
+  if (stored && stored.endsWith('-tts')) return stored;
+  return 'gemini-3.8-flash-tts';
 }
 
 export function setSelectedGeminiAudioModel(modelId: string): void {
@@ -61,11 +63,13 @@ export function setSelectedGeminiVoice(voiceName: string): void {
 }
 
 /**
- * Clean text for natural speech synthesis
+ * Clean text for natural speech synthesis.
+ * For low latency, extracts the punchy core answer (1-2 sentences, max 35 words).
+ * Full explanations remain visible in the left history chat for reading.
  */
 export function cleanTextForSpeech(text: string): string {
   if (!text) return '';
-  return text
+  const cleaned = text
     .replace(/```[\s\S]*?```/g, '') // Remove code blocks
     .replace(/`([^`]+)`/g, '$1') // Inline code
     .replace(/\*\*([^*]+)\*\*/g, '$1') // Bold
@@ -77,6 +81,15 @@ export function cleanTextForSpeech(text: string): string {
     .replace(/\n{2,}/g, '. ') // Paragraphs to pause
     .replace(/\n/g, ' ')
     .trim();
+
+  // Extract first 1-2 punchy sentences (up to ~35 words) so TTS synthesizes rapidly in < 2 seconds
+  const sentences = cleaned.match(/[^.!?]+[.!?]+/g) || [cleaned];
+  const summary = sentences.slice(0, 2).join(' ').trim();
+  const words = summary.split(/\s+/);
+  if (words.length > 35) {
+    return words.slice(0, 35).join(' ') + '.';
+  }
+  return summary || cleaned;
 }
 
 /**
@@ -164,14 +177,15 @@ export async function speakWithGeminiVoice(
     return;
   }
 
-  // Only Gemini models — primary and fallback
-  const primaryModel = preferredModelId || getSelectedGeminiAudioModel();
+  // Only Gemini TTS audio models — primary and fallback
+  const chosenModel = preferredModelId || getSelectedGeminiAudioModel();
+  const primaryModel = chosenModel.endsWith('-tts') ? chosenModel : 'gemini-3.8-flash-tts';
   const modelCandidates = [
     primaryModel,
     'gemini-3.8-flash-tts',
     'gemini-3.8-flash-lite-tts',
     'gemini-3.1-flash-tts-preview',
-  ].filter((v, i, a) => a.indexOf(v) === i);
+  ].filter((v, i, a) => a.indexOf(v) === i && v.endsWith('-tts'));
 
   const selectedVoice = getSelectedGeminiVoice();
 

@@ -69,22 +69,36 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
       recognition.interimResults = true;
       recognition.lang = 'en-US';
 
+      let silenceTimer: ReturnType<typeof setTimeout> | null = null;
+
       recognition.onstart = () => {
         setIsListening(true);
-        setMicNotice('Listening... Speak your architecture command. Click mic to finish.');
+        setMicNotice('Listening... Speak your architecture command.');
       };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recognition.onresult = (event: any) => {
         let transcript = '';
+        let hasFinal = false;
         for (let i = 0; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript + ' ';
+          if (event.results[i].isFinal) hasFinal = true;
         }
-        accumulatedTranscriptRef.current = transcript.trim();
+        const clean = transcript.trim();
+        accumulatedTranscriptRef.current = clean;
+
+        // Auto-submit after 1.1s of silence (or 800ms if finalized), avoiding 10-20s pauses
+        if (silenceTimer) clearTimeout(silenceTimer);
+        if (clean.length > 2) {
+          silenceTimer = setTimeout(() => {
+            stopListening();
+          }, hasFinal ? 800 : 1200);
+        }
       };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recognition.onerror = (event: any) => {
+        if (silenceTimer) clearTimeout(silenceTimer);
         if (event.error !== 'no-speech') {
           console.warn('SpeechRecognition error:', event.error);
           setIsListening(false);
@@ -93,6 +107,7 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
       };
 
       recognition.onend = () => {
+        if (silenceTimer) clearTimeout(silenceTimer);
         setIsListening(false);
         setMicNotice(null);
       };

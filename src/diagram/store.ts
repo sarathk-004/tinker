@@ -103,6 +103,34 @@ export function inferAWSDetails(name: string, explicitType?: SystemNodeType): {
   };
 }
 
+function getNodeArchitecturalRank(node?: DiagramNode): number {
+  if (!node) return 99;
+  const type = node.data.type;
+  const icon = (node.data.awsIcon || '').toLowerCase();
+  const label = (node.data.label || '').toLowerCase();
+
+  // 1. Client / Ingress consumer
+  if (type === 'client' || label.includes('client') || label.includes('user') || label.includes('browser') || label.includes('mobile')) return 1;
+  // 2. DNS & Edge CDN
+  if (icon === 'route53' || icon === 'waf' || icon === 'cloudfront') return 2;
+  // 3. Reverse Proxies & Gateways
+  if (type === 'gateway' || icon === 'api-gateway' || icon === 'alb') return 3;
+  // 4. Authentication / Security
+  if (icon === 'cognito' || label.includes('auth') || label.includes('jwt') || label.includes('login')) return 4;
+  // 5. Compute & Business microservices
+  if (type === 'service' || icon === 'lambda' || icon === 'ec2' || icon === 'ecs' || icon === 'eks') return 5;
+  // 6. Caching Layer (fast path before DB)
+  if (type === 'cache' || icon === 'redis' || icon === 'elasticache') return 6;
+  // 7. Relational / Primary DB persistence
+  if (type === 'database' || icon === 'rds' || icon === 'dynamodb') return 7;
+  // 8. Event Streaming & Buffering Queues
+  if (type === 'queue' || icon === 'sqs' || icon === 'sns' || icon === 'eventbridge' || icon === 'kinesis') return 8;
+  // 9. Object Storage & Search
+  if (type === 'storage' || icon === 's3' || icon === 'opensearch' || icon === 'secrets-manager') return 9;
+
+  return 10;
+}
+
 export const useDiagramStore = create<DiagramState>((set, get) => {
   const pushHistory = () => {
     const currentSnapshot = {
@@ -540,7 +568,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
       });
     },
 
-    // Step-by-step packet animation: lights up nodes one after the other across the flow
+    // Logical packet animation: traces realistic architectural pipeline from Ingress -> Services -> DB/Cache
     playFlow: async (sequence?: string[]) => {
       const nodes = get().nodes;
       const edges = get().edges;
@@ -548,12 +576,34 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
 
       set({ isPlayingFlow: true });
 
-      // Determine traversal sequence
-      let order: string[] = [];
+      interface FlowStep {
+        nodeId: string;
+        edgeId?: string;
+        label: string;
+      }
+
+      const steps: FlowStep[] = [];
+
       if (sequence && sequence.length > 0) {
-        order = sequence.map(sanitizeId);
+        for (let i = 0; i < sequence.length; i++) {
+          const nid = sanitizeId(sequence[i]);
+          const prevNid = i > 0 ? sanitizeId(sequence[i - 1]) : undefined;
+          const connectingEdge = prevNid
+            ? edges.find(
+                (e) => (e.source === prevNid && e.target === nid) || (e.source === nid && e.target === prevNid)
+              )
+            : undefined;
+          const node = nodes.find((n) => n.id === nid);
+          if (node) {
+            steps.push({
+              nodeId: nid,
+              edgeId: connectingEdge?.id,
+              label: node.data.label || nid,
+            });
+          }
+        }
       } else {
-        // Build sequence starting from root nodes (nodes with 0 incoming edges)
+        // Build sequence using architectural logic
         const incomingCount: Record<string, number> = {};
         nodes.forEach((n) => {
           incomingCount[n.id] = 0;
@@ -562,28 +612,88 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
           if (incomingCount[e.target] !== undefined) incomingCount[e.target]++;
         });
 
-        const roots = nodes.filter((n) => incomingCount[n.id] === 0).map((n) => n.id);
-        const queue = roots.length > 0 ? [...roots] : [nodes[0].id];
-        const visited = new Set<string>();
+        // Rank roots: in-degree 0 nodes first, sorted by architectural entry rank
+        const roots = nodes.filter((n) => incomingCount[n.id] === 0);
+        roots.sort((a, b) => getNodeArchitecturalRank(a) - getNodeArchitecturalRank(b));
 
-        while (queue.length > 0) {
-          const curr = queue.shift()!;
-          if (!visited.has(curr)) {
-            visited.add(curr);
-            order.push(curr);
-            const nextNodes = edges.filter((e) => e.source === curr).map((e) => e.target);
-            queue.push(...nextNodes);
+        const orderedRoots =
+          roots.length > 0
+            ? roots
+            : [...nodes].sort((a, b) => getNodeArchitecturalRank(a) - getNodeArchitecturalRank(b));
+
+        const visitedNodes = new Set<string>();
+        const visitedEdges = new Set<string>();
+
+        const traverse = (nodeId: string, fromEdgeId?: string) => {
+          if (visitedNodes.has(nodeId)) return;
+          visitedNodes.add(nodeId);
+
+          const node = nodes.find((n) => n.id === nodeId);
+          if (node) {
+            steps.push({
+              nodeId,
+              edgeId: fromEdgeId,
+              label: node.data.label || nodeId,
+            });
           }
-        }
+
+          // Outgoing edges from this node
+          const outgoing = edges.filter((e) => e.source === nodeId && !visitedEdges.has(e.id));
+          // Sort outgoing edges by the target node's architectural priority (Auth -> Service -> Cache -> DB -> Queue)
+          outgoing.sort((a, b) => {
+            const targetA = nodes.find((n) => n.id === a.target);
+            const targetB = nodes.find((n) => n.id === b.target);
+            return getNodeArchitecturalRank(targetA) - getNodeArchitecturalRank(targetB);
+          });
+
+          for (const edge of outgoing) {
+            visitedEdges.add(edge.id);
+            traverse(edge.target, edge.id);
+          }
+        };
+
+        orderedRoots.forEach((r) => traverse(r.id));
       }
 
-      // Step-by-step sequential illumination
-      for (let i = 0; i < order.length; i++) {
-        const activeNodeId = order[i];
-        const activePathSoFar = order.slice(0, i + 1);
+      if (steps.length === 0) {
+        set({ isPlayingFlow: false });
+        return;
+      }
 
+      // Step-by-step visual animation
+      const activePathSoFar: string[] = [];
+      const activeEdgesSoFar: string[] = [];
+
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+        activePathSoFar.push(step.nodeId);
+        if (step.edgeId) {
+          activeEdgesSoFar.push(step.edgeId);
+        }
+
+        // Pulse edge first if connecting edge exists
+        if (step.edgeId) {
+          const pulseEdges = get().edges.map((e) => {
+            const isThisEdge = e.id === step.edgeId;
+            const isHistorical = activeEdgesSoFar.includes(e.id);
+            return {
+              ...e,
+              animated: true,
+              style: {
+                ...e.style,
+                stroke: isThisEdge ? '#f54e00' : isHistorical ? '#26251e' : '#cfcdc4',
+                strokeWidth: isThisEdge ? 3 : isHistorical ? 2 : 1.2,
+                opacity: isThisEdge ? 1 : isHistorical ? 0.7 : 0.2,
+              },
+            };
+          });
+          set({ edges: pulseEdges });
+          await new Promise((r) => setTimeout(r, 160));
+        }
+
+        // Light up node
         const stepNodes = get().nodes.map((node) => {
-          const isCurrent = node.id === activeNodeId;
+          const isCurrent = node.id === step.nodeId;
           const isPassed = activePathSoFar.includes(node.id);
           return {
             ...node,
@@ -595,33 +705,38 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
           };
         });
 
-        const stepEdges = get().edges.map((edge) => {
-          const isTraversed =
-            activePathSoFar.includes(edge.source) && activePathSoFar.includes(edge.target);
+        const stepEdges = get().edges.map((e) => {
+          const isThisEdge = e.id === step.edgeId;
+          const isHistorical = activeEdgesSoFar.includes(e.id);
           return {
-            ...edge,
-            animated: isTraversed,
+            ...e,
+            animated: true,
             style: {
-              ...edge.style,
-              stroke: isTraversed ? '#f54e00' : '#cfcdc4',
-              strokeWidth: isTraversed ? 2.5 : 1.5,
-              opacity: isTraversed ? 1 : 0.25,
+              ...e.style,
+              stroke: isThisEdge ? '#f54e00' : isHistorical ? '#26251e' : '#cfcdc4',
+              strokeWidth: isThisEdge ? 3 : isHistorical ? 2 : 1.2,
+              opacity: isThisEdge ? 1 : isHistorical ? 0.8 : 0.2,
             },
           };
         });
 
+        const prevLabel = i > 0 ? steps[i - 1].label : '';
+        const actionLabel = prevLabel
+          ? `Flow: ${prevLabel} ➔ ${step.label}`
+          : `Flow Ingress: ${step.label}`;
+
         set({
           nodes: stepNodes,
           edges: stepEdges,
-          highlightedIds: activePathSoFar,
-          activeAction: `Flow step ${i + 1}/${order.length}: ${activeNodeId}`,
+          highlightedIds: [...activePathSoFar],
+          activeAction: actionLabel,
         });
 
-        await new Promise((resolve) => setTimeout(resolve, 550));
+        await new Promise((resolve) => setTimeout(resolve, 440));
       }
 
-      // Hold final state briefly, then return to normal
-      await new Promise((resolve) => setTimeout(resolve, 900));
+      // Hold final complete pipeline illuminated briefly
+      await new Promise((resolve) => setTimeout(resolve, 1100));
       get().clearHighlight();
       set({ isPlayingFlow: false });
     },
