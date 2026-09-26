@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Key, X, Check, ExternalLink, ShieldCheck, Eye, EyeOff, Clipboard, Trash2, Volume2, Sparkles } from 'lucide-react';
-import { GEMINI_AUDIO_MODELS, getSelectedGeminiAudioModel, setSelectedGeminiAudioModel, speakWithGeminiVoice } from '../ai/geminiVoice';
+import {
+  GEMINI_AUDIO_MODELS,
+  GEMINI_VOICES,
+  getSelectedGeminiAudioModel,
+  setSelectedGeminiAudioModel,
+  getSelectedGeminiVoice,
+  setSelectedGeminiVoice,
+  speakWithGeminiVoice,
+} from '../ai/geminiVoice';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -11,7 +19,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.0-flash');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-3.8-flash-tts');
+  const [selectedVoice, setSelectedVoiceState] = useState<string>('Kore');
   const [testStatus, setTestStatus] = useState<{ testing: boolean; message?: string; success?: boolean }>({
     testing: false,
   });
@@ -24,8 +33,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_API_KEY : '') ||
         '';
       const storedModel = getSelectedGeminiAudioModel();
+      const storedVoice = getSelectedGeminiVoice();
       setApiKey(stored);
       setSelectedModel(storedModel);
+      setSelectedVoiceState(storedVoice);
       setSaved(false);
       setTestStatus({ testing: false });
     }
@@ -52,7 +63,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
     setTestStatus({ testing: true, message: 'Verifying with Google Gemini API...' });
 
-    const candidateModels = [selectedModel, 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    const candidateModels = [selectedModel, 'gemini-3.8-flash', 'gemini-3.8-flash-tts'];
     let verifiedModel = '';
 
     for (const model of candidateModels) {
@@ -94,12 +105,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
   const handleTestVoice = async () => {
     setSelectedGeminiAudioModel(selectedModel);
+    setSelectedGeminiVoice(selectedVoice);
     if (apiKey.trim()) {
       localStorage.setItem('tinker_gemini_api_key', apiKey.trim());
       localStorage.setItem('tinker_gemini_key', apiKey.trim());
     }
     await speakWithGeminiVoice(
-      `Gemini Voice model ${selectedModel} is configured and active for your system design workspace.`,
+      `Hello! This is Gemini's natural voice, using the ${selectedVoice} model profile.`,
       selectedModel
     );
   };
@@ -123,6 +135,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       localStorage.removeItem('tinker_gemini_key');
     }
     setSelectedGeminiAudioModel(selectedModel);
+    setSelectedGeminiVoice(selectedVoice);
     setSaved(true);
     window.dispatchEvent(new Event('storage'));
     setTimeout(() => {
@@ -137,7 +150,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-white border border-[#e6e5e0] rounded-lg p-6 relative select-text"
+        className="w-full max-w-md bg-white border border-[#e6e5e0] rounded-lg p-6 relative select-text max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -154,9 +167,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           </div>
           <div>
             <h3 className="text-base font-normal tracking-[-0.3px] text-[#26251e]">
-              Gemini Audio & Model Configuration
+              Gemini Voice & API Configuration
             </h3>
-            <p className="text-xs text-[#5a5852]">Native multimodal speech & live reasoning</p>
+            <p className="text-xs text-[#5a5852]">Pure Gemini Multimodal Voice Synthesis</p>
           </div>
         </div>
 
@@ -209,7 +222,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             </div>
 
             <div className="flex items-center justify-between text-[11px] text-[#5a5852] mt-2">
-              <span>Key is stored locally in your browser.</span>
+              <span>Using API key from .env file or local storage.</span>
               <a
                 href="https://aistudio.google.com/app/apikey"
                 target="_blank"
@@ -233,61 +246,96 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             )}
           </div>
 
-          {/* Gemini Voice / Audio Model Selector */}
+          {/* Gemini Voice Persona Picker (Kore, Puck, Fenrir) */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-mono font-medium text-[#5a5852] uppercase tracking-wider">
-                Gemini Audio / Voice Model
+                Gemini Voice Tone
               </label>
-              <span className="text-[10px] font-mono text-[#807d72]">Multimodal Speech Output</span>
+              <span className="text-[10px] font-mono text-[#807d72]">Soft & Natural</span>
             </div>
-            <div className="grid grid-cols-1 gap-2">
-              {GEMINI_AUDIO_MODELS.map((m) => (
+            <div className="grid grid-cols-1 gap-1.5">
+              {GEMINI_VOICES.map((v) => (
                 <button
-                  key={m.id}
+                  key={v.id}
                   type="button"
-                  onClick={() => setSelectedModel(m.id)}
+                  onClick={() => setSelectedVoiceState(v.id)}
                   className={`p-2.5 rounded-md border text-left transition-all ${
-                    selectedModel === m.id
-                      ? 'bg-[#fafaf7] border-[#26251e] shadow-sm'
+                    selectedVoice === v.id
+                      ? 'bg-[#fafaf7] border-[#26251e] shadow-xs'
                       : 'bg-white border-[#e6e5e0] hover:border-[#cfcdc4]'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-xs text-[#26251e] flex items-center gap-1.5">
                       <Sparkles className="w-3 h-3 text-[#f54e00]" />
-                      {m.name}
+                      {v.name}
                     </span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#e6e5e0] text-[#26251e]">
-                      {m.tag}
-                    </span>
+                    {selectedVoice === v.id && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-[#f54e00]/15 text-[#f54e00]">
+                        Active
+                      </span>
+                    )}
                   </div>
-                  <p className="text-[11px] text-[#5a5852] mt-1 leading-snug">{m.description}</p>
+                  <p className="text-[11px] text-[#5a5852] mt-0.5">{v.description}</p>
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Gemini Voice Model Selector */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-mono font-medium text-[#5a5852] uppercase tracking-wider">
+                Audio Engine Model
+              </label>
+              <span className="text-[10px] font-mono text-[#807d72]">Gemini Only</span>
+            </div>
+            <div className="grid grid-cols-1 gap-1.5">
+              {GEMINI_AUDIO_MODELS.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setSelectedModel(m.id)}
+                  className={`p-2 rounded-md border text-left transition-all ${
+                    selectedModel === m.id
+                      ? 'bg-[#fafaf7] border-[#26251e] shadow-xs'
+                      : 'bg-white border-[#e6e5e0] hover:border-[#cfcdc4]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-xs text-[#26251e]">{m.name}</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-[#e6e5e0] text-[#26251e]">
+                      {m.tag}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#5a5852] mt-0.5 leading-snug">{m.description}</p>
+                </button>
+              ))}
+            </div>
+
             <button
               type="button"
               onClick={handleTestVoice}
-              className="mt-2 text-[11px] text-[#f54e00] hover:underline flex items-center gap-1.5 font-medium font-mono"
+              className="mt-2.5 text-[11px] text-[#f54e00] hover:underline flex items-center gap-1.5 font-medium font-mono"
             >
-              <Volume2 className="w-3.5 h-3.5" /> Test Gemini Audio Voice
+              <Volume2 className="w-3.5 h-3.5" /> Play Voice Sample ({selectedVoice})
             </button>
           </div>
 
-          {/* Offline / Local Rule Engine Notice */}
-          <div className="p-3 rounded-md bg-[#fafaf7] border border-[#e6e5e0] text-xs text-[#5a5852] space-y-1">
+          {/* Guarantee Box */}
+          <div className="p-2.5 rounded-md bg-[#fafaf7] border border-[#e6e5e0] text-xs text-[#5a5852] space-y-1">
             <div className="flex items-center gap-2 font-medium text-[#26251e]">
               <ShieldCheck className="w-4 h-4 text-[#1f8a65]" />
-              <span>Offline Architecture Engine Active</span>
+              <span>Strict Gemini Audio Only</span>
             </div>
             <p className="text-[#5a5852] text-[11px] leading-relaxed">
-              If an API key is not entered, Tinker runs on its built-in local rule engine for zero-dependency operation.
+              Robotic OS and Microsoft browser voices are completely disabled. All speech is synthesized directly by Google Gemini's audio models.
             </p>
           </div>
 
           {/* Bottom Actions */}
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-2 border-t border-[#e6e5e0]">
             <button
               type="button"
               onClick={handleTestKey}
@@ -308,7 +356,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               <button
                 type="button"
                 onClick={handleSave}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-white bg-[#f54e00] hover:bg-[#d04200] rounded-md transition-all"
+                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-white bg-[#f54e00] hover:bg-[#d04200] rounded-md transition-all shadow-xs"
               >
                 {saved ? (
                   <>
