@@ -70,17 +70,47 @@ export function inferAWSDetails(name: string, explicitType?: SystemNodeType): {
   };
 }
 
-export const useDiagramStore = create<DiagramState>((set, get) => ({
-  nodes: [],
-  edges: [],
-  highlightedIds: [],
-  activeAction: null,
+export const useDiagramStore = create<DiagramState>((set, get) => {
+  const pushHistory = () => {
+    const currentSnapshot = {
+      nodes: JSON.parse(JSON.stringify(get().nodes)),
+      edges: JSON.parse(JSON.stringify(get().edges)),
+    };
+    set((state) => ({
+      history: [...state.history.slice(-30), currentSnapshot],
+    }));
+  };
 
-  setNodes: (nodes) => set({ nodes }),
-  setEdges: (edges) => set({ edges }),
+  return {
+    nodes: [],
+    edges: [],
+    highlightedIds: [],
+    activeAction: null,
+    history: [],
 
-  addNode: ({ id, label, type, awsIcon, subType, description }) => {
-    const cleanLabel = sanitizeLabel(label);
+    setNodes: (nodes) => set({ nodes }),
+    setEdges: (edges) => set({ edges }),
+
+    undo: () => {
+      const hist = get().history;
+      if (hist.length === 0) return;
+      const previous = hist[hist.length - 1];
+      const newHist = hist.slice(0, -1);
+      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+        previous.nodes,
+        previous.edges
+      );
+      set({
+        nodes: layoutedNodes,
+        edges: layoutedEdges,
+        history: newHist,
+        activeAction: 'Undid previous action',
+      });
+    },
+
+    addNode: ({ id, label, type, awsIcon, subType, description }) => {
+      pushHistory();
+      const cleanLabel = sanitizeLabel(label);
     const inferred = inferAWSDetails(cleanLabel, type);
     const resolvedType = type || inferred.type;
     const resolvedIcon = awsIcon || inferred.awsIcon;
@@ -124,6 +154,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   removeNode: (id: string, options?: { reconnectBridge?: boolean }) => {
+    pushHistory();
     const reconnect = options?.reconnectBridge ?? true;
     const targetId = sanitizeId(id);
 
@@ -184,7 +215,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     });
   },
 
-  connect: (source: string, target: string, label?: string) => {
+  connect: (source: string, target: string, label?: string, bidirectional?: boolean) => {
+    pushHistory();
     const srcId = sanitizeId(source);
     const tgtId = sanitizeId(target);
 
@@ -206,6 +238,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       ? `e_${srcId}_${tgtId}_${Date.now()}`
       : `e_${srcId}_${tgtId}`;
 
+    const isBi = Boolean(bidirectional);
+
     const newEdge: DiagramEdge = {
       id: edgeId,
       source: srcId,
@@ -214,6 +248,16 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       type: hasReverse || hasParallel ? 'default' : 'smoothstep',
       animated: true,
       style: { stroke: '#FF9900', strokeWidth: 2.2 },
+      ...(isBi
+        ? {
+            markerStart: {
+              type: MarkerType.ArrowClosed,
+              width: 18,
+              height: 18,
+              color: '#FF9900',
+            },
+          }
+        : {}),
       markerEnd: {
         type: MarkerType.ArrowClosed,
         width: 18,
@@ -236,6 +280,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   disconnect: (source: string, target: string) => {
+    pushHistory();
     const srcId = sanitizeId(source);
     const tgtId = sanitizeId(target);
 
@@ -260,6 +305,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   renameNode: (id: string, newLabel: string) => {
+    pushHistory();
     const targetId = sanitizeId(id);
     const inferred = inferAWSDetails(newLabel);
 
@@ -285,6 +331,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   insertBetween: (source: string, target: string, node) => {
+    pushHistory();
     const srcId = sanitizeId(source);
     const tgtId = sanitizeId(target);
     const cleanLabel = sanitizeLabel(node.label);
@@ -426,6 +473,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   reset: () => {
+    pushHistory();
     set({
       nodes: [],
       edges: [],
@@ -445,4 +493,5 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       edges: layoutedEdges,
     });
   },
-}));
+};
+});

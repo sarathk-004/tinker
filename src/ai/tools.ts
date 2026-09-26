@@ -60,6 +60,10 @@ export const DIAGRAM_TOOLS = [
           type: 'STRING',
           description: 'Optional label on the connection (e.g., "HTTPS", "gRPC", "reads/writes", "async").',
         },
+        bidirectional: {
+          type: 'BOOLEAN',
+          description: 'Set to true if data flows both ways or connection is bidirectional (adds reverse arrow).',
+        },
       },
       required: ['source', 'target'],
     },
@@ -156,6 +160,25 @@ export const DIAGRAM_TOOLS = [
     parameters: {
       type: 'OBJECT',
       properties: {},
+    },
+  },
+  {
+    name: 'explainOrAnswer',
+    description: 'Provide an architectural explanation, blast radius analysis (e.g. "What happens if Auth goes down?"), data flow walk-through, or simplify the system for a non-technical person.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        explanation: {
+          type: 'STRING',
+          description: 'Clear, concise, professional spoken architectural answer or explanation.',
+        },
+        highlightNodeIds: {
+          type: 'ARRAY',
+          items: { type: 'STRING' },
+          description: 'Optional list of node ids involved in the explanation to highlight on the diagram.',
+        },
+      },
+      required: ['explanation'],
     },
   },
 ];

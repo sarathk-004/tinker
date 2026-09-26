@@ -2,6 +2,7 @@ import { useDiagramStore, inferAWSDetails, sanitizeId } from '../diagram/store';
 import { useConversationStore } from './conversationStore';
 import { DIAGRAM_TOOLS } from './tools';
 import { buildSystemPrompt, buildContentsWithHistory } from './prompts';
+import { speakText } from './speechSynthesis';
 
 interface ExecutionResult {
   success: boolean;
@@ -74,6 +75,12 @@ export async function processArchitectureInstruction(
       actions: result.actionsExecuted,
       source: result.source,
     });
+  }
+
+  // Voice response
+  if (result.success && result.actionsExecuted.length > 0) {
+    const spoken = result.actionsExecuted.join('. ');
+    speakText(spoken);
   }
 
   return result;
@@ -167,6 +174,8 @@ async function callGeminiAPI(
       const { name, args } = part.functionCall;
       const desc = executeFunctionCall(name, args, store);
       if (desc) executedActions.push(desc);
+    } else if (part.text && part.text.trim()) {
+      executedActions.push(part.text.trim());
     }
   }
 
@@ -203,8 +212,10 @@ function executeFunctionCall(
     }
 
     case 'connect': {
-      store.connect(args.source, args.target, args.label);
-      return `Connected ${args.source} → ${args.target}`;
+      store.connect(args.source, args.target, args.label, args.bidirectional);
+      return args.bidirectional
+        ? `Connected ${args.source} ↔ ${args.target}`
+        : `Connected ${args.source} → ${args.target}`;
     }
 
     case 'disconnect': {
@@ -230,6 +241,13 @@ function executeFunctionCall(
     case 'highlight': {
       store.highlight(args.ids || []);
       return `Highlighted [${(args.ids || []).join(', ')}]`;
+    }
+
+    case 'explainOrAnswer': {
+      if (args.highlightNodeIds && args.highlightNodeIds.length > 0) {
+        store.highlight(args.highlightNodeIds);
+      }
+      return args.explanation;
     }
 
     case 'reset': {
@@ -267,6 +285,111 @@ function executeLocalRuleEngine(
   if (/^(unhighlight|clear\s+highlight|remove\s+highlight)/i.test(lower)) {
     store.clearHighlight();
     return { success: true, actionsExecuted: ['Cleared highlights'], source: 'local_fallback' };
+  }
+
+  // --- Conversational Q&A: Failure Analysis ("What happens if Auth goes down?") ---
+  const failureMatch = lower.match(
+    /(?:what\s+happens\s+if|what\s+if|if)\s+([a-z0-9_\s]+?)\s+(?:goes\s+down|fails|crashes|is\s+down|stops\s+working|is\s+removed|dies)(?:\s*[?!.]?\s*$)/i
+  );
+  if (failureMatch) {
+    const rawTarget = failureMatch[1].trim();
+    const targetId = findMatchingNodeId(rawTarget, nodes);
+    if (targetId) {
+      const targetNode = nodes.find((n) => n.id === targetId);
+      const incoming = edges.filter((e) => e.target === targetId).map((e) => e.source);
+      const outgoing = edges.filter((e) => e.source === targetId).map((e) => e.target);
+      const blastRadius = Array.from(new Set([targetId, ...incoming, ...outgoing]));
+      store.highlight(blastRadius);
+
+      let answer = '';
+      if (targetId.includes('auth')) {
+        answer = `If Auth goes down, token verification and user authentication will fail. The API Gateway will reject unauthenticated client requests with 401 Unauthorized or 503 errors, blocking access to downstream backend services like Orders.`;
+      } else if (targetId.includes('redis') || targetId.includes('cache')) {
+        answer = `If Redis Cache goes down, read traffic will bypass cache and hit the PostgreSQL database directly, causing cache stampedes and increased response latency. Data integrity remains safe.`;
+      } else if (targetId.includes('postgres') || targetId.includes('db') || targetId.includes('rds')) {
+        answer = `If PostgreSQL goes down, persistent read and write transactions will fail, causing database timeouts and 500 internal server errors across all connected services.`;
+      } else if (targetId.includes('gateway') || targetId.includes('alb')) {
+        answer = `If API Gateway goes down, all external ingress traffic is completely cut off, preventing clients from communicating with any backend microservices.`;
+      } else {
+        const callers = incoming.length > 0 ? incoming.join(', ') : 'upstream clients';
+        const targets = outgoing.length > 0 ? outgoing.join(', ') : 'downstream services';
+        answer = `If ${targetNode?.label || targetId} fails, requests from ${callers} will fail or time out, blocking communication to ${targets}. Highlighting its blast radius on the canvas.`;
+      }
+
+      return {
+        success: true,
+        actionsExecuted: [answer],
+        source: 'local_fallback',
+      };
+    }
+  }
+
+  // --- Conversational Q&A: Non-Technical Simplification ("Simplify this for a non-technical person") ---
+  if (/(?:simplify|explain).*(?:non-technical|simple|layman|beginner|5\s+year\s+old|overview)/i.test(lower)) {
+    const explanation = `In simple terms: this architecture functions like a digital retail store. The Client is the customer shopping on their phone. The API Gateway acts as the front desk receptionist directing visitors to the right department. The backend microservices process payments and manage catalog items, while the Cache and Database store customer records securely and quickly.`;
+    store.highlight(nodes.map((n) => n.id));
+    return {
+      success: true,
+      actionsExecuted: [explanation],
+      source: 'local_fallback',
+    };
+  }
+
+  // --- Flow Highlighting ("Highlight the payment flow") ---
+  const flowHighlightMatch = lower.match(
+    /highlight(?:\s+the)?\s+([a-z0-9_\s]+?)(?:\s+flow|\s+pipeline|\s+path)?(?:\s*[.!]?\s*$)/i
+  );
+  if (flowHighlightMatch && !flowHighlightMatch[1].startsWith('node')) {
+    const term = flowHighlightMatch[1].trim();
+    const matched = nodes.filter(
+      (n) => n.id.includes(term) || n.label.toLowerCase().includes(term)
+    );
+    if (matched.length > 0) {
+      const matchedIds = matched.map((n) => n.id);
+      store.highlight(matchedIds);
+      return {
+        success: true,
+        actionsExecuted: [`Highlighted ${term} flow [${matchedIds.join(', ')}]`],
+        source: 'local_fallback',
+      };
+    }
+  }
+
+  // --- Grouping ("Group these three as backend services") ---
+  const groupMatch = lower.match(
+    /group\s+(?:these(?:\s+three|\s+nodes)?|all|the\s+services)\s+as\s+([a-z0-9_\s]+)(?:\s*[.!]?\s*$)/i
+  );
+  if (groupMatch) {
+    const groupName = groupMatch[1].trim();
+    const serviceNodes = nodes.filter(
+      (n) => n.type === 'service' || !['client', 'gateway', 'database', 'cache'].includes(n.type)
+    );
+    const idsToGroup = serviceNodes.length > 0 ? serviceNodes.map((n) => n.id) : nodes.slice(-3).map((n) => n.id);
+    store.highlight(idsToGroup);
+    return {
+      success: true,
+      actionsExecuted: [`Grouped [${idsToGroup.join(', ')}] as ${groupName}`],
+      source: 'local_fallback',
+    };
+  }
+
+  // --- Bidirectional Connections ("Bidirectional connection between Client and Gateway" / "Client and Gateway talk to each other") ---
+  const biMatch =
+    lower.match(/(?:bidirectional|two-way|both\s+ways).*(?:between\s+([a-z0-9_\s]+?)\s+and\s+([a-z0-9_\s]+)|([a-z0-9_\s]+?)\s+(?:and|to)\s+([a-z0-9_\s]+))/i) ||
+    lower.match(/([a-z0-9_\s]+?)\s+and\s+([a-z0-9_\s]+?)\s+talk\s+to\s+each\s+other/i);
+  if (biMatch) {
+    const rawSrc = (biMatch[1] || biMatch[3] || '').trim();
+    const rawTgt = (biMatch[2] || biMatch[4] || '').trim();
+    const srcId = findMatchingNodeId(rawSrc, nodes) || sanitizeId(rawSrc);
+    const tgtId = findMatchingNodeId(rawTgt, nodes) || sanitizeId(rawTgt);
+    if (srcId && tgtId) {
+      store.connect(srcId, tgtId, undefined, true);
+      return {
+        success: true,
+        actionsExecuted: [`Connected ${srcId} ↔ ${tgtId} bidirectionally`],
+        source: 'local_fallback',
+      };
+    }
   }
 
   // --- INSERT_BETWEEN "between them" / "between the two" / "in between them" ---

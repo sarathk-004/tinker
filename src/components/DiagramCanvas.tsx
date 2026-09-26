@@ -26,6 +26,52 @@ const InnerCanvas: React.FC = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(storeNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(storeEdges);
 
+  // Keyboard shortcut for Undo (Ctrl+Z or Cmd+Z)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger undo when typing in an input or textarea
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        useDiagramStore.getState().undo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const onConnect = React.useCallback(
+    (connection: any) => {
+      if (connection.source && connection.target) {
+        useDiagramStore.getState().connect(connection.source, connection.target);
+      }
+    },
+    []
+  );
+
+  const onNodesDelete = React.useCallback(
+    (deleted: any[]) => {
+      deleted.forEach((node) => {
+        useDiagramStore.getState().removeNode(node.id);
+      });
+    },
+    []
+  );
+
+  const onEdgesDelete = React.useCallback(
+    (deleted: any[]) => {
+      deleted.forEach((edge) => {
+        useDiagramStore.getState().disconnect(edge.source, edge.target);
+      });
+    },
+    []
+  );
+
   // Sync ReactFlow internal state when Zustand store updates
   useEffect(() => {
     setNodes(storeNodes);
@@ -69,6 +115,10 @@ const InnerCanvas: React.FC = () => {
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodesDelete={onNodesDelete}
+        onEdgesDelete={onEdgesDelete}
+        deleteKeyCode={['Backspace', 'Delete']}
         fitView
         minZoom={0.2}
         maxZoom={1.5}

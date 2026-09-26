@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Header } from './components/Header';
 import { DiagramCanvas } from './components/DiagramCanvas';
 import { DemoController } from './components/DemoController';
+import { ManualToolbar } from './components/ManualToolbar';
 import { CommandBar } from './components/CommandBar';
 import { SettingsModal } from './components/SettingsModal';
-import { ConversationLog } from './components/ConversationLog';
+import { RightPanel } from './components/RightPanel';
 import { useDiagramStore } from './diagram/store';
 
 export const App: React.FC = () => {
@@ -28,8 +29,9 @@ export const App: React.FC = () => {
 
       <main className="relative flex-1 w-full h-full overflow-hidden">
         <DiagramCanvas />
+        <ManualToolbar />
         <DemoController />
-        <ConversationLog />
+        <RightPanel />
         <CommandBar onOpenSettings={() => setSettingsOpen(true)} />
       </main>
 

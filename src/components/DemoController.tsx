@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useDiagramStore } from '../diagram/store';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Minus, ChevronDown, RotateCcw } from 'lucide-react';
 
 export const DemoController: React.FC = () => {
   const store = useDiagramStore();
+  const [isMinimized, setIsMinimized] = useState(false);
 
   // Golden Demo sequence turns from the PRD
   const runStep1 = () => {
@@ -41,6 +42,21 @@ export const DemoController: React.FC = () => {
     store.highlight(['orders', 'redis', 'postgres']);
   };
 
+  if (isMinimized) {
+    return (
+      <div className="absolute top-20 left-6 z-30 pointer-events-auto select-none">
+        <button
+          onClick={() => setIsMinimized(false)}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#11141c]/90 hover:bg-slate-800/90 border border-slate-800 text-xs font-semibold text-slate-200 shadow-xl backdrop-blur-xl transition-all"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <span>Golden Demo</span>
+          <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="absolute top-20 left-6 z-30 flex flex-col gap-2 pointer-events-auto">
       {/* Golden Demo Floating Panel */}
@@ -50,7 +66,15 @@ export const DemoController: React.FC = () => {
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span>Golden Demo Flow</span>
           </div>
-          <span className="text-[10px] text-slate-400 font-mono">Phase 0</span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setIsMinimized(true)}
+              title="Minimize panel"
+              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -97,6 +121,14 @@ export const DemoController: React.FC = () => {
 
         {/* Quick actions row */}
         <div className="flex items-center gap-1 mt-2.5 pt-2 border-t border-slate-800">
+          <button
+            onClick={() => store.undo()}
+            title="Undo previous action (Ctrl+Z)"
+            className="flex items-center justify-center gap-1 px-2 py-1 text-[11px] font-medium text-slate-400 hover:text-slate-200 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span>Undo</span>
+          </button>
           <button
             onClick={() => store.clearHighlight()}
             title="Clear Highlights"

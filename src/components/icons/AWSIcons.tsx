@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Icon } from '@iconify/react';
 import { AWSServiceIcon, SystemNodeType } from '../../types/diagram';
 
 interface AWSIconProps {
@@ -8,15 +9,50 @@ interface AWSIconProps {
   size?: number;
 }
 
+const ICONIFY_AWS_MAP: Record<string, string> = {
+  'api-gateway': 'logos:aws-api-gateway',
+  'alb': 'logos:aws-elastic-load-balancing',
+  'ec2': 'logos:aws-ec2',
+  'ecs': 'logos:aws-ecs',
+  'lambda': 'logos:aws-lambda',
+  'rds': 'logos:aws-rds',
+  'dynamodb': 'logos:aws-dynamodb',
+  'elasticache': 'logos:aws-elasticache',
+  'redis': 'logos:redis',
+  'sqs': 'logos:aws-sqs',
+  'sns': 'logos:aws-sns',
+  's3': 'logos:aws-s3',
+  'cloudfront': 'logos:aws-cloudfront',
+};
+
 export const AWSIcon: React.FC<AWSIconProps> = ({
   name,
   type,
-  className = "w-6 h-6",
-  size = 24
+  className = 'w-6 h-6',
+  size = 26,
 }) => {
-  // Determine icon to render based on name or fallback type
+  const [loadError, setLoadError] = useState(false);
   const resolvedName = name || mapTypeToIcon(type);
+  const iconifyId = ICONIFY_AWS_MAP[resolvedName];
 
+  // If Iconify icon exists and hasn't failed to load, render Iconify component
+  if (iconifyId && !loadError) {
+    return (
+      <div
+        className={`flex items-center justify-center ${className}`}
+        style={{ width: size, height: size }}
+      >
+        <Icon
+          icon={iconifyId}
+          width={size}
+          height={size}
+          onError={() => setLoadError(true)}
+        />
+      </div>
+    );
+  }
+
+  // High-fidelity fallback SVG
   switch (resolvedName) {
     case 'api-gateway':
       return (
@@ -106,28 +142,27 @@ export const AWSIcon: React.FC<AWSIconProps> = ({
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
           <rect width="24" height="24" rx="4" fill="#10B981" fillOpacity="0.15" />
-          <path d="M5 8C5 6.34 8.13 5 12 5C15.87 5 19 6.34 19 8M5 8V16C5 17.66 8.13 19 12 19C15.87 19 19 17.66 19 16V8M5 8C5 9.66 8.13 11 12 11C15.87 11 19 9.66 19 8" stroke="#10B981" strokeWidth="1.8" />
-          <path d="M12 11V19" stroke="#34D399" strokeWidth="1.5" />
+          <path d="M4 7C4 5.9 7.58 5 12 5C16.42 5 20 5.9 20 7M4 7V17C4 18.1 7.58 19 12 19C16.42 19 20 18.1 20 17V7M4 7C4 8.1 7.58 9 12 9C16.42 9 20 8.1 20 7" stroke="#10B981" strokeWidth="1.8" />
+          <path d="M4 12C4 13.1 7.58 14 12 14C16.42 14 20 13.1 20 12" stroke="#34D399" strokeWidth="1.8" />
         </svg>
       );
 
     case 'cloudfront':
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
-          <rect width="24" height="24" rx="4" fill="#6366F1" fillOpacity="0.15" />
-          <circle cx="12" cy="12" r="8" stroke="#6366F1" strokeWidth="1.8" />
-          <ellipse cx="12" cy="12" rx="3.5" ry="8" stroke="#818CF8" strokeWidth="1.5" />
-          <line x1="4" y1="12" x2="20" y2="12" stroke="#818CF8" strokeWidth="1.5" />
+          <rect width="24" height="24" rx="4" fill="#8B5CF6" fillOpacity="0.15" />
+          <circle cx="12" cy="12" r="8" stroke="#8B5CF6" strokeWidth="1.8" />
+          <ellipse cx="12" cy="12" rx="3.5" ry="8" stroke="#A78BFA" strokeWidth="1.5" />
+          <line x1="4" y1="12" x2="20" y2="12" stroke="#A78BFA" strokeWidth="1.5" />
         </svg>
       );
 
     case 'client':
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
-          <rect width="24" height="24" rx="4" fill="#64748B" fillOpacity="0.15" />
-          <rect x="5" y="4" width="14" height="12" rx="2" stroke="#94A3B8" strokeWidth="1.8" />
-          <path d="M10 20H14M12 16V20" stroke="#94A3B8" strokeWidth="1.8" strokeLinecap="round" />
-          <circle cx="12" cy="10" r="1.5" fill="#38BDF8" />
+          <rect width="24" height="24" rx="4" fill="#0EA5E9" fillOpacity="0.15" />
+          <rect x="4" y="5" width="16" height="11" rx="2" stroke="#0EA5E9" strokeWidth="1.8" />
+          <path d="M8 19H16M12 16V19" stroke="#38BDF8" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       );
 
@@ -135,10 +170,9 @@ export const AWSIcon: React.FC<AWSIconProps> = ({
     default:
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
-          <rect width="24" height="24" rx="4" fill="#475569" fillOpacity="0.2" />
-          <rect x="5" y="6" width="14" height="12" rx="2" stroke="#94A3B8" strokeWidth="1.8" />
-          <line x1="8" y1="10" x2="16" y2="10" stroke="#CBD5E1" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="8" y1="14" x2="13" y2="14" stroke="#CBD5E1" strokeWidth="1.5" strokeLinecap="round" />
+          <rect width="24" height="24" rx="4" fill="#64748B" fillOpacity="0.15" />
+          <circle cx="12" cy="12" r="7" stroke="#94A3B8" strokeWidth="1.8" strokeDasharray="2 2" />
+          <circle cx="12" cy="12" r="2" fill="#CBD5E1" />
         </svg>
       );
   }
@@ -146,13 +180,21 @@ export const AWSIcon: React.FC<AWSIconProps> = ({
 
 function mapTypeToIcon(type?: SystemNodeType): AWSServiceIcon {
   switch (type) {
-    case 'client': return 'client';
-    case 'gateway': return 'api-gateway';
-    case 'service': return 'ec2';
-    case 'database': return 'rds';
-    case 'cache': return 'elasticache';
-    case 'queue': return 'sqs';
-    case 'storage': return 's3';
-    default: return 'generic';
+    case 'client':
+      return 'client';
+    case 'gateway':
+      return 'api-gateway';
+    case 'database':
+      return 'rds';
+    case 'cache':
+      return 'redis';
+    case 'queue':
+      return 'sqs';
+    case 'storage':
+      return 's3';
+    case 'service':
+      return 'ec2';
+    default:
+      return 'generic';
   }
 }

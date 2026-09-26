@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.4",
+    "@iconify/react": "^6.0.2",
     "@xyflow/react": "^12.3.6",
     "clsx": "^2.1.1",
     "lucide-react": "^0.469.0",

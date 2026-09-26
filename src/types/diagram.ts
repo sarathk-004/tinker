@@ -48,6 +48,8 @@ export interface DiagramState {
   highlightedIds: string[];
   activeAction: string | null;
 
+  history: Array<{ nodes: DiagramNode[]; edges: DiagramEdge[] }>;
+
   // Actions
   addNode: (node: {
     id?: string;
@@ -58,7 +60,7 @@ export interface DiagramState {
     description?: string;
   }) => string;
   removeNode: (id: string, options?: { reconnectBridge?: boolean }) => void;
-  connect: (source: string, target: string, label?: string) => void;
+  connect: (source: string, target: string, label?: string, bidirectional?: boolean) => void;
   disconnect: (source: string, target: string) => void;
   renameNode: (id: string, newLabel: string) => void;
   insertBetween: (
@@ -75,6 +77,7 @@ export interface DiagramState {
   highlight: (ids: string[]) => void;
   clearHighlight: () => void;
   reset: () => void;
+  undo: () => void;
   applyLayout: (direction?: 'LR' | 'TB') => void;
   setNodes: (nodes: DiagramNode[]) => void;
   setEdges: (edges: DiagramEdge[]) => void;
