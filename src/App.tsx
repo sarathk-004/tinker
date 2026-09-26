@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Header } from './components/Header';
 import { DiagramCanvas } from './components/DiagramCanvas';
-import { SideChat } from './components/SideChat';
 import { ManualToolbar } from './components/ManualToolbar';
 import { CommandBar } from './components/CommandBar';
 import { SettingsModal } from './components/SettingsModal';
@@ -20,7 +19,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col w-screen h-screen bg-[#080a0f] text-slate-100 overflow-hidden select-none">
+    <div className="flex flex-col w-screen h-screen bg-[#f7f7f4] text-[#26251e] overflow-hidden select-none font-sans">
       <Header
         layoutDir={layoutDir}
         onToggleLayout={toggleLayout}
@@ -30,7 +29,6 @@ export const App: React.FC = () => {
       <main className="relative flex-1 w-full h-full overflow-hidden">
         <DiagramCanvas />
         <ManualToolbar />
-        <SideChat />
         <RightPanel />
         <CommandBar onOpenSettings={() => setSettingsOpen(true)} />
       </main>

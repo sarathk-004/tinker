@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Mic, MicOff, ArrowRight, Loader2, Command, Sparkles, Volume2, VolumeX } from 'lucide-react';
 import { processArchitectureInstruction } from '../ai/orchestrator';
-import { Sparkles, ArrowRight, Loader2, Command, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
-import { stopSpeaking } from '../ai/speechSynthesis';
 
 interface CommandBarProps {
-  onOpenSettings: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const CommandBar: React.FC<CommandBarProps> = () => {
@@ -13,20 +12,20 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
   const [isListening, setIsListening] = useState(false);
   const [micNotice, setMicNotice] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
-    const storedMute = localStorage.getItem('tinker_tts_muted') === 'true';
-    setIsMuted(storedMute);
+    setIsMuted(localStorage.getItem('tinker_tts_muted') === 'true');
   }, []);
 
   const toggleMute = () => {
     const next = !isMuted;
     setIsMuted(next);
     localStorage.setItem('tinker_tts_muted', String(next));
-    if (next) {
-      stopSpeaking();
+    if (next && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
     }
   };
 
@@ -51,20 +50,7 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
     }
   };
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (isListening) {
-      stopListening();
-    }
-    await executeCommand(input);
-  };
-
-  const handleSuggestion = (prompt: string) => {
-    setInput(prompt);
-    executeCommand(prompt);
-  };
-
-  // Continuous speech recognition without live text preview
+  // Speech recognition without interim UI flicker
   const accumulatedTranscriptRef = useRef('');
 
   const startListening = () => {
@@ -85,7 +71,7 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
 
       recognition.onstart = () => {
         setIsListening(true);
-        setMicNotice('🎙️ Listening... Wait 1 second before speaking. Click mic again when done.');
+        setMicNotice('Listening... Speak your architecture command. Click mic to finish.');
       };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -94,7 +80,6 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
         for (let i = 0; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript + ' ';
         }
-        // Save silently without writing live preview to input
         accumulatedTranscriptRef.current = transcript.trim();
       };
 
@@ -144,64 +129,72 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
     }
   };
 
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (isListening) {
+      stopListening();
+    }
+    await executeCommand(input);
+  };
+
+  const handleSuggestion = (prompt: string) => {
+    setInput(prompt);
+    executeCommand(prompt);
+  };
+
   return (
     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-2xl px-4 flex flex-col items-center gap-2 select-none">
-      {/* Listening notification / wait banner */}
+      {/* Listening notification */}
       {micNotice && (
-        <div className="flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-[#00ed64]/15 text-[#00ed64] border border-[#00ed64]/30 backdrop-blur-xl animate-pulse shadow-xl">
+        <div className="flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-mono bg-white text-[#26251e] border border-[#e6e5e0]">
+          <span className="w-2 h-2 rounded-full bg-[#f54e00] animate-pulse" />
           <span>{micNotice}</span>
         </div>
       )}
 
-      {/* Suggestion Pills - MongoDB pill-tab style */}
-      <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto max-w-full py-1 text-[11px] text-[#a8b3bc]">
-        <span className="text-[#a8b3bc] font-medium mr-1 flex items-center gap-1">
-          <Sparkles className="w-3 h-3 text-[#00ed64]" /> Ideas:
+      {/* Suggestion Pills - Cursor subtle hairlines */}
+      <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto max-w-full py-1 text-[11px] text-[#5a5852]">
+        <span className="text-[#807d72] font-medium mr-1 flex items-center gap-1 font-mono">
+          <Sparkles className="w-3 h-3 text-[#f54e00]" /> Prompts:
         </span>
         <button
           onClick={() => handleSuggestion('What happens if Auth goes down?')}
-          className="px-3 py-1 rounded-full bg-[#002636] hover:bg-[#003d4f] hover:text-white border border-[#1c2d38] hover:border-[#00ed64]/40 transition-all whitespace-nowrap"
+          className="px-2.5 py-1 rounded-md bg-white hover:bg-[#fafaf7] hover:text-[#26251e] border border-[#e6e5e0] hover:border-[#cfcdc4] transition-all whitespace-nowrap"
         >
           "What happens if Auth goes down?"
         </button>
         <button
-          onClick={() => handleSuggestion('Simplify this for a non-technical person')}
-          className="px-3 py-1 rounded-full bg-[#002636] hover:bg-[#003d4f] hover:text-white border border-[#1c2d38] hover:border-[#00ed64]/40 transition-all whitespace-nowrap"
-        >
-          "Simplify this"
-        </button>
-        <button
           onClick={() => handleSuggestion('Put Redis between orders and postgres')}
-          className="px-3 py-1 rounded-full bg-[#002636] hover:bg-[#003d4f] hover:text-white border border-[#1c2d38] hover:border-[#00ed64]/40 transition-all whitespace-nowrap"
+          className="px-2.5 py-1 rounded-md bg-white hover:bg-[#fafaf7] hover:text-[#26251e] border border-[#e6e5e0] hover:border-[#cfcdc4] transition-all whitespace-nowrap"
         >
           "Put Redis between orders & DB"
         </button>
         <button
           onClick={() => handleSuggestion('Highlight the payment flow')}
-          className="px-3 py-1 rounded-full bg-[#002636] hover:bg-[#003d4f] hover:text-white border border-[#1c2d38] hover:border-[#00ed64]/40 transition-all whitespace-nowrap"
+          className="px-2.5 py-1 rounded-md bg-white hover:bg-[#fafaf7] hover:text-[#26251e] border border-[#e6e5e0] hover:border-[#cfcdc4] transition-all whitespace-nowrap"
         >
           "Highlight payment flow"
         </button>
       </div>
 
-      {/* Main Floating Input Bar with MongoDB pill shape */}
+      {/* Main Floating Input Bar with Cursor 8px rounded card */}
       <form
         onSubmit={handleSubmit}
-        className="w-full flex items-center gap-2 p-1.5 pl-4 rounded-full bg-[#001e2b]/95 border border-[#1c2d38] hover:border-[#243846] backdrop-blur-2xl shadow-2xl transition-all group focus-within:border-[#00ed64] focus-within:ring-2 focus-within:ring-[#00ed64]/20"
+        className="w-full flex items-center gap-2 p-1.5 pl-3.5 rounded-md bg-white border border-[#e6e5e0] hover:border-[#cfcdc4] transition-all group focus-within:border-[#26251e]"
       >
         <div className="flex items-center justify-center">
-          <Command className="w-4 h-4 text-[#5c6c7a] group-focus-within:text-[#00ed64] transition-colors" />
+          <Command className="w-4 h-4 text-[#807d72] group-focus-within:text-[#26251e] transition-colors" />
         </div>
 
         {isListening ? (
-          <div className="flex-1 flex items-center gap-2.5 py-1 select-none">
+          <div className="flex-1 flex items-center gap-2 py-1 select-none">
             <div className="flex items-center gap-1">
-              <span className="w-1.5 h-3 bg-[#00ed64] rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-              <span className="w-1.5 h-5 bg-[#00ed64] rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-              <span className="w-1.5 h-3 bg-[#00ed64] rounded-full animate-bounce"></span>
+              <span className="w-1.5 h-3 bg-[#f54e00] rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+              <span className="w-1.5 h-4 bg-[#f54e00] rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+              <span className="w-1.5 h-3 bg-[#f54e00] rounded-full animate-bounce"></span>
             </div>
-            <span className="text-xs font-semibold text-[#00ed64] tracking-wide">
-              Listening to voice... Click mic to submit
+            <span className="text-xs font-mono font-medium text-[#26251e]">
+              Recording voice... Click mic to generate
             </span>
           </div>
         ) : (
@@ -209,48 +202,48 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder='Describe architecture change or ask a question... (e.g. "What happens if Auth goes down?")'
+            placeholder='Ask an architecture question or command (e.g. "Add Redis cache", "What happens if Auth goes down?")...'
             disabled={loading}
-            className="flex-1 bg-transparent text-sm text-white placeholder-[#5c6c7a] focus:outline-none disabled:opacity-50"
+            className="flex-1 bg-transparent text-sm text-[#26251e] placeholder-[#807d72] focus:outline-none disabled:opacity-50 font-sans"
           />
         )}
 
-        {/* Audio Mute/Unmute Toggle */}
+        {/* Audio Mute/Unmute */}
         <button
           type="button"
           onClick={toggleMute}
           title={isMuted ? 'Unmute voice responses' : 'Mute voice responses'}
-          className={`p-2 rounded-full transition-colors ${
+          className={`p-1.5 rounded-md transition-colors ${
             isMuted
-              ? 'text-[#5c6c7a] hover:text-white hover:bg-[#002636]'
-              : 'text-[#00ed64] hover:text-[#00ed64] hover:bg-[#00ed64]/10'
+              ? 'text-[#807d72] hover:text-[#26251e] hover:bg-[#fafaf7]'
+              : 'text-[#26251e] hover:bg-[#fafaf7]'
           }`}
         >
           {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
         </button>
 
-        {/* Integrated Speech / Microphone Button */}
+        {/* Integrated Speech / Microphone */}
         <button
           type="button"
           onClick={toggleListening}
-          title={isListening ? 'Stop listening and submit' : 'Click to speak (stays listening until stopped)'}
-          className={`p-2 rounded-full transition-all ${
+          title={isListening ? 'Stop listening and submit' : 'Click to speak'}
+          className={`p-1.5 rounded-md transition-all ${
             isListening
-              ? 'bg-rose-500 text-white animate-pulse ring-4 ring-rose-500/30'
-              : 'bg-[#002636] border border-[#1c2d38] text-[#00ed64] hover:bg-[#003d4f] hover:text-white'
+              ? 'bg-[#f54e00] text-white animate-pulse'
+              : 'bg-[#fafaf7] border border-[#e6e5e0] text-[#26251e] hover:bg-[#efeee8]'
           }`}
         >
           {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
         </button>
 
-        {/* Submit Button - MongoDB Signature Green Pill */}
+        {/* Submit Button - Signature Cursor Orange (8px rounded) */}
         <button
           type="submit"
           disabled={!input.trim() || loading}
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-[#00ed64] hover:bg-[#00b545] disabled:bg-[#002636] disabled:text-[#5c6c7a] text-[#001e2b] font-bold transition-all shadow-md shadow-[#00ed64]/10"
+          className="flex items-center justify-center w-8 h-8 rounded-md bg-[#f54e00] hover:bg-[#d04200] disabled:bg-[#e6e5e0] disabled:text-[#a09c92] text-white font-medium transition-all"
         >
           {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-[#001e2b]" />
+            <Loader2 className="w-4 h-4 animate-spin text-white" />
           ) : (
             <ArrowRight className="w-4 h-4" />
           )}

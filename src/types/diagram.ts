@@ -78,6 +78,7 @@ export interface DiagramState {
   clearHighlight: () => void;
   reset: () => void;
   undo: () => void;
+  groupNodes: (ids: string[], groupName: string) => void;
   applyLayout: (direction?: 'LR' | 'TB') => void;
   setNodes: (nodes: DiagramNode[]) => void;
   setEdges: (edges: DiagramEdge[]) => void;

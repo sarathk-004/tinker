@@ -7,70 +7,72 @@ import clsx from 'clsx';
 export const AWSArchitectureNode: React.FC<NodeProps<DiagramNode>> = memo(({ data, selected }) => {
   const { label, type, awsIcon, subType, isHighlighted, isDimmed } = data;
 
+  // In-product timeline pastels from Cursor Design System
   const getBadgeColor = () => {
     switch (type) {
       case 'gateway':
-        return 'text-purple-300 bg-[#7b3ff2]/15 border-[#7b3ff2]/35';
+        return 'text-[#26251e] bg-[#9fbbe0]/30 border-[#9fbbe0]/70'; // pastel blue
       case 'cache':
-        return 'text-pink-300 bg-[#f06bb8]/15 border-[#f06bb8]/35';
+        return 'text-[#26251e] bg-[#dfa88f]/30 border-[#dfa88f]/70'; // peach
       case 'database':
-        return 'text-[#00ed64] bg-[#00ed64]/15 border-[#00ed64]/35';
+        return 'text-[#26251e] bg-[#9fc9a2]/35 border-[#9fc9a2]/70'; // mint
       case 'queue':
-        return 'text-orange-300 bg-[#fa6e39]/15 border-[#fa6e39]/35';
+        return 'text-[#26251e] bg-[#c08532]/25 border-[#c08532]/60'; // warm gold
       case 'storage':
-        return 'text-blue-300 bg-[#3d4f9f]/15 border-[#3d4f9f]/35';
+        return 'text-[#26251e] bg-[#c0a8dd]/30 border-[#c0a8dd]/70'; // lavender
       case 'client':
-        return 'text-slate-200 bg-[#002636] border-[#1c2d38]';
+        return 'text-[#5a5852] bg-[#fafaf7] border-[#e6e5e0]';
       case 'service':
       default:
-        return 'text-[#00ed64] bg-[#00ed64]/10 border-[#00ed64]/30';
+        return 'text-[#26251e] bg-[#e6e5e0] border-[#cfcdc4]';
     }
   };
 
   return (
     <div
       className={clsx(
-        'relative group min-w-[210px] rounded-xl px-4 py-3 transition-all duration-300 shadow-xl select-none animate-in fade-in zoom-in-95',
-        'bg-[#001e2b]/95 backdrop-blur-md border',
+        'relative group min-w-[200px] rounded-lg px-3.5 py-3 transition-all duration-200 select-none bg-white border',
         isHighlighted
-          ? 'border-[#00ed64] ring-2 ring-[#00ed64]/50 shadow-[#00ed64]/20 scale-105 z-50'
+          ? 'border-[#f54e00] ring-2 ring-[#f54e00]/25 z-50 scale-105'
           : selected
-          ? 'border-[#00ed64] ring-2 ring-[#00ed64]/40'
-          : 'border-[#1c2d38] hover:border-[#00ed64]/40 shadow-black/40',
+          ? 'border-[#f54e00] ring-1 ring-[#f54e00]/20'
+          : 'border-[#e6e5e0] hover:border-[#cfcdc4]',
         isDimmed && 'opacity-25 blur-[0.4px] scale-95'
       )}
     >
-      {/* Input handles - MongoDB bright green */}
+      {/* Input handles - Cursor dark ink */}
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-2.5 !h-2.5 !bg-[#00ed64] !border-2 !border-[#001e2b] hover:!scale-125 !transition-transform"
+        className="!w-2 !h-2 !bg-[#26251e] !border !border-white hover:!bg-[#f54e00] hover:!scale-125 !transition-all"
       />
       <Handle
         type="target"
         position={Position.Top}
-        className="!w-2.5 !h-2.5 !bg-[#00ed64] !border-2 !border-[#001e2b] hover:!scale-125 !transition-transform"
+        className="!w-2 !h-2 !bg-[#26251e] !border !border-white hover:!bg-[#f54e00] hover:!scale-125 !transition-all"
       />
 
       <div className="flex items-center gap-3">
         {/* AWS Icon Container */}
-        <div className="flex-shrink-0 p-2 rounded-xl bg-[#002636] border border-[#1c2d38] shadow-inner group-hover:border-[#00ed64]/40 transition-colors">
-          <AWSIcon name={awsIcon} type={type} size={26} />
+        <div className="flex-shrink-0 p-2 rounded-md bg-[#fafaf7] border border-[#e6e5e0] group-hover:border-[#cfcdc4] transition-colors">
+          <AWSIcon name={awsIcon} type={type} size={24} />
         </div>
 
-        {/* Labels */}
+        {/* Node Labels */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-white text-sm tracking-tight truncate font-sans">
+            <span className="font-medium text-[#26251e] text-[13px] tracking-tight truncate font-sans">
               {label}
             </span>
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#00ed64] animate-pulse flex-shrink-0" />
+            {isHighlighted && (
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#f54e00] animate-pulse flex-shrink-0" />
+            )}
           </div>
 
-          <div className="flex items-center gap-1.5 mt-0.5">
+          <div className="flex items-center gap-1.5 mt-1">
             <span
               className={clsx(
-                'text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full border',
+                'text-[10px] font-mono font-medium tracking-wide uppercase px-2 py-0.5 rounded-full border',
                 getBadgeColor()
               )}
             >
@@ -80,16 +82,16 @@ export const AWSArchitectureNode: React.FC<NodeProps<DiagramNode>> = memo(({ dat
         </div>
       </div>
 
-      {/* Output handles - MongoDB bright green */}
+      {/* Output handles */}
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-2.5 !h-2.5 !bg-[#00ed64] !border-2 !border-[#001e2b] hover:!scale-125 !transition-transform"
+        className="!w-2 !h-2 !bg-[#26251e] !border !border-white hover:!bg-[#f54e00] hover:!scale-125 !transition-all"
       />
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!w-2.5 !h-2.5 !bg-[#00ed64] !border-2 !border-[#001e2b] hover:!scale-125 !transition-transform"
+        className="!w-2 !h-2 !bg-[#26251e] !border !border-white hover:!bg-[#f54e00] hover:!scale-125 !transition-all"
       />
     </div>
   );

@@ -17,7 +17,10 @@ export async function processArchitectureInstruction(
 ): Promise<ExecutionResult> {
   const store = useDiagramStore.getState();
   const conversation = useConversationStore.getState();
-  const storedKey = typeof localStorage !== 'undefined' ? localStorage.getItem('tinker_gemini_api_key') : null;
+  const storedKey =
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('tinker_gemini_api_key') || localStorage.getItem('tinker_gemini_key')
+      : null;
   const apiKey =
     apiKeyOverride ||
     storedKey ||

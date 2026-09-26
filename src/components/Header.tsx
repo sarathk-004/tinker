@@ -14,68 +14,67 @@ export const Header: React.FC<HeaderProps> = ({ layoutDir, onToggleLayout, onOpe
   const reset = useDiagramStore((s) => s.reset);
 
   return (
-    <header className="h-16 px-6 border-b border-[#1c2d38] bg-[#001e2b]/95 backdrop-blur-xl flex items-center justify-between z-20 select-none">
-      {/* Brand & Tagline - MongoDB Theme */}
-      <div className="flex items-center gap-4">
+    <header className="h-14 px-6 border-b border-[#e6e5e0] bg-[#f7f7f4] flex items-center justify-between z-20 select-none">
+      {/* Brand & Wordmark - Cursor Style */}
+      <div className="flex items-center gap-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-[#00ed64] flex items-center justify-center shadow-lg shadow-[#00ed64]/20 text-[#001e2b] font-black">
+          <div className="w-7 h-7 rounded-md bg-[#f54e00] flex items-center justify-center text-white font-medium">
             <Cpu className="w-4 h-4" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-base font-extrabold tracking-tight text-white font-sans">tinker</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#00ed64]/10 text-[#00ed64] border border-[#00ed64]/25 font-mono">
-                Gemini 3.8 Flash
-              </span>
-            </div>
-            <p className="text-[11px] text-[#a8b3bc] font-medium">AWS Architecture Studio</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-base font-normal tracking-[-0.3px] text-[#26251e] font-sans">
+              tinker
+            </span>
+            <span className="text-[11px] font-mono font-medium uppercase tracking-[0.5px] px-2 py-0.5 rounded-full bg-[#e6e5e0] text-[#26251e]">
+              Gemini 3.8 Flash
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Right controls - MongoDB Pill Button Style */}
-      <div className="flex items-center gap-2.5">
+      {/* Right controls - Cursor 8px rounded cards with hairline depth */}
+      <div className="flex items-center gap-2">
         {/* Node & Edge counts */}
-        <div className="flex items-center gap-2 text-xs font-mono text-[#a8b3bc] bg-[#002636] px-3.5 py-1.5 rounded-full border border-[#1c2d38]">
-          <span className="text-white font-semibold">{nodes.length}</span> nodes
-          <span className="text-[#5c6c7a]">·</span>
-          <span className="text-white font-semibold">{edges.length}</span> edges
+        <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-[#5a5852] bg-white px-3 py-1.5 rounded-md border border-[#e6e5e0]">
+          <span className="text-[#26251e] font-medium">{nodes.length}</span> nodes
+          <span className="text-[#a09c92]">·</span>
+          <span className="text-[#26251e] font-medium">{edges.length}</span> edges
         </div>
 
-        {/* Layout toggle pill */}
+        {/* Layout toggle */}
         <button
           onClick={onToggleLayout}
           title={`Switch layout to ${layoutDir === 'LR' ? 'Top-to-Bottom' : 'Left-to-Right'}`}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-[#002636] hover:bg-[#003d4f] border border-[#1c2d38] hover:border-[#00ed64]/40 rounded-full transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#26251e] bg-white hover:bg-[#fafaf7] border border-[#e6e5e0] hover:border-[#cfcdc4] rounded-md transition-all"
         >
           {layoutDir === 'LR' ? (
             <>
-              <ArrowRightLeft className="w-3.5 h-3.5 text-[#00ed64]" />
+              <ArrowRightLeft className="w-3.5 h-3.5 text-[#5a5852]" />
               <span>LR Layout</span>
             </>
           ) : (
             <>
-              <ArrowUpDown className="w-3.5 h-3.5 text-[#00ed64]" />
+              <ArrowUpDown className="w-3.5 h-3.5 text-[#5a5852]" />
               <span>TB Layout</span>
             </>
           )}
         </button>
 
-        {/* API Settings Modal button */}
+        {/* Voice & API Settings */}
         <button
           onClick={onOpenSettings}
-          title="Configure Gemini API Key & Nuanced Voice"
-          className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-[#002636] hover:bg-[#003d4f] border border-[#1c2d38] hover:border-[#00ed64]/40 rounded-full transition-all"
+          title="Configure Gemini Audio Models & API Key"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#26251e] bg-white hover:bg-[#fafaf7] border border-[#e6e5e0] hover:border-[#cfcdc4] rounded-md transition-all"
         >
-          <Settings className="w-3.5 h-3.5 text-[#00ed64]" />
-          <span className="hidden sm:inline">Settings</span>
+          <Settings className="w-3.5 h-3.5 text-[#f54e00]" />
+          <span>Models</span>
         </button>
 
-        {/* Reset Canvas pill */}
+        {/* Reset Canvas */}
         <button
           onClick={reset}
           title="Reset canvas"
-          className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:text-rose-400 bg-[#002636] hover:bg-rose-950/40 border border-[#1c2d38] hover:border-rose-800/50 rounded-full transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#5a5852] hover:text-[#cf2d56] bg-white hover:bg-[#fafaf7] border border-[#e6e5e0] hover:border-[#cfcdc4] rounded-md transition-all"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">Reset</span>

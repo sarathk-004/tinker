@@ -88,22 +88,22 @@ const InnerCanvas: React.FC = () => {
   const isEmpty = useMemo(() => storeNodes.length === 0, [storeNodes]);
 
   return (
-    <div className="relative w-full h-full bg-[#001e2b]">
+    <div className="relative w-full h-full bg-[#f7f7f4]">
       {isEmpty && (
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
-          <div className="flex flex-col items-center max-w-md text-center px-6 py-8 rounded-2xl bg-[#002636]/90 border border-[#1c2d38] backdrop-blur-xl shadow-2xl">
-            <div className="w-12 h-12 rounded-xl bg-[#00ed64]/10 border border-[#00ed64]/20 flex items-center justify-center text-[#00ed64] mb-4 shadow-lg shadow-[#00ed64]/5">
-              <Sparkles className="w-6 h-6 animate-pulse" />
+          <div className="flex flex-col items-center max-w-md text-center px-8 py-8 rounded-lg bg-white border border-[#e6e5e0]">
+            <div className="w-10 h-10 rounded-md bg-[#fafaf7] border border-[#e6e5e0] flex items-center justify-center text-[#f54e00] mb-4">
+              <Sparkles className="w-5 h-5" />
             </div>
-            <h2 className="text-xl font-bold tracking-tight text-white mb-2 font-display">
+            <h2 className="text-xl font-normal tracking-[-0.5px] text-[#26251e] mb-2 font-sans">
               Talk through what you're building
             </h2>
-            <p className="text-sm text-[#a8b3bc] leading-relaxed mb-4">
-              Describe your architecture verbally or run interactive commands. Tinker will construct and restructure the AWS system in real time.
+            <p className="text-sm text-[#5a5852] leading-relaxed mb-5">
+              Describe your architecture verbally or run interactive commands. Tinker constructs and restructures the AWS system in real time.
             </p>
-            <div className="flex items-center gap-2 text-xs text-[#a8b3bc] bg-[#001e2b] border border-[#1c2d38] px-3.5 py-1.5 rounded-full">
-              <Layers className="w-3.5 h-3.5 text-[#00ed64]" />
-              <span>Try: <span className="text-white italic">"Client talks to API Gateway, then to Orders and Auth"</span></span>
+            <div className="flex items-center gap-2 text-xs text-[#5a5852] bg-[#fafaf7] border border-[#e6e5e0] px-3.5 py-1.5 rounded-full font-mono">
+              <Layers className="w-3.5 h-3.5 text-[#f54e00]" />
+              <span>Try: <span className="text-[#26251e] italic">"Client talks to API Gateway, then to Orders and Auth"</span></span>
             </div>
           </div>
         </div>
@@ -129,10 +129,10 @@ const InnerCanvas: React.FC = () => {
           variant={BackgroundVariant.Dots}
           gap={24}
           size={1.5}
-          color="#1c2d38"
+          color="#cfcdc4"
         />
         <Controls
-          className="!bg-[#001e2b] !border !border-[#1c2d38] !rounded-2xl !shadow-2xl overflow-hidden [&>button]:!bg-transparent [&>button]:!border-[#1c2d38] [&>button]:!text-[#a8b3bc] hover:[&>button]:!bg-[#002636] hover:[&>button]:!text-white"
+          className="!bg-white !border !border-[#e6e5e0] !rounded-md overflow-hidden [&>button]:!bg-transparent [&>button]:!border-[#e6e5e0] [&>button]:!text-[#26251e] hover:[&>button]:!bg-[#fafaf7]"
           showInteractive={false}
         />
       </ReactFlow>

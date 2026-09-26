@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Key, X, Check, ExternalLink, ShieldCheck, Eye, EyeOff, Clipboard, Trash2, Volume2 } from 'lucide-react';
-import { AVAILABLE_GEMINI_VOICES, GeminiVoiceName, speakWithGeminiVoice } from '../ai/geminiVoice';
+import { Key, X, Check, ExternalLink, ShieldCheck, Eye, EyeOff, Clipboard, Trash2, Volume2, Sparkles } from 'lucide-react';
+import { GEMINI_AUDIO_MODELS, getSelectedGeminiAudioModel, setSelectedGeminiAudioModel, speakWithGeminiVoice } from '../ai/geminiVoice';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -11,7 +11,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [selectedVoice, setSelectedVoice] = useState<GeminiVoiceName>('Aoede');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.0-flash');
   const [testStatus, setTestStatus] = useState<{ testing: boolean; message?: string; success?: boolean }>({
     testing: false,
   });
@@ -20,11 +20,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     if (isOpen) {
       const stored =
         localStorage.getItem('tinker_gemini_api_key') ||
+        localStorage.getItem('tinker_gemini_key') ||
         (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_API_KEY : '') ||
         '';
-      const storedVoice = (localStorage.getItem('tinker_gemini_voice') as GeminiVoiceName) || 'Aoede';
+      const storedModel = getSelectedGeminiAudioModel();
       setApiKey(stored);
-      setSelectedVoice(storedVoice);
+      setSelectedModel(storedModel);
       setSaved(false);
       setTestStatus({ testing: false });
     }
@@ -49,10 +50,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       return;
     }
 
-    setTestStatus({ testing: true, message: 'Testing Gemini API key...' });
+    setTestStatus({ testing: true, message: 'Verifying with Google Gemini API...' });
 
-    // Try models in order: gemini-3.8-flash -> gemini-2.0-flash -> gemini-1.5-flash
-    const candidateModels = ['gemini-3.8-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    const candidateModels = [selectedModel, 'gemini-2.0-flash', 'gemini-1.5-flash'];
     let verifiedModel = '';
 
     for (const model of candidateModels) {
@@ -63,7 +63,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: 'Hello' }] }],
+              contents: [{ parts: [{ text: 'Ping' }] }],
             }),
           }
         );
@@ -72,14 +72,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           verifiedModel = model;
           break;
         }
-
-        if (res.status === 404) {
-          continue;
-        } else {
-          break;
-        }
       } catch {
-        // continue trying next model
+        // try next
       }
     }
 
@@ -87,44 +81,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       setTestStatus({
         testing: false,
         success: true,
-        message: `✓ Connected to ${verifiedModel}! API Key is active.`,
+        message: `✓ Connected to ${verifiedModel}! Gemini Audio API authorized.`,
       });
     } else {
-      // Fallback: test models list endpoint to see if key itself is authorized
-      try {
-        const listRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`
-        );
-        if (listRes.ok) {
-          setTestStatus({
-            testing: false,
-            success: true,
-            message: '✓ API Key is valid and authorized for Google AI Studio.',
-          });
-        } else {
-          const errData = await listRes.json().catch(() => ({}));
-          setTestStatus({
-            testing: false,
-            success: false,
-            message: `Key rejected (${listRes.status}): ${errData.error?.message || 'Check your key'}`,
-          });
-        }
-      } catch (err: unknown) {
-        setTestStatus({
-          testing: false,
-          success: false,
-          message: `Network error: ${err instanceof Error ? err.message : 'Failed to reach API'}`,
-        });
-      }
+      setTestStatus({
+        testing: false,
+        success: false,
+        message: 'Could not connect. Please check that your Google AI Studio API key is active.',
+      });
     }
   };
 
   const handleTestVoice = async () => {
-    localStorage.setItem('tinker_gemini_voice', selectedVoice);
+    setSelectedGeminiAudioModel(selectedModel);
     if (apiKey.trim()) {
       localStorage.setItem('tinker_gemini_api_key', apiKey.trim());
+      localStorage.setItem('tinker_gemini_key', apiKey.trim());
     }
-    await speakWithGeminiVoice(`Hello! This is the ${selectedVoice} voice model configured for your architecture advisor.`, selectedVoice);
+    await speakWithGeminiVoice(
+      `Gemini Voice model ${selectedModel} is configured and active for your system design workspace.`,
+      selectedModel
+    );
   };
 
   const handlePaste = async () => {
@@ -140,10 +117,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     const key = apiKey.trim();
     if (key) {
       localStorage.setItem('tinker_gemini_api_key', key);
+      localStorage.setItem('tinker_gemini_key', key);
     } else {
       localStorage.removeItem('tinker_gemini_api_key');
+      localStorage.removeItem('tinker_gemini_key');
     }
-    localStorage.setItem('tinker_gemini_voice', selectedVoice);
+    setSelectedGeminiAudioModel(selectedModel);
     setSaved(true);
     window.dispatchEvent(new Event('storage'));
     setTimeout(() => {
@@ -154,42 +133,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#26251e]/40 backdrop-blur-sm animate-fade-in p-4 font-sans select-none"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-[#001e2b] border border-[#1c2d38] rounded-2xl p-6 shadow-2xl relative select-text"
+        className="w-full max-w-md bg-white border border-[#e6e5e0] rounded-lg p-6 relative select-text"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onClose}
           aria-label="Close dialog"
-          className="absolute top-4 right-4 text-[#a8b3bc] hover:text-white p-1.5 rounded-full hover:bg-[#002636] transition-colors"
+          className="absolute top-4 right-4 text-[#807d72] hover:text-[#26251e] p-1.5 rounded-md hover:bg-[#fafaf7] transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
 
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-full bg-[#00ed64]/15 border border-[#00ed64]/30 flex items-center justify-center text-[#00ed64]">
-            <Key className="w-5 h-5" />
+          <div className="w-9 h-9 rounded-md bg-[#fafaf7] border border-[#e6e5e0] flex items-center justify-center text-[#f54e00]">
+            <Key className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-white tracking-tight">AI & Voice Configuration</h3>
-            <p className="text-xs text-[#a8b3bc]">Gemini multimodal reasoning & nuanced voice models</p>
+            <h3 className="text-base font-normal tracking-[-0.3px] text-[#26251e]">
+              Gemini Audio & Model Configuration
+            </h3>
+            <p className="text-xs text-[#5a5852]">Native multimodal speech & live reasoning</p>
           </div>
         </div>
 
         <div className="space-y-4">
+          {/* API Key Input */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-[#a8b3bc] uppercase tracking-wider">
-                Gemini API Key
+              <label className="text-xs font-mono font-medium text-[#5a5852] uppercase tracking-wider">
+                Google AI Studio Key
               </label>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={handlePaste}
-                  className="text-[11px] text-[#a8b3bc] hover:text-[#00ed64] flex items-center gap-1 transition-colors"
+                  className="text-[11px] text-[#5a5852] hover:text-[#f54e00] flex items-center gap-1 transition-colors font-mono"
                   title="Paste from clipboard"
                 >
                   <Clipboard className="w-3 h-3" /> Paste
@@ -198,7 +180,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   <button
                     type="button"
                     onClick={() => setApiKey('')}
-                    className="text-[11px] text-[#a8b3bc] hover:text-rose-400 flex items-center gap-1 transition-colors"
+                    className="text-[11px] text-[#5a5852] hover:text-[#cf2d56] flex items-center gap-1 transition-colors font-mono"
                     title="Clear input"
                   >
                     <Trash2 className="w-3 h-3" /> Clear
@@ -214,25 +196,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="AIzaSy..."
                 autoFocus
-                className="w-full px-3.5 py-2.5 pr-10 bg-[#002636] border border-[#1c2d38] rounded-xl text-sm text-white placeholder-[#5c6c7a] focus:outline-none focus:border-[#00ed64] font-mono select-text"
+                className="w-full px-3 py-2 pr-10 bg-white border border-[#e6e5e0] rounded-md text-sm text-[#26251e] placeholder-[#a09c92] focus:outline-none focus:border-[#26251e] font-mono select-text"
               />
               <button
                 type="button"
                 onClick={() => setShowKey(!showKey)}
-                className="absolute right-3 text-[#5c6c7a] hover:text-white transition-colors"
+                className="absolute right-3 text-[#807d72] hover:text-[#26251e] transition-colors"
                 title={showKey ? 'Hide Key' : 'Show Key'}
               >
                 {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
 
-            <div className="flex items-center justify-between text-[11px] text-[#a8b3bc] mt-2">
-              <span>Saved locally in your browser.</span>
+            <div className="flex items-center justify-between text-[11px] text-[#5a5852] mt-2">
+              <span>Key is stored locally in your browser.</span>
               <a
                 href="https://aistudio.google.com/app/apikey"
                 target="_blank"
                 rel="noreferrer"
-                className="text-[#00ed64] hover:underline inline-flex items-center gap-1 font-medium"
+                className="text-[#f54e00] hover:underline inline-flex items-center gap-1 font-medium"
               >
                 Get API Key <ExternalLink className="w-3 h-3" />
               </a>
@@ -240,10 +222,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
             {testStatus.message && (
               <div
-                className={`text-[11px] mt-2 p-2 rounded-xl font-mono leading-relaxed ${
+                className={`text-[11px] mt-2 p-2 rounded-md font-mono leading-relaxed ${
                   testStatus.success
-                    ? 'bg-[#00ed64]/10 border border-[#00ed64]/30 text-[#00ed64]'
-                    : 'bg-rose-950/60 border border-rose-800 text-rose-300'
+                    ? 'bg-[#9fc9a2]/20 border border-[#9fc9a2] text-[#1f8a65]'
+                    : 'bg-[#cf2d56]/10 border border-[#cf2d56]/30 text-[#cf2d56]'
                 }`}
               >
                 {testStatus.message}
@@ -251,76 +233,86 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             )}
           </div>
 
-          {/* Gemini Voice Selection */}
+          {/* Gemini Voice / Audio Model Selector */}
           <div>
-            <label className="text-xs font-semibold text-[#a8b3bc] uppercase tracking-wider block mb-2">
-              Gemini Voice Model
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {AVAILABLE_GEMINI_VOICES.map((v) => (
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-mono font-medium text-[#5a5852] uppercase tracking-wider">
+                Gemini Audio / Voice Model
+              </label>
+              <span className="text-[10px] font-mono text-[#807d72]">Multimodal Speech Output</span>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {GEMINI_AUDIO_MODELS.map((m) => (
                 <button
-                  key={v.name}
+                  key={m.id}
                   type="button"
-                  onClick={() => setSelectedVoice(v.name)}
-                  className={`p-2.5 rounded-xl border text-left transition-all ${
-                    selectedVoice === v.name
-                      ? 'bg-[#00ed64]/15 border-[#00ed64] text-white shadow-sm'
-                      : 'bg-[#002636] border-[#1c2d38] text-[#a8b3bc] hover:border-[#243846] hover:text-white'
+                  onClick={() => setSelectedModel(m.id)}
+                  className={`p-2.5 rounded-md border text-left transition-all ${
+                    selectedModel === m.id
+                      ? 'bg-[#fafaf7] border-[#26251e] shadow-sm'
+                      : 'bg-white border-[#e6e5e0] hover:border-[#cfcdc4]'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-xs">{v.label}</span>
-                    <span className="text-[10px] text-[#5c6c7a]">{v.gender}</span>
+                    <span className="font-medium text-xs text-[#26251e] flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-[#f54e00]" />
+                      {m.name}
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#e6e5e0] text-[#26251e]">
+                      {m.tag}
+                    </span>
                   </div>
-                  <p className="text-[10px] text-[#5c6c7a] mt-0.5 truncate">{v.style}</p>
+                  <p className="text-[11px] text-[#5a5852] mt-1 leading-snug">{m.description}</p>
                 </button>
               ))}
             </div>
             <button
               type="button"
               onClick={handleTestVoice}
-              className="mt-2 text-[11px] text-[#00ed64] hover:underline flex items-center gap-1.5 font-medium"
+              className="mt-2 text-[11px] text-[#f54e00] hover:underline flex items-center gap-1.5 font-medium font-mono"
             >
-              <Volume2 className="w-3.5 h-3.5" /> Preview Selected Voice
+              <Volume2 className="w-3.5 h-3.5" /> Test Gemini Audio Voice
             </button>
           </div>
 
-          <div className="p-3 rounded-xl bg-[#002636]/60 border border-[#1c2d38] text-xs text-slate-300 space-y-1.5">
-            <div className="flex items-center gap-2 font-medium text-white">
-              <ShieldCheck className="w-4 h-4 text-[#00ed64]" />
-              <span>Offline / Local Fallback Active</span>
+          {/* Offline / Local Rule Engine Notice */}
+          <div className="p-3 rounded-md bg-[#fafaf7] border border-[#e6e5e0] text-xs text-[#5a5852] space-y-1">
+            <div className="flex items-center gap-2 font-medium text-[#26251e]">
+              <ShieldCheck className="w-4 h-4 text-[#1f8a65]" />
+              <span>Offline Architecture Engine Active</span>
             </div>
-            <p className="text-[#a8b3bc] text-[11px] leading-relaxed">
-              If an API key is not provided, tinker automatically uses its built-in architecture rule engine for all diagram commands!
+            <p className="text-[#5a5852] text-[11px] leading-relaxed">
+              If an API key is not entered, Tinker runs on its built-in local rule engine for zero-dependency operation.
             </p>
           </div>
 
+          {/* Bottom Actions */}
           <div className="flex items-center justify-between pt-2">
             <button
               type="button"
               onClick={handleTestKey}
               disabled={testStatus.testing}
-              className="px-3.5 py-2 text-xs font-medium text-[#00ed64] hover:bg-[#00ed64]/10 border border-[#00ed64]/30 rounded-full transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 text-xs font-medium text-[#26251e] hover:bg-[#fafaf7] border border-[#e6e5e0] rounded-md transition-colors disabled:opacity-50"
             >
-              {testStatus.testing ? 'Testing...' : 'Test Connection'}
+              {testStatus.testing ? 'Testing...' : 'Test Key'}
             </button>
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-xs font-medium text-[#a8b3bc] hover:text-white hover:bg-[#002636] rounded-full transition-colors"
+                className="px-3 py-1.5 text-xs font-medium text-[#5a5852] hover:text-[#26251e] hover:bg-[#fafaf7] rounded-md transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSave}
-                className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-[#001e2b] bg-[#00ed64] hover:bg-[#00b545] rounded-full transition-colors shadow-lg shadow-[#00ed64]/20"
+                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium text-white bg-[#f54e00] hover:bg-[#d04200] rounded-md transition-all"
               >
                 {saved ? (
                   <>
-                    <Check className="w-4 h-4 text-[#001e2b]" />
+                    <Check className="w-4 h-4" />
                     <span>Saved!</span>
                   </>
                 ) : (
