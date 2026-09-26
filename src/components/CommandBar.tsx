@@ -30,38 +30,22 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
     }
   };
 
-  const [statusMessage, setStatusMessage] = useState<{
-    text: string;
-    type: 'success' | 'error';
-    source?: string;
-  } | null>(null);
-
   const executeCommand = async (commandText: string) => {
     if (!commandText.trim() || loading) return;
     setLoading(true);
-    setStatusMessage(null);
 
     try {
       const result = await processArchitectureInstruction(commandText.trim());
       if (result.success) {
-        setStatusMessage({
-          text: result.actionsExecuted.join(' • ') || 'Architecture updated',
-          type: 'success',
-          source: result.source === 'gemini' ? 'Gemini AI' : 'Local Rule Engine',
-        });
         setInput('');
-      } else {
-        setStatusMessage({
-          text: result.error || 'Could not understand command',
-          type: 'error',
-        });
+      } else if (result.error) {
+        setMicNotice(result.error);
+        setTimeout(() => setMicNotice(null), 3500);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setStatusMessage({
-        text: msg,
-        type: 'error',
-      });
+      setMicNotice(msg);
+      setTimeout(() => setMicNotice(null), 3500);
     } finally {
       setLoading(false);
     }
@@ -87,10 +71,8 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      setStatusMessage({
-        text: 'Speech recognition is not supported in this browser. Please use Chrome or Edge.',
-        type: 'error',
-      });
+      setMicNotice('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
+      setTimeout(() => setMicNotice(null), 4000);
       return;
     }
 
@@ -166,77 +148,59 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-2xl px-4 flex flex-col items-center gap-2 select-none">
       {/* Listening notification / wait banner */}
       {micNotice && (
-        <div className="flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 backdrop-blur-xl animate-pulse shadow-xl">
+        <div className="flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-[#00ed64]/15 text-[#00ed64] border border-[#00ed64]/30 backdrop-blur-xl animate-pulse shadow-xl">
           <span>{micNotice}</span>
         </div>
       )}
 
-      {/* Status banner */}
-      {statusMessage && !micNotice && (
-        <div
-          className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium backdrop-blur-xl border animate-fade-in shadow-xl ${
-            statusMessage.type === 'success'
-              ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800/80'
-              : 'bg-rose-950/80 text-rose-300 border-rose-800/80'
-          }`}
-        >
-          <span>{statusMessage.text}</span>
-          {statusMessage.source && (
-            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-slate-900/80 text-slate-300 border border-slate-700/60">
-              {statusMessage.source}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Suggestion Pills */}
-      <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto max-w-full py-1 text-[11px] text-slate-400">
-        <span className="text-slate-400 font-medium mr-1 flex items-center gap-1">
-          <Sparkles className="w-3 h-3 text-amber-400" /> Ideas:
+      {/* Suggestion Pills - MongoDB pill-tab style */}
+      <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto max-w-full py-1 text-[11px] text-[#a8b3bc]">
+        <span className="text-[#a8b3bc] font-medium mr-1 flex items-center gap-1">
+          <Sparkles className="w-3 h-3 text-[#00ed64]" /> Ideas:
         </span>
         <button
           onClick={() => handleSuggestion('What happens if Auth goes down?')}
-          className="px-2.5 py-1 rounded-full bg-[#11141c]/80 hover:bg-slate-800 hover:text-slate-200 border border-slate-800 transition-colors whitespace-nowrap"
+          className="px-3 py-1 rounded-full bg-[#002636] hover:bg-[#003d4f] hover:text-white border border-[#1c2d38] hover:border-[#00ed64]/40 transition-all whitespace-nowrap"
         >
           "What happens if Auth goes down?"
         </button>
         <button
           onClick={() => handleSuggestion('Simplify this for a non-technical person')}
-          className="px-2.5 py-1 rounded-full bg-[#11141c]/80 hover:bg-slate-800 hover:text-slate-200 border border-slate-800 transition-colors whitespace-nowrap"
+          className="px-3 py-1 rounded-full bg-[#002636] hover:bg-[#003d4f] hover:text-white border border-[#1c2d38] hover:border-[#00ed64]/40 transition-all whitespace-nowrap"
         >
           "Simplify this"
         </button>
         <button
           onClick={() => handleSuggestion('Put Redis between orders and postgres')}
-          className="px-2.5 py-1 rounded-full bg-[#11141c]/80 hover:bg-slate-800 hover:text-slate-200 border border-slate-800 transition-colors whitespace-nowrap"
+          className="px-3 py-1 rounded-full bg-[#002636] hover:bg-[#003d4f] hover:text-white border border-[#1c2d38] hover:border-[#00ed64]/40 transition-all whitespace-nowrap"
         >
-          "Put Redis between orders and postgres"
+          "Put Redis between orders & DB"
         </button>
         <button
           onClick={() => handleSuggestion('Highlight the payment flow')}
-          className="px-2.5 py-1 rounded-full bg-[#11141c]/80 hover:bg-slate-800 hover:text-slate-200 border border-slate-800 transition-colors whitespace-nowrap"
+          className="px-3 py-1 rounded-full bg-[#002636] hover:bg-[#003d4f] hover:text-white border border-[#1c2d38] hover:border-[#00ed64]/40 transition-all whitespace-nowrap"
         >
           "Highlight payment flow"
         </button>
       </div>
 
-      {/* Main Floating Input Bar with Integrated Mic */}
+      {/* Main Floating Input Bar with MongoDB pill shape */}
       <form
         onSubmit={handleSubmit}
-        className="w-full flex items-center gap-2 p-1.5 pl-4 rounded-2xl bg-[#11141c]/90 border border-slate-800/90 hover:border-slate-700 backdrop-blur-2xl shadow-2xl transition-all group focus-within:border-amber-500/60 focus-within:ring-2 focus-within:ring-amber-500/20"
+        className="w-full flex items-center gap-2 p-1.5 pl-4 rounded-full bg-[#001e2b]/95 border border-[#1c2d38] hover:border-[#243846] backdrop-blur-2xl shadow-2xl transition-all group focus-within:border-[#00ed64] focus-within:ring-2 focus-within:ring-[#00ed64]/20"
       >
-        <div className="text-amber-400 flex items-center justify-center">
-          <Command className="w-4 h-4 text-slate-400 group-focus-within:text-amber-400 transition-colors" />
+        <div className="flex items-center justify-center">
+          <Command className="w-4 h-4 text-[#5c6c7a] group-focus-within:text-[#00ed64] transition-colors" />
         </div>
 
         {isListening ? (
           <div className="flex-1 flex items-center gap-2.5 py-1 select-none">
             <div className="flex items-center gap-1">
-              <span className="w-1.5 h-3 bg-amber-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-              <span className="w-1.5 h-5 bg-amber-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-              <span className="w-1.5 h-3 bg-amber-400 rounded-full animate-bounce"></span>
+              <span className="w-1.5 h-3 bg-[#00ed64] rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+              <span className="w-1.5 h-5 bg-[#00ed64] rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+              <span className="w-1.5 h-3 bg-[#00ed64] rounded-full animate-bounce"></span>
             </div>
-            <span className="text-xs font-medium text-amber-300/90 tracking-wide">
+            <span className="text-xs font-semibold text-[#00ed64] tracking-wide">
               Listening to voice... Click mic to submit
             </span>
           </div>
@@ -247,7 +211,7 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
             onChange={(e) => setInput(e.target.value)}
             placeholder='Describe architecture change or ask a question... (e.g. "What happens if Auth goes down?")'
             disabled={loading}
-            className="flex-1 bg-transparent text-sm text-slate-100 placeholder-slate-500 focus:outline-none disabled:opacity-50"
+            className="flex-1 bg-transparent text-sm text-white placeholder-[#5c6c7a] focus:outline-none disabled:opacity-50"
           />
         )}
 
@@ -256,10 +220,10 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
           type="button"
           onClick={toggleMute}
           title={isMuted ? 'Unmute voice responses' : 'Mute voice responses'}
-          className={`p-2 rounded-xl transition-colors ${
+          className={`p-2 rounded-full transition-colors ${
             isMuted
-              ? 'text-slate-500 hover:text-slate-400 hover:bg-slate-800/50'
-              : 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/10'
+              ? 'text-[#5c6c7a] hover:text-white hover:bg-[#002636]'
+              : 'text-[#00ed64] hover:text-[#00ed64] hover:bg-[#00ed64]/10'
           }`}
         >
           {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
@@ -270,23 +234,23 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
           type="button"
           onClick={toggleListening}
           title={isListening ? 'Stop listening and submit' : 'Click to speak (stays listening until stopped)'}
-          className={`p-2 rounded-xl transition-all ${
+          className={`p-2 rounded-full transition-all ${
             isListening
               ? 'bg-rose-500 text-white animate-pulse ring-4 ring-rose-500/30'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+              : 'bg-[#002636] border border-[#1c2d38] text-[#00ed64] hover:bg-[#003d4f] hover:text-white'
           }`}
         >
           {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
         </button>
 
-        {/* Submit Button */}
+        {/* Submit Button - MongoDB Signature Green Pill */}
         <button
           type="submit"
           disabled={!input.trim() || loading}
-          className="flex items-center justify-center w-8 h-8 rounded-xl bg-amber-400 hover:bg-amber-300 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-bold transition-all shadow-md shadow-amber-500/10"
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-[#00ed64] hover:bg-[#00b545] disabled:bg-[#002636] disabled:text-[#5c6c7a] text-[#001e2b] font-bold transition-all shadow-md shadow-[#00ed64]/10"
         >
           {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+            <Loader2 className="w-4 h-4 animate-spin text-[#001e2b]" />
           ) : (
             <ArrowRight className="w-4 h-4" />
           )}

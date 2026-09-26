@@ -12,7 +12,7 @@ import {
   PlusCircle,
   CheckCircle2,
 } from 'lucide-react';
-import { speakText } from '../ai/speechSynthesis';
+import { speakWithGeminiVoice } from '../ai/geminiVoice';
 
 interface Suggestion {
   id: string;
@@ -102,7 +102,7 @@ export const RightPanel: React.FC = () => {
           serviceNodes.forEach((svc) => {
             store.connect('api_gw', svc.id);
           });
-          speakText('Added API Gateway to manage client ingress and security.');
+          speakWithGeminiVoice('Added API Gateway to manage client ingress and security.');
         },
       });
     }
@@ -140,7 +140,7 @@ export const RightPanel: React.FC = () => {
             });
             if (dbNode) store.connect('redis', dbNode.id);
           }
-          speakText('Inserted Redis Cache to protect database from read spikes.');
+          speakWithGeminiVoice('Inserted Redis Cache to protect database from read spikes.');
         },
       });
     }
@@ -167,7 +167,7 @@ export const RightPanel: React.FC = () => {
           if (orders) {
             store.connect(orders.id, 'orders_queue', 'async events');
           }
-          speakText('Added SQS Queue to decouple background asynchronous workflows.');
+          speakWithGeminiVoice('Added SQS Queue to decouple background asynchronous workflows.');
         },
       });
     }
@@ -190,7 +190,7 @@ export const RightPanel: React.FC = () => {
             awsIcon: 's3',
             subType: 'Amazon S3',
           });
-          speakText('Added Amazon S3 storage bucket for static media assets.');
+          speakWithGeminiVoice('Added Amazon S3 storage bucket for static media assets.');
         },
       });
     }
@@ -217,7 +217,7 @@ export const RightPanel: React.FC = () => {
           if (gw) {
             store.connect(gw.id, 'auth', 'authorizes');
           }
-          speakText('Added Auth Service for token validation.');
+          speakWithGeminiVoice('Added Auth Service for token validation.');
         },
       });
     }
@@ -232,9 +232,9 @@ export const RightPanel: React.FC = () => {
 
   return (
     <div className="absolute top-20 right-6 z-30 pointer-events-auto select-none">
-      <div className="bg-[#11141c]/90 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl w-80 overflow-hidden">
-        {/* Tab Headers */}
-        <div className="flex items-center justify-between border-b border-slate-800 bg-[#0d1017]/70 px-2 py-1.5">
+      <div className="bg-[#001e2b]/95 backdrop-blur-xl border border-[#1c2d38] rounded-2xl shadow-2xl w-80 overflow-hidden">
+        {/* Tab Headers - MongoDB Style */}
+        <div className="flex items-center justify-between border-b border-[#1c2d38] bg-[#002636]/90 px-2 py-1.5">
           <div className="flex items-center gap-1">
             {/* Advisor Tab */}
             <button
@@ -242,13 +242,13 @@ export const RightPanel: React.FC = () => {
                 setActiveTab('advisor');
                 setIsExpanded(true);
               }}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
                 activeTab === 'advisor'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  ? 'bg-[#00ed64]/15 text-[#00ed64] border border-[#00ed64]/30 shadow-sm'
+                  : 'text-[#a8b3bc] hover:text-white hover:bg-[#002636]'
               }`}
             >
-              <Lightbulb className="w-3.5 h-3.5" />
+              <Lightbulb className="w-3.5 h-3.5 text-[#00ed64]" />
               <span>Advisor</span>
               {suggestions.length > 0 && (
                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
@@ -263,16 +263,16 @@ export const RightPanel: React.FC = () => {
                 setActiveTab('conversation');
                 setIsExpanded(true);
               }}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
                 activeTab === 'conversation'
-                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  ? 'bg-[#00ed64]/15 text-[#00ed64] border border-[#00ed64]/30 shadow-sm'
+                  : 'text-[#a8b3bc] hover:text-white hover:bg-[#002636]'
               }`}
             >
               <MessageSquare className="w-3.5 h-3.5" />
               <span>History</span>
               {turns.length > 0 && (
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300">
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-[#001e2b] text-[#a8b3bc] border border-[#1c2d38]">
                   {turns.length}
                 </span>
               )}
@@ -284,7 +284,7 @@ export const RightPanel: React.FC = () => {
               <button
                 onClick={() => clearTurns()}
                 title="Clear conversation"
-                className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors"
+                className="p-1 rounded-full text-[#a8b3bc] hover:text-rose-400 hover:bg-rose-950/40 transition-colors"
               >
                 <Trash2 className="w-3 h-3" />
               </button>
@@ -293,7 +293,7 @@ export const RightPanel: React.FC = () => {
             <button
               onClick={() => setIsExpanded(!isExpanded)}
               title={isExpanded ? 'Collapse' : 'Expand'}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1 rounded-full text-[#a8b3bc] hover:text-white hover:bg-[#002636] transition-colors"
             >
               {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
@@ -307,19 +307,19 @@ export const RightPanel: React.FC = () => {
             {activeTab === 'advisor' && (
               <div className="p-2.5 flex flex-col gap-2">
                 <div className="flex items-center justify-between px-1 py-0.5">
-                  <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+                  <span className="text-[11px] font-semibold text-[#a8b3bc] uppercase tracking-wider">
                     Production Gaps
                   </span>
-                  <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-mono font-bold text-[#00ed64] bg-[#00ed64]/10 border border-[#00ed64]/25 px-2.5 py-0.5 rounded-full">
                     {readinessScore}% Ready
                   </span>
                 </div>
 
                 {suggestions.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-emerald-400 flex flex-col items-center gap-1.5">
-                    <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-                    <span className="font-semibold">Architecture looks solid!</span>
-                    <span className="text-[11px] text-slate-400">
+                  <div className="p-4 text-center text-xs text-[#00ed64] flex flex-col items-center gap-1.5">
+                    <CheckCircle2 className="w-6 h-6 text-[#00ed64]" />
+                    <span className="font-semibold text-white">Architecture looks solid!</span>
+                    <span className="text-[11px] text-[#a8b3bc]">
                       No critical architectural bottlenecks or missing layers detected.
                     </span>
                   </div>
@@ -327,30 +327,32 @@ export const RightPanel: React.FC = () => {
                   suggestions.map((item) => (
                     <div
                       key={item.id}
-                      className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 flex flex-col gap-1.5 shadow-sm"
+                      className="p-2.5 rounded-xl bg-[#002636]/60 border border-[#1c2d38] flex flex-col gap-1.5 shadow-sm"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-200">
+                        <span className="text-xs font-semibold text-white">
                           {item.title}
                         </span>
                         <span
-                          className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                            item.severity === 'high'
-                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                            item.category === 'Security'
+                              ? 'bg-[#7b3ff2]/20 text-purple-300 border border-[#7b3ff2]/30'
+                              : item.category === 'Performance'
+                              ? 'bg-[#00ed64]/15 text-[#00ed64] border border-[#00ed64]/30'
+                              : 'bg-[#fa6e39]/20 text-orange-300 border border-[#fa6e39]/30'
                           }`}
                         >
                           {item.category}
                         </span>
                       </div>
 
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                      <p className="text-[11px] text-[#a8b3bc] leading-relaxed">
                         {item.reason}
                       </p>
 
                       <button
                         onClick={() => item.apply()}
-                        className="mt-1 flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-medium transition-all"
+                        className="mt-1 flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-[#00ed64] hover:bg-[#00b545] text-[#001e2b] text-xs font-bold transition-all shadow-sm shadow-[#00ed64]/10"
                       >
                         <PlusCircle className="w-3.5 h-3.5" />
                         <span>{item.actionLabel}</span>

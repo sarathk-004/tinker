@@ -247,14 +247,14 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
       label,
       type: hasReverse || hasParallel ? 'default' : 'smoothstep',
       animated: true,
-      style: { stroke: '#FF9900', strokeWidth: 2.2 },
+      style: { stroke: '#00ed64', strokeWidth: 2.2 },
       ...(isBi
         ? {
             markerStart: {
               type: MarkerType.ArrowClosed,
               width: 18,
               height: 18,
-              color: '#FF9900',
+              color: '#00ed64',
             },
           }
         : {}),
@@ -262,7 +262,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
         type: MarkerType.ArrowClosed,
         width: 18,
         height: 18,
-        color: '#FF9900',
+        color: '#00ed64',
       },
     };
 
@@ -368,12 +368,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
       target: newNodeId,
       type: 'smoothstep',
       animated: true,
-      style: { stroke: '#FF9900', strokeWidth: 2.2 },
+      style: { stroke: '#00ed64', strokeWidth: 2.2 },
       markerEnd: {
         type: MarkerType.ArrowClosed,
         width: 18,
         height: 18,
-        color: '#FF9900',
+        color: '#00ed64',
       },
     };
 
@@ -383,12 +383,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
       target: tgtId,
       type: 'smoothstep',
       animated: true,
-      style: { stroke: '#FF9900', strokeWidth: 2.2 },
+      style: { stroke: '#00ed64', strokeWidth: 2.2 },
       markerEnd: {
         type: MarkerType.ArrowClosed,
         width: 18,
         height: 18,
-        color: '#FF9900',
+        color: '#00ed64',
       },
     };
 
@@ -430,7 +430,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
         animated: isConnected,
         style: {
           ...edge.style,
-          stroke: isConnected ? '#F59E0B' : '#4B5563',
+          stroke: isConnected ? '#00ed64' : '#1c2d38',
           strokeWidth: isConnected ? 3 : 1.5,
           opacity: cleanIds.length === 0 || isConnected ? 1 : 0.25,
         },
@@ -459,7 +459,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => {
       ...edge,
       style: {
         ...edge.style,
-        stroke: '#FF9900',
+        stroke: '#00ed64',
         strokeWidth: 2.2,
         opacity: 1,
       },

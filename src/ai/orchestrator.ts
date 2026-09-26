@@ -2,7 +2,7 @@ import { useDiagramStore, inferAWSDetails, sanitizeId } from '../diagram/store';
 import { useConversationStore } from './conversationStore';
 import { DIAGRAM_TOOLS } from './tools';
 import { buildSystemPrompt, buildContentsWithHistory } from './prompts';
-import { speakText } from './speechSynthesis';
+import { speakWithGeminiVoice } from './geminiVoice';
 
 interface ExecutionResult {
   success: boolean;
@@ -69,18 +69,33 @@ export async function processArchitectureInstruction(
 
   // Record assistant turn in conversation history
   if (!result.actionsExecuted.includes('Reset canvas') && !result.actionsExecuted.includes('Canvas reset')) {
+    // If only primitive diagram edits occurred, don't spam "Added (...)"
+    const hasExplanation = result.actionsExecuted.some(
+      (a) => !/^(?:Added|Removed|Connected|Disconnected|Inserted|Renamed|Highlighted)/i.test(a)
+    );
+
+    const explanationText = result.actionsExecuted
+      .filter((a) => !/^(?:Added|Removed|Connected|Disconnected|Inserted|Renamed|Highlighted)/i.test(a))
+      .join('\n\n');
+
     conversation.addTurn({
       role: 'assistant',
-      text: result.actionsExecuted.join(', ') || (result.error ?? 'No action'),
+      text: hasExplanation ? explanationText : 'Diagram updated.',
       actions: result.actionsExecuted,
       source: result.source,
     });
   }
 
-  // Voice response
+  // Nuanced Voice response using Gemini Voice
   if (result.success && result.actionsExecuted.length > 0) {
-    const spoken = result.actionsExecuted.join('. ');
-    speakText(spoken);
+    const explanations = result.actionsExecuted.filter(
+      (a) => !/^(?:Added|Removed|Connected|Disconnected|Inserted|Renamed|Highlighted)/i.test(a)
+    );
+
+    // Only speak aloud when answering architectural questions or simulations
+    if (explanations.length > 0) {
+      speakWithGeminiVoice(explanations.join('. '));
+    }
   }
 
   return result;
