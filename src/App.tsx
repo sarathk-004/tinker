@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Header } from './components/Header';
 import { DiagramCanvas } from './components/DiagramCanvas';
-import { DemoController } from './components/DemoController';
+import { SideChat } from './components/SideChat';
 import { ManualToolbar } from './components/ManualToolbar';
 import { CommandBar } from './components/CommandBar';
 import { SettingsModal } from './components/SettingsModal';
@@ -30,7 +30,7 @@ export const App: React.FC = () => {
       <main className="relative flex-1 w-full h-full overflow-hidden">
         <DiagramCanvas />
         <ManualToolbar />
-        <DemoController />
+        <SideChat />
         <RightPanel />
         <CommandBar onOpenSettings={() => setSettingsOpen(true)} />
       </main>

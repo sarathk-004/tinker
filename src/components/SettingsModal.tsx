@@ -48,8 +48,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
     setTestStatus({ testing: true, message: 'Testing Gemini API key...' });
 
-    // Try models in order: gemini-2.5-flash -> gemini-1.5-flash -> gemini-2.0-flash
-    const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+    // Try models in order: gemini-3.8-flash -> gemini-2.0-flash -> gemini-1.5-flash
+    const candidateModels = ['gemini-3.8-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
     let verifiedModel = '';
     let lastError = '';
 

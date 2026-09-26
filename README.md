@@ -2,7 +2,7 @@
 
 > Real-time, voice-driven architecture diagramming powered by Gemini AI and interactive React Flow diagrams.
 
-![Tinker Banner](https://img.shields.io/badge/Gemini-2.5%20Flash-blue?style=for-the-badge&logo=google)
+![Tinker Banner](https://img.shields.io/badge/Gemini-3.8%20Flash-blue?style=for-the-badge&logo=google)
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?style=for-the-badge&logo=typescript)
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-38B2D9?style=for-the-badge&logo=tailwindcss)
@@ -12,7 +12,7 @@
 ## ✨ Features
 
 - **🗣️ Natural Voice Architecture Control**: Speak architecture changes naturally (e.g. *"Client talks to load balancer"*, *"Add Redis between them"*, *"Remove it"*).
-- **🤖 Gemini AI Integration**: Multi-turn NLU with function calling targeting automated diagram actions via Google Gemini models (`gemini-2.5-flash`, `gemini-1.5-flash`).
+- **🤖 Gemini AI Integration**: Multi-turn NLU with function calling targeting automated diagram actions via Google Gemini models (`gemini-3.8-flash`).
 - **🛡️ Offline / Local Rule Fallback**: Fully functional offline rule engine for demo scenarios and instant local operations without an API key.
 - **🔄 Auto-healing Connections**: Intelligently reconnects predecessor and successor nodes when intermediary nodes (like caches or proxies) are removed.
 - **⚡ Parallel & Bidirectional Edges**: Full multigraph Dagre layout support for bidirectional services and multi-channel connections.
@@ -36,7 +36,7 @@ Create a `.env` file in the project root:
 
 ```env
 VITE_GEMINI_API_KEY=your_gemini_api_key_here
-VITE_GEMINI_MODEL=gemini-2.5-flash
+VITE_GEMINI_MODEL=gemini-3.8-flash
 ```
 
 > **Note**: You can also enter and test your Gemini API key directly inside the app using the settings modal (stored securely in browser `localStorage`).

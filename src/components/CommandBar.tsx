@@ -80,7 +80,9 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
     executeCommand(prompt);
   };
 
-  // Continuous speech recognition
+  // Continuous speech recognition without live text preview
+  const accumulatedTranscriptRef = useRef('');
+
   const startListening = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -93,6 +95,7 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
     }
 
     try {
+      accumulatedTranscriptRef.current = '';
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
@@ -109,7 +112,8 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
         for (let i = 0; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript + ' ';
         }
-        setInput(transcript.trim());
+        // Save silently without writing live preview to input
+        accumulatedTranscriptRef.current = transcript.trim();
       };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -144,8 +148,9 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
     }
     setIsListening(false);
     setMicNotice(null);
-    if (input.trim()) {
-      executeCommand(input.trim());
+    const spokenText = accumulatedTranscriptRef.current;
+    if (spokenText && spokenText.trim()) {
+      executeCommand(spokenText.trim());
     }
   };
 
@@ -224,18 +229,27 @@ export const CommandBar: React.FC<CommandBarProps> = () => {
           <Command className="w-4 h-4 text-slate-400 group-focus-within:text-amber-400 transition-colors" />
         </div>
 
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={
-            isListening
-              ? 'Listening... speak now'
-              : 'Describe architecture change or ask a question... (e.g. "What happens if Auth goes down?")'
-          }
-          disabled={loading}
-          className="flex-1 bg-transparent text-sm text-slate-100 placeholder-slate-500 focus:outline-none disabled:opacity-50"
-        />
+        {isListening ? (
+          <div className="flex-1 flex items-center gap-2.5 py-1 select-none">
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-3 bg-amber-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+              <span className="w-1.5 h-5 bg-amber-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+              <span className="w-1.5 h-3 bg-amber-400 rounded-full animate-bounce"></span>
+            </div>
+            <span className="text-xs font-medium text-amber-300/90 tracking-wide">
+              Listening to voice... Click mic to submit
+            </span>
+          </div>
+        ) : (
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder='Describe architecture change or ask a question... (e.g. "What happens if Auth goes down?")'
+            disabled={loading}
+            className="flex-1 bg-transparent text-sm text-slate-100 placeholder-slate-500 focus:outline-none disabled:opacity-50"
+          />
+        )}
 
         {/* Audio Mute/Unmute Toggle */}
         <button

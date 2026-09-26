@@ -87,7 +87,7 @@ export async function processArchitectureInstruction(
 }
 
 // -------------------------------------------------------------
-// Gemini 2.0 Flash API Call — Multi-turn with History
+// Gemini 3.8 Flash API Call — Multi-turn with History
 // -------------------------------------------------------------
 async function callGeminiAPI(
   userInput: string,
@@ -97,9 +97,9 @@ async function callGeminiAPI(
 ): Promise<ExecutionResult> {
   const candidateModels = [
     (typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_MODEL : ''),
-    'gemini-2.5-flash',
-    'gemini-1.5-flash',
+    'gemini-3.8-flash',
     'gemini-2.0-flash',
+    'gemini-1.5-flash',
   ].filter(Boolean) as string[];
 
   const systemPrompt = buildSystemPrompt({ nodes, edges });
@@ -174,6 +174,10 @@ async function callGeminiAPI(
       const { name, args } = part.functionCall;
       const desc = executeFunctionCall(name, args, store);
       if (desc) executedActions.push(desc);
+      if (parts.length > 1) {
+        // Progressive live render step: allows user to see nodes appear live
+        await new Promise((resolve) => setTimeout(resolve, 140));
+      }
     } else if (part.text && part.text.trim()) {
       executedActions.push(part.text.trim());
     }

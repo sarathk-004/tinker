@@ -30,7 +30,7 @@ export const AWSArchitectureNode: React.FC<NodeProps<DiagramNode>> = memo(({ dat
   return (
     <div
       className={clsx(
-        'relative group min-w-[210px] rounded-xl px-4 py-3 transition-all duration-300 shadow-xl select-none',
+        'relative group min-w-[210px] rounded-xl px-4 py-3 transition-all duration-300 shadow-xl select-none animate-in fade-in zoom-in-95',
         'bg-[#121620]/90 backdrop-blur-md border',
         isHighlighted
           ? 'border-amber-400 ring-2 ring-amber-400/50 shadow-amber-500/20 scale-105 z-50'
