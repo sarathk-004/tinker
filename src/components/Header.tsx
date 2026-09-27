@@ -19,7 +19,7 @@ export const Header: React.FC<HeaderProps> = ({ layoutDir, onToggleLayout, onOpe
       {/* Brand & Wordmark - Cursor Style */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2.5">
-          <TinkerLogo size={28} className="shadow-xs border border-[#e6e5e0]" />
+          <TinkerLogo size={28} />
           <div className="flex items-baseline gap-2">
             <span className="text-base font-semibold tracking-[-0.3px] text-[#26251e] font-sans">
               tinker

@@ -108,7 +108,7 @@ export const TypewriterPrompt: React.FC = () => {
       <div className="flex flex-col items-center max-w-xl w-full text-center">
         {/* Sleek Terminal Badge in Geist Mono with Tinker Logo */}
         <div className="flex items-center gap-2.5 mb-3 pointer-events-auto">
-          <TinkerLogo size={32} className="shadow-xs border border-[#e6e5e0]" />
+          <TinkerLogo size={32} />
           <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#e6e5e0] text-xs font-mono text-[#5a5852] shadow-xs">
             <span className="text-[#26251e] font-semibold">tinker://</span>
             <span>interactive-aws-studio</span>
