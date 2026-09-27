@@ -1,6 +1,7 @@
 import React from 'react';
 import { useDiagramStore } from '../diagram/store';
-import { RotateCcw, ArrowRightLeft, ArrowUpDown, Cpu, Settings } from 'lucide-react';
+import { RotateCcw, ArrowRightLeft, ArrowUpDown, Settings } from 'lucide-react';
+import { TinkerLogo } from './TinkerLogo';
 
 interface HeaderProps {
   layoutDir: 'LR' | 'TB';
@@ -18,11 +19,9 @@ export const Header: React.FC<HeaderProps> = ({ layoutDir, onToggleLayout, onOpe
       {/* Brand & Wordmark - Cursor Style */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-md bg-[#f54e00] flex items-center justify-center text-white font-medium">
-            <Cpu className="w-4 h-4" />
-          </div>
+          <TinkerLogo size={28} className="shadow-xs border border-[#e6e5e0]" />
           <div className="flex items-baseline gap-2">
-            <span className="text-base font-normal tracking-[-0.3px] text-[#26251e] font-sans">
+            <span className="text-base font-semibold tracking-[-0.3px] text-[#26251e] font-sans">
               tinker
             </span>
             <span className="text-[11px] font-mono font-medium uppercase tracking-[0.5px] px-2 py-0.5 rounded-full bg-[#e6e5e0] text-[#26251e]">

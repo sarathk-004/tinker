@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Terminal, Sparkles, ArrowRight } from 'lucide-react';
+import { Sparkles, ArrowRight } from 'lucide-react';
 import { processArchitectureInstruction } from '../ai/orchestrator';
+import { TinkerLogo } from './TinkerLogo';
 
 interface PromptItem {
   prefix: string;
@@ -105,12 +106,14 @@ export const TypewriterPrompt: React.FC = () => {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 px-4 select-none">
       <div className="flex flex-col items-center max-w-xl w-full text-center">
-        {/* Sleek Terminal Badge in Geist Mono */}
-        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#e6e5e0] text-xs font-mono text-[#5a5852] mb-3 shadow-xs pointer-events-auto">
-          <Terminal className="w-3.5 h-3.5 text-[#f54e00]" />
-          <span className="text-[#26251e] font-semibold">tinker://</span>
-          <span>interactive-aws-studio</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-pulse" />
+        {/* Sleek Terminal Badge in Geist Mono with Tinker Logo */}
+        <div className="flex items-center gap-2.5 mb-3 pointer-events-auto">
+          <TinkerLogo size={32} className="shadow-xs border border-[#e6e5e0]" />
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#e6e5e0] text-xs font-mono text-[#5a5852] shadow-xs">
+            <span className="text-[#26251e] font-semibold">tinker://</span>
+            <span>interactive-aws-studio</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-pulse" />
+          </div>
         </div>
 
         {/* Animated Typewriter Card with Geist Mono and Bolded Text */}

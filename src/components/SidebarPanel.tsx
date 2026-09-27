@@ -15,6 +15,7 @@ import {
   Play,
 } from 'lucide-react';
 import { speakWithGeminiVoice } from '../ai/geminiVoice';
+import { TinkerLogo } from './TinkerLogo';
 
 interface Suggestion {
   id: string;
@@ -265,11 +266,11 @@ export const SidebarPanel: React.FC = () => {
         <button
           onClick={() => setIsOpen(true)}
           title="Open Advisory & Sidechat"
-          className="absolute left-0 top-16 z-30 flex items-center gap-1.5 px-2 py-2 rounded-r-md bg-white border-y border-r border-[#e6e5e0] text-[#26251e] shadow-sm hover:bg-[#fafaf7] transition-all cursor-pointer group"
+          className="absolute left-0 top-16 z-30 flex items-center gap-2 px-2.5 py-1.5 rounded-r-md bg-white border-y border-r border-[#e6e5e0] text-[#26251e] shadow-sm hover:bg-[#fafaf7] transition-all cursor-pointer group"
         >
-          <ChevronRight className="w-4 h-4 text-[#807d72] group-hover:text-[#26251e]" />
+          <TinkerLogo size={18} />
+          <ChevronRight className="w-3.5 h-3.5 text-[#807d72] group-hover:text-[#26251e]" />
           <div className="flex items-center gap-1 text-xs font-mono font-medium">
-            <Lightbulb className="w-3.5 h-3.5 text-[#f54e00]" />
             <span>Chat</span>
             {suggestions.length > 0 && (
               <span className="text-[10px] font-mono px-1 py-0.2 rounded-full bg-[#f54e00]/15 text-[#f54e00]">
