@@ -12,7 +12,7 @@
 ## ✨ Features
 
 - **🗣️ Natural Voice Architecture Control**: Speak architecture changes naturally (e.g. *"Client talks to load balancer"*, *"Add Redis between them"*, *"Remove it"*).
-- **🤖 Gemini AI Integration** *(returning in a later update, server-side)*: typed and voice commands with function calling.
+- **🤖 Typed commands**: plain commands are understood instantly by a built-in parser; free-form requests use Gemini on the server (validated, atomic, with clarifying questions). Voice returns later.
 - **💾 Saved diagrams**: sign in, edit, refresh, and your diagram is still there; edits retry safely and stale tabs cannot overwrite each other.
 - **🔄 Auto-healing Connections**: Intelligently reconnects predecessor and successor nodes when intermediary nodes (like caches or proxies) are removed.
 - **⚡ Parallel & Bidirectional Edges**: Full multigraph Dagre layout support for bidirectional services and multi-channel connections.
@@ -40,7 +40,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxxxxx   # public by design; neve
 ```
 
 Server settings live in `server/.env` (see `server/.env.example` and `server/README.md`): database, Supabase, and later the Gemini key.
-The Gemini key is server-side only. The app no longer calls Gemini from the browser, and typed/voice commands return in a later update.
+The Gemini key is server-side only (`GEMINI_API_KEY` in `server/.env`); the app never calls Gemini from the browser. Typed commands work now (plain ones without any key); voice returns in a later update.
 
 ### 3. Start the app
 

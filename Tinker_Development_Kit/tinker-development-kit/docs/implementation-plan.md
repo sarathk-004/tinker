@@ -86,15 +86,15 @@ This is the first durable working model. Do not wait for voice or a worker to de
 
 ## I5 — Typed command interpretation
 Read: Phase 3 sections 10–12; D07; provider documentation at implementation time.
-- [ ] Implement provider gateway interface and deterministic fake for tests.
-- [ ] Implement simple parser fast path using explicit IDs/unambiguous name resolution.
-- [ ] Interpret ambiguous text through server-side Gemini with validated structured output.
-- [ ] Bind interpretation to the captured diagram version; reject if state changes meanwhile.
-- [ ] Keep original AI request body/hash stable across retries; persist validated interpretation.
-- [ ] Enforce total 15-second deadline, cancellation, rate limit and concurrency cap.
-- [ ] Treat unknown references/ambiguous names as clarification rather than guesses.
-- [ ] Persist conversation turns and link committed operations without duplicate retry messages.
-- [ ] Keep retry failures separate from graph state; ignore late provider completion after cancellation.
+- [x] Implement provider gateway interface and deterministic fake for tests.
+- [x] Implement simple parser fast path using explicit IDs/unambiguous name resolution.
+- [x] Interpret ambiguous text through server-side Gemini with validated structured output. (implemented and tested against a fake provider and a fake fetch; the LIVE call is unverified until `npm run check:gemini` runs with a real key, see LC8/LC22)
+- [x] Bind interpretation to the captured diagram version; reject if state changes meanwhile.
+- [x] Keep original AI request body/hash stable across retries; persist validated interpretation.
+- [x] Enforce total 15-second deadline, cancellation, rate limit and concurrency cap.
+- [x] Treat unknown references/ambiguous names as clarification rather than guesses.
+- [x] Persist conversation turns and link committed operations without duplicate retry messages.
+- [x] Keep retry failures separate from graph state; ignore late provider completion after cancellation.
 Gate: typed “Put Redis between Orders and PostgreSQL” commits through the same API service as manual insertion. Malformed output, timeout and stale version do not change the diagram.
 Live provider smoke test requires a configured server credential; fake-provider tests do not prove live connectivity.
 

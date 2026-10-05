@@ -11,6 +11,7 @@ import {
   Zap,
   User,
   PlusCircle,
+  Loader2,
   CheckCircle2,
   Play,
 } from 'lucide-react';
@@ -28,7 +29,8 @@ interface Suggestion {
 
 export const SidebarPanel: React.FC = () => {
   const turns = useConversationStore((s) => s.turns);
-  const clearTurns = useConversationStore((s) => s.clear);
+  const clearTurns = useConversationStore((s) => s.hideAll);
+  const pendingAi = useConversationStore((s) => s.pending);
   const nodes = useDiagramStore((s) => s.nodes);
   const store = useDiagramStore();
 
@@ -462,7 +464,7 @@ export const SidebarPanel: React.FC = () => {
                   {turns.length > 0 && (
                     <button
                       onClick={clearTurns}
-                      title="Clear history"
+                      title="Clear this view (your saved conversation stays on the server)"
                       className="flex items-center gap-1 text-[10px] font-mono text-[#807d72] hover:text-[#cf2d56] transition-colors"
                     >
                       <Trash2 className="w-3 h-3" />
@@ -477,18 +479,20 @@ export const SidebarPanel: React.FC = () => {
                       <MessageSquare className="w-7 h-7 mx-auto mb-2 text-[#a09c92]" />
                       <p className="text-xs">No conversation history yet.</p>
                       <p className="text-[11px] text-[#a09c92] mt-1">
-                        Use the mic or command bar to build and ask questions.
+                        Type a command in the bar below, e.g. "Put Redis between Orders and PostgreSQL".
                       </p>
                     </div>
                   ) : (
-                    turns.map((turn, i) => (
+                    turns.map((turn) => (
                       <div
-                        key={i}
+                        key={turn.id}
                         className={`p-2.5 rounded-md border text-xs leading-relaxed ${
-                          turn.role === 'user'
+                          turn.kind === 'error' || turn.kind === 'refused'
+                            ? 'bg-[#cf2d56]/5 border-[#cf2d56]/30 text-[#7a1530]'
+                            : turn.role === 'user'
                             ? 'bg-[#fafaf7] border-[#e6e5e0] text-[#26251e]'
                             : 'bg-white border-[#e6e5e0] text-[#26251e] shadow-2xs'
-                        }`}
+                        } ${turn.kind === 'sending' ? 'opacity-60' : ''}`}
                       >
                         <div className="flex items-center justify-between mb-1">
                           <span className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-[#807d72]">
@@ -500,7 +504,7 @@ export const SidebarPanel: React.FC = () => {
                             ) : (
                               <>
                                 <Zap className="w-3 h-3 text-[#f54e00]" />
-                                <span>Gemini Architect</span>
+                                <span>{turn.source === 'AI' ? 'Tinker AI' : 'Tinker'}</span>
                               </>
                             )}
                           </span>
@@ -510,6 +514,21 @@ export const SidebarPanel: React.FC = () => {
                         <div className="text-[11.5px] text-[#26251e] whitespace-pre-wrap leading-relaxed">
                           {turn.text}
                         </div>
+
+                        {turn.options && turn.options.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {turn.options.map((option) => (
+                              <button
+                                key={option}
+                                onClick={() => useConversationStore.getState().setDraft(option)}
+                                title="Put this in the command bar"
+                                className="px-2 py-0.5 rounded-md bg-[#fafaf7] hover:bg-white border border-[#e6e5e0] hover:border-[#26251e] text-[11px] text-[#26251e] transition-colors"
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                        )}
 
                         {turn.actions && turn.actions.length > 0 && (
                           <div className="mt-2 pt-1.5 border-t border-[#e6e5e0]/60 space-y-0.5">
@@ -526,6 +545,11 @@ export const SidebarPanel: React.FC = () => {
                         )}
                       </div>
                     ))
+                  )}
+                  {pendingAi && (
+                    <div className="flex items-center gap-2 px-2 py-1 text-[11px] text-[#5a5852]">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Working on it…
+                    </div>
                   )}
                 </div>
               </div>

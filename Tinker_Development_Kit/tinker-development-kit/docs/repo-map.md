@@ -12,7 +12,7 @@ Retrieval index: `graphify-out/` built from `6e0130d` on 2026-10-05 (333 nodes).
 | Build + typecheck | `npm run build` (`tsc -b && vite build`) | PASS, 37s; 526 kB JS chunk warning (>500 kB) |
 | Preview | `npm run preview` | not run |
 | Typecheck all workspaces | `npm run typecheck` | PASS (I1) |
-| Tests (Vitest: shared, server) | `npm test` | 172 tests PASS (I4: shared 17, server 113, frontend 42 via `npm run test:web`; server tests start an isolated real Postgres) |
+| Tests (Vitest: shared, server) | `npm test` | 295 tests PASS (I5: shared 17, server 220, frontend 58 via `npm run test:web`; server tests start an isolated real Postgres) |
 | Boundary check | `npm run check:boundaries` (`--strict` fails on legacy VITE_* key refs) | PASS (I1) |
 | API dev server | `npm run dev:api` (server/.env from server/.env.example; needs `dev:db` first) | /health, /health/ready 200 verified (I3) |
 | Local database | `npm run dev:db -w @tinker/server` (embedded Postgres 18.4 on :54329, data in `server/.data/`) | running; migrations up/down/up verified |
@@ -39,6 +39,9 @@ Retrieval index: `graphify-out/` built from `6e0130d` on 2026-10-05 (333 nodes).
 | Browser API client, document session, auth, workspace store, editor view | `src/api/client.ts`, `src/document/{session,instance}.ts`, `src/auth/auth.ts`, `src/workspace/workspaceStore.ts`, `src/diagram/{store,adapters,flow,inference}.ts`, `src/config.ts` | I4 (replaces the prototype store and the `src/ai` Gemini code) |
 | Login, diagram bar, banners | `src/components/{LoginScreen,DiagramBar,StatusBanners}.tsx` | I4 |
 | Prototype AI code (reference only) | `Tinker_Development_Kit/tinker-development-kit/legacy/prototype-ai/` | not compiled; input for I5/I7 |
+| AI: parser, prompt, plan executor, provider gateway, service | `server/src/modules/ai/{domain,application,providers,persistence}`, `server/src/infrastructure/http/concurrency-limiter.ts`, `shared/src/ai.ts` | I5 |
+| Browser typed commands and conversation | `src/ai/{aiCommands,conversationStore}.ts`, `src/components/CommandBar.tsx` | I5 |
+| Live Gemini smoke test | `server/scripts/check-gemini.ts` (`npm run check:gemini`) | needs GEMINI_API_KEY; not yet run |
 | Persistence, idempotency, identity, access | `server/src/infrastructure/{database,idempotency,auth}`, `server/src/modules/{identity,workspaces}`, `server/src/modules/diagrams/{application,persistence,http}`, `server/migrations/*.sql` | I3 |
 | Dev saved-diagrams preview (localhost, dev only) | `api-demo.html`, `src/dev/api-demo.ts`, `src/dev/diagram-svg.ts` | http://localhost:5173/api-demo.html |
 | DB migrations | `server/migrations/` (empty until I3), `docker-compose.yml` | |

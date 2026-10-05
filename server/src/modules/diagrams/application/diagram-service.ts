@@ -50,7 +50,7 @@ const detail = (row: DiagramRow): DiagramDetail => ({
 });
 
 /** Deterministic failures (version conflict, domain refusal) are stored and replayed exactly like successes (D03). */
-function failure(requestId: string, code: ErrorCode, message: string, details?: Record<string, unknown>): Outcome {
+export function failure(requestId: string, code: ErrorCode, message: string, details?: Record<string, unknown>): Outcome {
   const body: ErrorEnvelope = { error: { code, message, requestId, ...(details ? { details } : {}) } };
   return { status: ERROR_HTTP_STATUS[code], body };
 }
@@ -224,7 +224,7 @@ export async function patchPresentation(deps: ServiceDeps, actor: Actor, diagram
   );
 }
 
-function versionConflict(actor: Actor, expectedVersion: number, currentVersion: number): Outcome {
+export function versionConflict(actor: Actor, expectedVersion: number, currentVersion: number): Outcome {
   return failure(actor.requestId, 'DIAGRAM_VERSION_CONFLICT', 'The diagram has changed since this request was created.', { expectedVersion, currentVersion });
 }
 

@@ -22,6 +22,13 @@ The project URL is in `server/.env.supabase.local` (gitignored). The schema is a
 3. Stop the dev-mode API, then `npm run dev:api:supabase`.
 4. Open http://localhost:5173/api-demo.html, use "1b. Sign in with Supabase" with the publishable key and a user created in Supabase (Authentication > Users). The API verifies that real token against Supabase's published keys.
 
+## Typed commands and Gemini (I5)
+Plain typed commands ("put Redis between Orders and PostgreSQL") are understood by a deterministic parser and need no key. Free-form requests go to Gemini through the server only.
+1. Put `GEMINI_API_KEY=...` in `server/.env` (or `server/.env.supabase.local`). Never in a `VITE_*` variable, never in chat. Optional: `GEMINI_MODEL`, `AI_DEADLINE_MS` (15000), `AI_RATE_LIMIT_PER_MINUTE` (10), `AI_MAX_CONCURRENT` (2).
+2. `npm run check:gemini` makes a few real calls (no database, no diagrams) and prints PASS/FAIL lines. Share those lines if something fails; they contain no key.
+3. Restart the API. `/v1/me` then reports `features.aiModel: true`.
+Without a key the API still serves typed parser commands and everything manual.
+
 ## Checks (repo root)
 | Command | What it does |
 |---|---|

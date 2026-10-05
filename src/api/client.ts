@@ -4,9 +4,13 @@ import {
   diagramDetailSchema,
   diagramListResponseSchema,
   ERROR_RETRY_POLICY,
+  aiCommandResponseSchema,
+  conversationResponseSchema,
   errorEnvelopeSchema,
   meResponseSchema,
+  type AiCommandResponse,
   type CommandResponse,
+  type ConversationResponse,
   type DeleteDiagramResponse,
   type DiagramDetail,
   type DiagramListResponse,
@@ -53,6 +57,13 @@ export interface ApiClientOptions {
   timeoutMs?: number;
 }
 
+/** Per-request overrides. AI requests must not auto-retry provider failures (each attempt can take the full deadline). */
+export interface RequestOptions {
+  timeoutMs?: number;
+  /** Error codes that are reported to the caller immediately instead of being retried automatically. */
+  noRetryCodes?: readonly ErrorCode[];
+}
+
 export interface MutationSpec {
   method: 'POST' | 'PATCH' | 'DELETE';
   path: string;
@@ -76,7 +87,7 @@ export function createApiClient(options: ApiClientOptions) {
   const timeoutMs = options.timeoutMs ?? 15_000;
 
   /** One HTTP round trip. Throws ApiError (transport failures are retryable). */
-  async function once(method: string, path: string, body: unknown, key: string | undefined, token: string | null): Promise<{ status: number; json: unknown; replayed: boolean; retryAfterMs?: number }> {
+  async function once(method: string, path: string, body: unknown, key: string | undefined, token: string | null, timeout: number): Promise<{ status: number; json: unknown; replayed: boolean; retryAfterMs?: number }> {
     const headers: Record<string, string> = {};
     if (token) headers['authorization'] = `Bearer ${token}`;
     if (body !== undefined) headers['content-type'] = 'application/json';
@@ -88,7 +99,7 @@ export function createApiClient(options: ApiClientOptions) {
         method,
         headers,
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: AbortSignal.timeout(timeout),
       });
     } catch (error) {
       const timedOut = (error as { name?: string }).name === 'TimeoutError';
@@ -127,14 +138,14 @@ export function createApiClient(options: ApiClientOptions) {
    * Request with transport-level resilience: transient failures are retried with exponential backoff and the same
    * Idempotency-Key (so a retried write can never apply twice); a 401 triggers one credential refresh.
    */
-  async function request<T>(method: string, path: string, body: unknown, key: string | undefined, schema: Schema<T>): Promise<Replayable<T>> {
+  async function request<T>(method: string, path: string, body: unknown, key: string | undefined, schema: Schema<T>, opts: RequestOptions = {}): Promise<Replayable<T>> {
     let refreshed = false;
     let lastError: ApiError | undefined;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       let token = await options.auth.getAccessToken();
       let result;
       try {
-        result = await once(method, path, body, key, token);
+        result = await once(method, path, body, key, token, opts.timeoutMs ?? timeoutMs);
       } catch (error) {
         lastError = error as ApiError;
         await sleep(backoff(attempt));
@@ -147,7 +158,10 @@ export function createApiClient(options: ApiClientOptions) {
         return { data: parsed.data, replayed: result.replayed };
       }
 
-      const error = toError(result.status, result.json);
+      let error = toError(result.status, result.json);
+      if (error.retryable && error.code !== 'NETWORK_ERROR' && opts.noRetryCodes?.includes(error.code as ErrorCode)) {
+        error = new ApiError(error.code, error.message, error.status, error.details, error.requestId, false);
+      }
       if (error.code === 'UNAUTHENTICATED') {
         if (!refreshed) {
           refreshed = true;
@@ -170,6 +184,8 @@ export function createApiClient(options: ApiClientOptions) {
   const backoff = (attempt: number) => Math.min(4_000, 300 * 2 ** attempt) + Math.floor(Math.random() * 150);
 
   return {
+    conversation: (diagramId: string) =>
+      request('GET', `/v1/diagrams/${diagramId}/conversation`, undefined, undefined, conversationResponseSchema).then((r) => r.data as ConversationResponse),
     me: () => request('GET', '/v1/me', undefined, undefined, meResponseSchema).then((r) => r.data as MeResponse),
     listDiagrams: (workspaceId: string) =>
       request('GET', `/v1/workspaces/${workspaceId}/diagrams`, undefined, undefined, diagramListResponseSchema).then((r) => r.data as DiagramListResponse),
@@ -180,6 +196,12 @@ export function createApiClient(options: ApiClientOptions) {
     mutate: {
       command: (spec: MutationSpec) => request(spec.method, spec.path, spec.body, spec.idempotencyKey, commandResponseSchema) as Promise<Replayable<CommandResponse>>,
       detail: (spec: MutationSpec) => request(spec.method, spec.path, spec.body, spec.idempotencyKey, diagramDetailSchema) as Promise<Replayable<DiagramDetail>>,
+      /** Typed command. 28 s budget (the server's deadline is 15 s); provider failures surface at once for the user to decide. */
+      ai: (spec: MutationSpec) =>
+        request(spec.method, spec.path, spec.body, spec.idempotencyKey, aiCommandResponseSchema, {
+          timeoutMs: 28_000,
+          noRetryCodes: ['AI_TIMEOUT', 'AI_PROVIDER_ERROR', 'AI_UNAVAILABLE', 'RATE_LIMITED'],
+        }) as Promise<Replayable<AiCommandResponse>>,
       deleted: (spec: MutationSpec) => request(spec.method, spec.path, spec.body, spec.idempotencyKey, deleteDiagramResponseSchema) as Promise<Replayable<DeleteDiagramResponse>>,
     },
   };

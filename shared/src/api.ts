@@ -83,6 +83,12 @@ export type WorkspaceSummary = z.infer<typeof workspaceSummarySchema>;
 export const meResponseSchema = z.strictObject({
   user: z.strictObject({ id: uuidSchema, email: z.string().nullable(), displayName: z.string().nullable() }),
   workspaces: z.array(workspaceSummarySchema),
+  /** What this server can do right now; the UI enables features from this, never from guesses. */
+  /**
+   * aiCommands: typed commands are offered (the deterministic parser needs no model).
+   * aiModel: a model is configured, so free-form requests can be interpreted; without it only plain commands work.
+   */
+  features: z.strictObject({ aiCommands: z.boolean(), aiModel: z.boolean() }),
 });
 export type MeResponse = z.infer<typeof meResponseSchema>;
 

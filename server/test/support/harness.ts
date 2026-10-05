@@ -7,6 +7,7 @@ import { loadConfig } from '../../src/infrastructure/config/config.ts';
 import { createPool, type Pool } from '../../src/infrastructure/database/pool.ts';
 import type { TestHooks } from '../../src/infrastructure/idempotency/mutation-requests.ts';
 import type { RateLimiter } from '../../src/infrastructure/http/rate-limiter.ts';
+import type { InterpretationProvider } from '../../src/modules/ai/providers/types.ts';
 
 export interface Harness {
   app: FastifyInstance;
@@ -26,6 +27,8 @@ export interface TestUser {
 export interface HarnessOptions {
   hooks?: TestHooks;
   rateLimiter?: RateLimiter;
+  aiProvider?: InterpretationProvider;
+  aiRateLimiter?: RateLimiter;
   env?: Record<string, string>;
   /** Share an existing pool/signer (simulates an API restart against the same database). */
   pool?: Pool;
@@ -43,6 +46,8 @@ export async function startHarness(options: HarnessOptions = {}): Promise<Harnes
     logger: false,
     ...(options.hooks ? { hooks: options.hooks } : {}),
     ...(options.rateLimiter ? { rateLimiter: options.rateLimiter } : {}),
+    ...(options.aiProvider ? { aiProvider: options.aiProvider } : {}),
+    ...(options.aiRateLimiter ? { aiRateLimiter: options.aiRateLimiter } : {}),
   });
   return {
     app,
@@ -96,3 +101,21 @@ export async function createDiagramFor(h: Harness, user: TestUser, name = 'Test 
 
 export const cmd = (diagramId: string, user: TestUser, h: Harness, expectedVersion: number, command: unknown, idemKey = key()) =>
   call(h, user, 'POST', `/v1/diagrams/${diagramId}/commands`, { expectedVersion, command }, { 'idempotency-key': idemKey });
+
+/** POST /v1/diagrams/{id}/ai/command */
+export const aiCmd = (
+  h: Harness,
+  user: TestUser,
+  diagramId: string,
+  expectedVersion: number,
+  text: string,
+  opts: { key?: string; conversationId?: string } = {},
+) =>
+  call(
+    h,
+    user,
+    'POST',
+    `/v1/diagrams/${diagramId}/ai/command`,
+    { expectedVersion, ...(opts.conversationId ? { conversationId: opts.conversationId } : {}), input: { type: 'TEXT', text } },
+    { 'idempotency-key': opts.key ?? key() },
+  );

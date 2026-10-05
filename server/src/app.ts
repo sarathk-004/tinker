@@ -6,7 +6,11 @@ import type { Config } from './infrastructure/config/config.ts';
 import { createJwtAuthenticator, rejectAllAuthenticator, type Authenticator } from './infrastructure/auth/authenticator.ts';
 import type { LocalSigner, TokenVerifier } from './infrastructure/auth/verifier.ts';
 import type { Pool } from './infrastructure/database/pool.ts';
+import { createConcurrencyLimiter } from './infrastructure/http/concurrency-limiter.ts';
 import { createRateLimiter, type RateLimiter } from './infrastructure/http/rate-limiter.ts';
+import { createGeminiProvider } from './modules/ai/providers/gemini.ts';
+import { disabledProvider } from './modules/ai/providers/fake.ts';
+import type { InterpretationProvider } from './modules/ai/providers/types.ts';
 import type { TestHooks } from './infrastructure/idempotency/mutation-requests.ts';
 import { registerDevAuthRoutes } from './modules/identity/dev-auth-routes.ts';
 import { AppError, toErrorResponse } from './infrastructure/http/errors.ts';
@@ -24,6 +28,10 @@ export interface BuildAppOptions {
   /** Present only in AUTH_MODE=dev: enables POST /dev/auth/login. */
   devSigner?: LocalSigner;
   rateLimiter?: RateLimiter;
+  /** Override the AI provider (tests inject a deterministic fake). Defaults to Gemini when GEMINI_API_KEY is set, else disabled. */
+  aiProvider?: InterpretationProvider;
+  /** Override the AI rate limiter (tests). */
+  aiRateLimiter?: RateLimiter;
   /** Test-only: fault injection into the commit path and a short lease. */
   hooks?: TestHooks;
   /** Tests disable logging. */
@@ -116,6 +124,12 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     ...(options.pool ? { pool: options.pool } : {}),
     authenticate,
     rateLimiter: options.rateLimiter ?? createRateLimiter({ limit: config.rateLimitPerMinute }),
+    ai: {
+      provider: options.aiProvider ?? (config.ai.apiKey ? createGeminiProvider({ apiKey: config.ai.apiKey, model: config.ai.model }) : disabledProvider),
+      deadlineMs: config.ai.deadlineMs,
+      limiter: options.aiRateLimiter ?? createRateLimiter({ limit: config.ai.ratePerMinute }),
+      concurrency: createConcurrencyLimiter({ max: config.ai.maxConcurrent }),
+    },
     ...(options.hooks ? { hooks: options.hooks } : {}),
   });
 

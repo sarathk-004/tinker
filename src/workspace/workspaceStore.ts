@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type { DiagramSummary, MeResponse, WorkspaceSummary } from '../contracts';
 import { ApiError } from '../api/client';
 import { api, session } from '../document/instance';
+import { useConversationStore } from '../ai/conversationStore';
+import { syncConversation } from '../ai/aiCommands';
 
 const lastKey = (userId: string) => `tinker_last_diagram:${userId}`;
 const remember = (userId: string | undefined, diagramId: string | null) => {
@@ -27,6 +29,8 @@ interface WorkspaceState {
   user: MeResponse['user'] | null;
   workspace: WorkspaceSummary | null;
   diagrams: DiagramSummary[];
+  /** What this server can do (from /v1/me): typed commands are offered only when a model is configured. */
+  features: MeResponse['features'];
 
   bootstrap(): Promise<void>;
   refreshList(): Promise<void>;
@@ -56,6 +60,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     user: null,
     workspace: null,
     diagrams: [],
+    features: { aiCommands: false, aiModel: false },
 
     async bootstrap() {
       set({ phase: 'loading', error: null });
@@ -63,7 +68,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         const me = await api.me();
         const workspace = me.workspaces.find((w) => w.personal) ?? me.workspaces[0] ?? null;
         if (!workspace) throw new Error('No workspace is available for this account.');
-        set({ user: me.user, workspace });
+        set({ user: me.user, workspace, features: me.features });
         await get().refreshList();
         const diagrams = get().diagrams;
         const wanted = recall(me.user.id);
@@ -88,6 +93,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       if (session.getState().diagram && !(await settleBeforeLeaving())) return;
       await session.open(id);
       remember(get().user?.id, id);
+      void syncConversation(id);
       await get().refreshList();
     },
 
@@ -98,6 +104,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       const created = await api.createDiagram(ws.id, name, crypto.randomUUID());
       session.adopt(created.data);
       remember(get().user?.id, created.data.diagramId);
+      void syncConversation(created.data.diagramId);
       await get().refreshList();
     },
 
@@ -131,7 +138,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
 
     reset() {
       session.close();
-      set({ phase: 'idle', error: null, user: null, workspace: null, diagrams: [] });
+      useConversationStore.getState().reset();
+      set({ phase: 'idle', error: null, user: null, workspace: null, diagrams: [], features: { aiCommands: false, aiModel: false } });
     },
   };
 });

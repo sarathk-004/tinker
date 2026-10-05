@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, ArrowRight } from 'lucide-react';
 import { TinkerLogo } from './TinkerLogo';
+import { useConversationStore } from '../ai/conversationStore';
+import { useWorkspaceStore } from '../workspace/workspaceStore';
 
 interface PromptItem {
   prefix: string;
@@ -38,6 +40,10 @@ const TYPEWRITER_PROMPTS: PromptItem[] = [
 ];
 
 export const TypewriterPrompt: React.FC = () => {
+  const aiAvailable = useWorkspaceStore((st) => st.features.aiCommands);
+  const useExample = (command: string) => {
+    if (aiAvailable) useConversationStore.getState().setDraft(command); // fills the command bar; the user presses send
+  };
   const [promptIndex, setPromptIndex] = useState(0);
   const [displayedText, setDisplayedText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -112,7 +118,11 @@ export const TypewriterPrompt: React.FC = () => {
         </div>
 
         {/* Animated Typewriter Card with Geist Mono and Bolded Text */}
-        <div className="pointer-events-auto group px-6 py-4 rounded-lg bg-white border border-[#e6e5e0] flex items-center justify-between gap-4 w-full shadow-xs text-left">
+        <div
+          onClick={() => useExample(currentPrompt.fullCommand)}
+          title={aiAvailable ? 'Click to put this command in the command bar' : undefined}
+          className={`pointer-events-auto group px-6 py-4 rounded-lg bg-white border border-[#e6e5e0] flex items-center justify-between gap-4 w-full shadow-xs text-left ${aiAvailable ? 'cursor-pointer hover:border-[#26251e]' : ''}`}
+        >
           <div className="flex items-center gap-3 overflow-hidden">
             <span className="text-[#f54e00] font-mono text-sm font-semibold flex-shrink-0">&gt;</span>
             <div className="font-mono text-sm leading-relaxed truncate">
@@ -122,26 +132,33 @@ export const TypewriterPrompt: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-1.5 text-xs font-mono text-[#807d72] group-hover:text-[#26251e] flex-shrink-0 pl-2 border-l border-[#e6e5e0]">
-            <span className="hidden sm:inline">AI soon</span>
+            <span className="hidden sm:inline">{aiAvailable ? 'Use' : 'AI off'}</span>
             <ArrowRight className="w-3.5 h-3.5 text-[#f54e00]" />
           </div>
         </div>
 
         <p className="mt-3 text-xs text-[#5a5852] pointer-events-auto">
-          Typed and voice commands return in an upcoming update. Start with <strong>Add Node</strong> in the toolbar above.
+          {aiAvailable ? (
+            <>Type a command in the bar below, or start with <strong>Add Node</strong> in the toolbar above.</>
+          ) : (
+            <>Typed commands are not available on this server yet. Start with <strong>Add Node</strong> in the toolbar above.</>
+          )}
         </p>
 
         {/* Quick prompt chips below */}
         <div className="flex flex-wrap items-center justify-center gap-1.5 mt-3 pointer-events-auto">
           {TYPEWRITER_PROMPTS.slice(0, 3).map((item, idx) => (
-            <span
+            <button
               key={idx}
-              title="Example of what typed commands will be able to do"
-              className="px-2.5 py-1 rounded-md bg-white border border-[#e6e5e0] text-[11px] font-mono text-[#5a5852]"
+              type="button"
+              disabled={!aiAvailable}
+              onClick={() => useExample(item.fullCommand)}
+              title={aiAvailable ? 'Put this command in the command bar' : 'Example of what typed commands can do'}
+              className="px-2.5 py-1 rounded-md bg-white border border-[#e6e5e0] text-[11px] font-mono text-[#5a5852] enabled:hover:border-[#26251e] enabled:hover:text-[#26251e] disabled:cursor-default"
             >
               <Sparkles className="w-3 h-3 text-[#f54e00] inline mr-1" />
               {item.highlight}
-            </span>
+            </button>
           ))}
         </div>
       </div>

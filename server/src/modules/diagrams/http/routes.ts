@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
   API_PREFIX,
+  aiCommandRequestSchema,
   commandRequestSchema,
   createDiagramRequestSchema,
   diagramCommandSchema,
@@ -19,6 +20,7 @@ import { AppError, parseOrThrow } from '../../../infrastructure/http/errors.ts';
 import type { RateLimiter } from '../../../infrastructure/http/rate-limiter.ts';
 import type { RunResult, TestHooks } from '../../../infrastructure/idempotency/mutation-requests.ts';
 import { listWorkspaces } from '../../workspaces/access.ts';
+import { executeAiCommand, loadConversation, type AiRuntime } from '../../ai/application/ai-service.ts';
 import {
   createDiagram,
   deleteDiagram,
@@ -37,6 +39,8 @@ export interface ApiDeps {
   authenticate: Authenticator;
   rateLimiter: RateLimiter;
   hooks?: TestHooks;
+  /** AI gateway, limits and deadline. Always present; `ai.provider.available` says whether a model is configured. */
+  ai: AiRuntime;
 }
 
 const diagramParams = z.object({ diagramId: uuidSchema });
@@ -87,6 +91,7 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
       return {
         user: { id: auth.userId, email: auth.email, displayName: auth.displayName },
         workspaces: await listWorkspaces(pool, auth.userId),
+        features: { aiCommands: true, aiModel: deps.ai.provider.available },
       };
     });
 
@@ -130,6 +135,19 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
       parseOrThrow(diagramCommandSchema, envelope.command, 'INVALID_COMMAND', 'Invalid command.');
       const body = parseOrThrow(commandRequestSchema, envelope, 'INVALID_COMMAND', 'Invalid command.');
       return send(reply, request, await executeCommand(svc, actorOf(request), diagramId, key, body));
+    });
+
+    app.post(`${API_PREFIX}/diagrams/:diagramId/ai/command`, async (request, reply) => {
+      const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
+      const key = idempotencyKeyOf(request);
+      const body = parseOrThrow(aiCommandRequestSchema, request.body, 'INVALID_REQUEST', 'Invalid AI command request.');
+      const aiDeps = { ...svc, ai: deps.ai, log: (message: string, data: Record<string, unknown>) => request.log.warn(data, message) };
+      return send(reply, request, await executeAiCommand(aiDeps, actorOf(request), diagramId, key, body));
+    });
+
+    app.get(`${API_PREFIX}/diagrams/:diagramId/conversation`, async (request) => {
+      const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
+      return loadConversation(svc, actorOf(request), diagramId);
     });
 
     app.patch(`${API_PREFIX}/diagrams/:diagramId/presentation`, async (request, reply) => {

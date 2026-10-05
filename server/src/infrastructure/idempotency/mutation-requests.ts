@@ -101,7 +101,10 @@ async function reserveOnce(pool: Pool, identity: MutationIdentity, hash: string,
       throw new AppError('REQUEST_ALREADY_PROCESSING', 'This request is already being processed.');
     }
     if (row.attempt_count >= MAX_ATTEMPTS) {
-      throw new AppError('SERVICE_UNAVAILABLE', 'The request could not be completed after several attempts.');
+      // Bounded retries (D03): after the last attempt the final outcome is "unavailable", never another provider call.
+      throw row.status === 'RETRYABLE_FAILED'
+        ? new AppError('AI_UNAVAILABLE', "Couldn't interpret that command after several attempts. Your diagram hasn't changed.")
+        : new AppError('SERVICE_UNAVAILABLE', 'The request could not be completed after several attempts.');
     }
     await tx.query(
       `UPDATE mutation_requests
@@ -160,6 +163,65 @@ export interface RunResult {
   replayed: boolean;
 }
 
+/** Hold the key for bounded retries after a transient provider failure: nothing was mutated, no response is stored (D03). */
+async function markRetryable(pool: Pool, id: string, leaseToken: string): Promise<void> {
+  await pool.query(
+    `UPDATE mutation_requests
+        SET status = 'RETRYABLE_FAILED', lease_token = NULL, lease_expires_at = NULL, updated_at = now()
+      WHERE id = $1 AND lease_token = $2 AND status = 'PROCESSING'`,
+    [id, leaseToken],
+  );
+}
+
+export type Finish = (tx: PoolClient, mutationRequestId: string) => Promise<Outcome>;
+
+/** Decides how a thrown error is handled: `retryable` errors mark the key RETRYABLE_FAILED, others release it. */
+export type ClassifyFailure = (error: unknown) => { retryable: boolean; error: Error } | null;
+
+/**
+ * Execute a durable mutation at most once per (actor, Idempotency-Key), with slow preparation OUTSIDE any transaction.
+ *
+ *  1. reserve (short transaction, lease);
+ *  2. `prepare()` runs holding only the lease (an AI interpretation, up to its own deadline) and returns `finish`;
+ *  3. ONE transaction locks the reservation (fencing: a holder whose lease expired and was taken over fails here, so a late
+ *     provider result can never commit), runs `finish` (re-authorise, version check, mutation, revision, records) and stores
+ *     the response with the completion.
+ * `finish` returns a terminal outcome (success, or a deterministic 4xx) or throws an error that must NOT be cached.
+ * Thrown errors release the key, except those `classify` marks retryable (transient provider failure): those keep the key for
+ * a bounded number of same-key retries.
+ */
+export async function runIdempotentPrepared(
+  pool: Pool,
+  identity: MutationIdentity,
+  prepare: () => Promise<Finish>,
+  hooks: TestHooks = {},
+  classify?: ClassifyFailure,
+): Promise<RunResult> {
+  const fault = hooks.fault;
+  const hash = requestHash(identity);
+  const reservation = await reserve(pool, identity, hash, hooks.leaseSeconds ?? LEASE_SECONDS);
+  if (reservation.kind === 'replay') return { outcome: reservation.outcome, replayed: true };
+
+  try {
+    await fault?.('after-reserve');
+    const finish = await prepare();
+    await fault?.('after-prepare');
+    const outcome = await withTransaction(pool, async (tx) => {
+      await lockReservation(tx, reservation.id, reservation.leaseToken);
+      const result = await finish(tx, reservation.id);
+      await fault?.('before-complete');
+      await completeReservation(tx, reservation.id, result);
+      return result;
+    });
+    return { outcome, replayed: false };
+  } catch (error) {
+    const classified = classify?.(error) ?? null;
+    if (classified?.retryable) await markRetryable(pool, reservation.id, reservation.leaseToken).catch(() => undefined);
+    else await releaseReservation(pool, reservation.id, reservation.leaseToken).catch(() => undefined);
+    throw classified?.error ?? error;
+  }
+}
+
 /**
  * Execute a durable mutation at most once per (actor, Idempotency-Key).
  * `commit` runs inside ONE transaction together with the reservation completion: the mutation, its revision,
@@ -173,24 +235,5 @@ export async function runIdempotent(
   commit: (tx: PoolClient, mutationRequestId: string) => Promise<Outcome>,
   hooks: TestHooks = {},
 ): Promise<RunResult> {
-  const fault = hooks.fault;
-  const hash = requestHash(identity);
-  const reservation = await reserve(pool, identity, hash, hooks.leaseSeconds ?? LEASE_SECONDS);
-  if (reservation.kind === 'replay') return { outcome: reservation.outcome, replayed: true };
-
-  try {
-    // Work done here (an AI call in I5) happens while holding only the lease; late results must fail the lock below.
-    await fault?.('after-reserve');
-    const outcome = await withTransaction(pool, async (tx) => {
-      await lockReservation(tx, reservation.id, reservation.leaseToken);
-      const result = await commit(tx, reservation.id);
-      await fault?.('before-complete');
-      await completeReservation(tx, reservation.id, result);
-      return result;
-    });
-    return { outcome, replayed: false };
-  } catch (error) {
-    await releaseReservation(pool, reservation.id, reservation.leaseToken).catch(() => undefined);
-    throw error;
-  }
+  return runIdempotentPrepared(pool, identity, async () => commit, hooks);
 }

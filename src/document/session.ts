@@ -13,6 +13,7 @@
 import {
   emptyGraph,
   emptyPresentation,
+  type AiCommandResponse,
   type CommandResponse,
   type DiagramCommand,
   type DiagramDetail,
@@ -63,6 +64,7 @@ export interface SessionApi {
   loadDiagram(id: string): Promise<DiagramDetail>;
   mutate: {
     command(spec: MutationSpec): Promise<Replayable<CommandResponse>>;
+    ai(spec: MutationSpec): Promise<Replayable<AiCommandResponse>>;
     detail(spec: MutationSpec): Promise<Replayable<DiagramDetail>>;
   };
 }
@@ -103,18 +105,20 @@ export class SessionClosedError extends Error {
   }
 }
 
-type Waiter = { resolve: (r: CommandResponse | DiagramDetail) => void; reject: (e: unknown) => void };
+type Waiter = { resolve: (r: CommandResponse | DiagramDetail | AiCommandResponse) => void; reject: (e: unknown) => void };
 
 type Item =
   | { type: 'command'; key: string; command: DiagramCommand; label: string; sent?: MutationSpec; waiters: Waiter[] }
   | { type: 'presentation'; key: string; positions: Record<string, Position>; viewport?: Viewport; sent?: MutationSpec; sentPositions?: Record<string, Position>; waiters: Waiter[] }
-  | { type: 'rename'; key: string; name: string; sent?: MutationSpec; waiters: Waiter[] };
+  | { type: 'rename'; key: string; name: string; sent?: MutationSpec; waiters: Waiter[] }
+  /** A typed command: interpreted by the server, committed (or answered with a question) as ONE queued write. */
+  | { type: 'ai'; key: string; text: string; conversationId?: string; sent?: MutationSpec; waiters: Waiter[] };
 
 interface Draft {
   diagramId: string;
   baseVersion: number;
   savedAt: number;
-  items: Array<{ type: 'command'; command: DiagramCommand; label: string } | { type: 'presentation'; positions: Record<string, Position>; viewport?: Viewport } | { type: 'rename'; name: string }>;
+  items: Array<{ type: 'command'; command: DiagramCommand; label: string } | { type: 'presentation'; positions: Record<string, Position>; viewport?: Viewport } | { type: 'rename'; name: string } | { type: 'ai'; text: string; conversationId?: string }>;
 }
 
 const draftKey = (diagramId: string) => `tinker_draft_${diagramId}`;
@@ -242,6 +246,13 @@ export function createDocumentSession(deps: SessionDeps) {
         return { method: 'POST', path: `${base}/commands`, body: { expectedVersion, command: item.command }, idempotencyKey: item.key };
       case 'rename':
         return { method: 'PATCH', path: base, body: { expectedVersion, name: item.name }, idempotencyKey: item.key };
+      case 'ai':
+        return {
+          method: 'POST',
+          path: `${base}/ai/command`,
+          body: { expectedVersion, ...(item.conversationId ? { conversationId: item.conversationId } : {}), input: { type: 'TEXT', text: item.text } },
+          idempotencyKey: item.key,
+        };
       case 'presentation': {
         // Positions for nodes that no longer exist (removed by an earlier queued command) must not be sent.
         const ids = new Set(graph.nodes.map((n) => n.id));
@@ -284,7 +295,7 @@ export function createDocumentSession(deps: SessionDeps) {
         setStatus('saving');
         emit();
         try {
-          const result = item.type === 'command' ? await api.mutate.command(spec) : await api.mutate.detail(spec);
+          const result = item.type === 'command' ? await api.mutate.command(spec) : item.type === 'ai' ? await api.mutate.ai(spec) : await api.mutate.detail(spec);
           if (generation !== myGeneration) return; // a different diagram was opened meanwhile
           acknowledge(item, result.data);
           queue.shift();
@@ -305,8 +316,15 @@ export function createDocumentSession(deps: SessionDeps) {
     }
   }
 
-  function acknowledge(item: Item, data: CommandResponse | DiagramDetail) {
+  function acknowledge(item: Item, data: CommandResponse | DiagramDetail | AiCommandResponse) {
     if (!diagram) return;
+    if ('status' in data) {
+      // A typed command: APPLIED carries the new canonical document; a CLARIFICATION changes nothing.
+      if (data.status === 'APPLIED' && data.diagram.version >= diagram.version) {
+        applyDocument({ version: data.diagram.version, graph: data.diagram.graph, presentation: data.diagram.presentation });
+      }
+      return;
+    }
     if (data.version < diagram.version) {
       // An older stored result (a replay). Never let it regress what we know; the next load reconciles.
       return;
@@ -352,7 +370,7 @@ export function createDocumentSession(deps: SessionDeps) {
         queue.shift();
         const reason = (error.details as { reason?: string } | undefined)?.reason;
         failWaiters(new RefusedError(error.message, reason));
-        setNotice('error', error.message);
+        if (item.type !== 'ai') setNotice('error', error.message);
         setStatus('idle');
         return 'continue';
       }
@@ -380,7 +398,7 @@ export function createDocumentSession(deps: SessionDeps) {
         }
         queue.shift();
         failWaiters(error);
-        setNotice('error', error.message);
+        if (item.type !== 'ai') setNotice('error', error.message); // typed commands report in the chat instead
         setStatus('idle');
         return 'continue';
       }
@@ -390,6 +408,7 @@ export function createDocumentSession(deps: SessionDeps) {
   function toDraftItem(item: Item): Draft['items'][number] {
     if (item.type === 'command') return { type: 'command', command: item.command, label: item.label };
     if (item.type === 'rename') return { type: 'rename', name: item.name };
+    if (item.type === 'ai') return { type: 'ai', text: item.text, ...(item.conversationId ? { conversationId: item.conversationId } : {}) };
     return { type: 'presentation', positions: item.positions, ...(item.viewport ? { viewport: item.viewport } : {}) };
   }
 
@@ -418,7 +437,7 @@ export function createDocumentSession(deps: SessionDeps) {
       expectedVersion: d?.expectedVersion ?? null,
       currentVersion: d?.currentVersion ?? null,
       draftCount: drafts.length,
-      descriptions: drafts.map((i) => (i.type === 'command' ? i.label : i.type === 'rename' ? `Rename diagram to "${i.name}"` : 'Moved nodes')),
+      descriptions: drafts.map((i) => (i.type === 'command' ? i.label : i.type === 'rename' ? `Rename diagram to "${i.name}"` : i.type === 'ai' ? `Ask: "${i.text.slice(0, 60)}"` : 'Moved nodes')),
     };
     setNotice('error', 'This diagram changed elsewhere. Your unsaved changes were kept.');
     setStatus('conflict');
@@ -438,6 +457,18 @@ export function createDocumentSession(deps: SessionDeps) {
     return new Promise((resolve, reject) => {
       try {
         enqueue({ type: 'command', key: newKey(), command: cmd, label, waiters: [{ resolve: resolve as Waiter['resolve'], reject }] });
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
+  /** Typed command. Resolves with the server's answer (applied, or a clarification question); rejects like any write. */
+  function ai(text: string, conversationId?: string): Promise<AiCommandResponse> {
+    flushPositionsNow();
+    return new Promise((resolve, reject) => {
+      try {
+        enqueue({ type: 'ai', key: newKey(), text, ...(conversationId ? { conversationId } : {}), waiters: [{ resolve: resolve as Waiter['resolve'], reject }] });
       } catch (e) {
         reject(e);
       }
@@ -527,6 +558,7 @@ export function createDocumentSession(deps: SessionDeps) {
       try {
         if (item.type === 'command') await command(item.command, item.label);
         else if (item.type === 'rename') await renameDiagram(item.name);
+        else if (item.type === 'ai') await ai(item.text, item.conversationId);
         else savePositions(item.positions, item.viewport);
         applied += 1;
       } catch (e) {
@@ -564,6 +596,7 @@ export function createDocumentSession(deps: SessionDeps) {
     adopt,
     close,
     command,
+    ai,
     renameDiagram,
     savePositions,
     flush,

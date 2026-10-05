@@ -5,3 +5,4 @@ export * from './presentation.ts';
 export * from './commands.ts';
 export * from './errors.ts';
 export * from './api.ts';
+export * from './ai.ts';

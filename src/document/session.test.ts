@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CommandResponse, DiagramCommand, DiagramDetail, Graph, Presentation } from '../contracts';
+import type { AiCommandResponse, CommandResponse, DiagramCommand, DiagramDetail, Graph, Presentation } from '../contracts';
 import { ApiError, type MutationSpec } from '../api/client';
 import { ConflictError, RefusedError, SessionClosedError, createDocumentSession, newNodeIds, type SessionApi, type SessionStorage } from './session';
 
@@ -23,9 +23,27 @@ function fakeServer() {
   };
   const detail = (): DiagramDetail => ({ diagramId: DIAGRAM, workspaceId: uid(9), name: s.name, version: s.version, graph: s.graph, presentation: s.presentation, updatedAt: '2026-01-01T00:00:00.000Z' });
 
-  function apply(spec: MutationSpec): CommandResponse | DiagramDetail {
+  function apply(spec: MutationSpec): CommandResponse | DiagramDetail | AiCommandResponse {
     const body = spec.body as { expectedVersion: number; command?: DiagramCommand; name?: string; nodePositions?: Record<string, { x: number; y: number }>; viewport?: Presentation['viewport'] };
     if (body.expectedVersion !== s.version) throw new ApiError('DIAGRAM_VERSION_CONFLICT', 'conflict', 409, { expectedVersion: body.expectedVersion, currentVersion: s.version });
+    if (spec.path.endsWith('/ai/command')) {
+      const text = (spec.body as { input: { text: string } }).input.text;
+      const msgs = (summary: string, status: string) => [
+        { id: uid(800 + s.nextId), role: 'USER' as const, content: text, createdAt: '2026-01-01T00:00:00.000Z' },
+        { id: uid(801 + s.nextId), role: 'ASSISTANT' as const, content: summary, createdAt: '2026-01-01T00:00:01.000Z', metadata: { status } },
+      ];
+      if (text.startsWith('ask')) {
+        return { status: 'CLARIFICATION', source: 'PARSER', question: 'Which one?', options: ['A', 'B'], conversationId: uid(700), messages: msgs('Which one?', 'CLARIFICATION'), diagram: { id: DIAGRAM, version: s.version } };
+      }
+      if (text === 'timeout') throw new ApiError('AI_TIMEOUT', "Couldn't interpret that command. Your diagram hasn't changed.", 504);
+      if (text === 'refuse') throw new ApiError('DOMAIN_VALIDATION_FAILED', 'These nodes are already connected.', 422, { reason: 'DUPLICATE_EDGE' });
+      const name = text.replace(/^add\s+/i, '');
+      const id = uid(s.nextId++);
+      s.graph = { ...s.graph, nodes: [...s.graph.nodes, { id, name, kind: 'SERVICE', metadata: {} }] };
+      s.presentation = { ...s.presentation, nodePositions: { ...s.presentation.nodePositions, [id]: { x: 0, y: 0 } } };
+      s.version += 1;
+      return { status: 'APPLIED', source: 'PARSER', interpretation: { commands: [{ type: 'ADD_NODE', summary: `Added ${name}` }] }, conversationId: uid(700), messages: msgs(`Added ${name}.`, 'APPLIED'), diagram: { id: DIAGRAM, version: s.version, graph: s.graph, presentation: s.presentation } };
+    }
     if (spec.path.endsWith('/commands')) {
       const c = body.command!;
       if (c.type === 'ADD_NODE') {
@@ -81,6 +99,7 @@ function fakeServer() {
     },
     mutate: {
       command: (spec) => handle(spec) as never,
+      ai: (spec) => handle(spec) as never,
       detail: (spec) => handle(spec) as never,
     },
   };
@@ -356,12 +375,84 @@ describe('document session: lifecycle', () => {
     await session.command(add('A'), 'A');
     await session.command(add('B'), 'B');
     const staleDoc = { diagramId: DIAGRAM, version: 2, appliedCommand: { type: 'ADD_NODE' as const }, graph: { schemaVersion: 1 as const, nodes: [], edges: [] }, presentation: { nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } }, replayed: true };
-    const apiWithStale: SessionApi = { ...s && { loadDiagram: async () => ({ diagramId: DIAGRAM, workspaceId: uid(9), name: 'x', version: 3, graph: session.getState().graph, presentation: session.getState().presentation, updatedAt: '' }) }, mutate: { command: async () => ({ data: staleDoc, replayed: true }), detail: async () => { throw new Error('unused'); } } };
+    const apiWithStale: SessionApi = { ...s && { loadDiagram: async () => ({ diagramId: DIAGRAM, workspaceId: uid(9), name: 'x', version: 3, graph: session.getState().graph, presentation: session.getState().presentation, updatedAt: '' }) }, mutate: { command: async () => ({ data: staleDoc, replayed: true }), ai: async () => { throw new Error('unused'); }, detail: async () => { throw new Error('unused'); } } };
     const s2 = createDocumentSession({ api: apiWithStale, newKey: () => 'key-stale-0001' });
     await s2.open(DIAGRAM);
     const before = s2.getState().graph.nodes.length;
     await s2.command(add('C'), 'C');
     expect(s2.getState().graph.nodes).toHaveLength(before); // version 2 < 3: ignored
     expect(s2.getState().diagram?.version).toBe(3);
+  });
+});
+
+describe('document session: typed commands travel through the same queue', () => {
+  it('an applied typed command updates the canonical document and resolves with the server answer', async () => {
+    const { session, s } = await newSession();
+    const res = await session.ai('add Redis', undefined);
+    expect(res.status).toBe('APPLIED');
+    expect(session.getState().graph.nodes.map((n) => n.name)).toEqual(['Redis']);
+    expect(session.getState().diagram?.version).toBe(2);
+    expect(s.received).toHaveLength(1);
+    expect(s.received[0]!.path).toBe(`/v1/diagrams/${DIAGRAM}/ai/command`);
+    expect(s.received[0]!.body).toMatchObject({ expectedVersion: 1, input: { type: 'TEXT', text: 'add Redis' } });
+  });
+
+  it('a clarification changes nothing and does not move the version', async () => {
+    const { session } = await newSession();
+    const res = await session.ai('ask which', undefined);
+    expect(res).toMatchObject({ status: 'CLARIFICATION', question: 'Which one?', options: ['A', 'B'] });
+    expect(session.getState().diagram?.version).toBe(1);
+    expect(session.getState().graph.nodes).toHaveLength(0);
+    expect(session.getState().status).toBe('idle');
+  });
+
+  it('is serialized with manual edits: each write sees the version the previous one produced', async () => {
+    const { session, s } = await newSession();
+    await Promise.all([session.command(add('Manual'), 'Manual'), session.ai('add Typed', undefined), session.command(add('Manual2'), 'Manual2')]);
+    expect(s.received.map((r) => (r.body as { expectedVersion: number }).expectedVersion)).toEqual([1, 2, 3]);
+    expect(session.getState().graph.nodes.map((n) => n.name)).toEqual(['Manual', 'Typed', 'Manual2']);
+  });
+
+  it('a provider failure rejects only that request (no automatic hold), shows no toast, and the queue carries on', async () => {
+    const { session } = await newSession();
+    const failing = session.ai('timeout', undefined);
+    const next = session.command(add('After'), 'After');
+    await expect(failing).rejects.toMatchObject({ code: 'AI_TIMEOUT' });
+    await next;
+    expect(session.getState().graph.nodes.map((n) => n.name)).toEqual(['After']);
+    expect(session.getState().notice).toBeNull(); // the chat reports typed-command failures
+    expect(session.getState().status).toBe('idle');
+  });
+
+  it('a domain refusal of a typed command rejects with the reason and leaves everything unchanged', async () => {
+    const { session } = await newSession();
+    await expect(session.ai('refuse', undefined)).rejects.toMatchObject({ reason: 'DUPLICATE_EDGE' });
+    expect(session.getState().diagram?.version).toBe(1);
+    expect(session.getState().notice).toBeNull();
+  });
+
+  it('a lost response is retried with the SAME key and applies once', async () => {
+    const { session, s } = await newSession();
+    s.failures.push('lost-response');
+    const done = session.ai('add Once', undefined);
+    await tick();
+    expect(session.getState().status).toBe('failed');
+    session.retry();
+    const res = await done;
+    expect(res.status).toBe('APPLIED');
+    expect(s.graph.nodes).toHaveLength(1);
+    expect(s.version).toBe(2);
+    expect(session.getState().diagram?.version).toBe(2);
+  });
+
+  it('a conflict keeps the typed text in the draft and re-apply re-asks the server on the latest version', async () => {
+    const { session, s, bump, storage } = await newSession();
+    bump();
+    await expect(session.ai('add Mine', undefined)).rejects.toBeInstanceOf(ConflictError);
+    expect(session.getState().conflict?.descriptions).toEqual(['Ask: "add Mine"']);
+    expect(JSON.parse(storage.data.get(`tinker_draft_${DIAGRAM}`)!).items).toEqual([{ type: 'ai', text: 'add Mine' }]);
+    expect(await session.reapplyDraft()).toEqual({ applied: 1, refused: 0 });
+    expect(s.graph.nodes.map((n) => n.name)).toEqual(['Mine']);
+    expect((s.received[s.received.length - 1]!.body as { expectedVersion: number }).expectedVersion).toBe(2);
   });
 });

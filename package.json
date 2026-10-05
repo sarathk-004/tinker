@@ -18,7 +18,8 @@
     "test": "npm run test --workspaces --if-present && vitest run",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check": "npm run typecheck && npm run test && npm run check:boundaries",
-    "test:web": "vitest run"
+    "test:web": "vitest run",
+    "check:gemini": "npm run check:gemini -w @tinker/server"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.4",

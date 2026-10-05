@@ -1,34 +1,74 @@
 import { create } from 'zustand';
+import type { ChatMessage, ConversationResponse } from '../contracts';
 
+/**
+ * What the Conversation tab shows. The server is the record (conversation + messages are persisted per diagram and user);
+ * this store is a view of it plus transient entries (a message being sent, a local error) that are never persisted.
+ */
 export interface ConversationTurn {
   id: string;
   timestamp: number;
   role: 'user' | 'assistant';
   text: string;
+  /** One line per applied edit ("Inserted Redis between Orders and PostgreSQL"). */
   actions?: string[];
-  source?: 'gemini' | 'local_fallback';
+  /** Suggestions from a clarification. Clicking one fills the command bar; nothing is sent automatically. */
+  options?: string[];
+  kind?: 'applied' | 'clarification' | 'refused' | 'error' | 'sending';
+  source?: 'PARSER' | 'AI';
 }
 
 interface ConversationState {
+  diagramId: string | null;
+  conversationId: string | null;
   turns: ConversationTurn[];
-  addTurn: (turn: Omit<ConversationTurn, 'id' | 'timestamp'>) => void;
-  getHistory: () => ConversationTurn[];
-  clear: () => void;
+  /** A typed command is in flight. */
+  pending: boolean;
+  /** Text to place in the command bar (set by suggestion chips). */
+  draft: string;
+
+  load(diagramId: string, conversation: ConversationResponse): void;
+  append(turns: ConversationTurn[]): void;
+  replaceLocal(localId: string, turns: ConversationTurn[], conversationId?: string): void;
+  setPending(pending: boolean): void;
+  setDraft(text: string): void;
+  /** Forget everything (sign-out, or before another diagram loads). */
+  reset(diagramId?: string | null): void;
+  /** Clear the visible turns only; the saved conversation stays on the server. */
+  hideAll(): void;
 }
 
-export const useConversationStore = create<ConversationState>((set, get) => ({
+const asString = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+
+export function messageToTurn(m: ChatMessage): ConversationTurn {
+  const meta = (m.metadata ?? {}) as Record<string, unknown>;
+  const status = asString(meta['status']);
+  const options = Array.isArray(meta['options']) ? (meta['options'] as unknown[]).filter((o): o is string => typeof o === 'string') : undefined;
+  const source = meta['source'] === 'PARSER' || meta['source'] === 'AI' ? (meta['source'] as 'PARSER' | 'AI') : undefined;
+  return {
+    id: m.id,
+    timestamp: Date.parse(m.createdAt),
+    role: m.role === 'USER' ? 'user' : 'assistant',
+    text: m.content,
+    ...(status === 'APPLIED' ? { kind: 'applied' as const } : status === 'CLARIFICATION' ? { kind: 'clarification' as const } : status === 'REFUSED' ? { kind: 'refused' as const } : {}),
+    ...(options && options.length > 0 ? { options } : {}),
+    ...(source ? { source } : {}),
+  };
+}
+
+export const useConversationStore = create<ConversationState>((set) => ({
+  diagramId: null,
+  conversationId: null,
   turns: [],
+  pending: false,
+  draft: '',
 
-  addTurn: (turn) => {
-    const entry: ConversationTurn = {
-      ...turn,
-      id: `turn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      timestamp: Date.now(),
-    };
-    set((state) => ({ turns: [...state.turns, entry] }));
-  },
-
-  getHistory: () => get().turns,
-
-  clear: () => set({ turns: [] }),
+  load: (diagramId, conversation) => set({ diagramId, conversationId: conversation.conversationId, turns: conversation.messages.map(messageToTurn) }),
+  append: (turns) => set((s) => ({ turns: [...s.turns, ...turns] })),
+  replaceLocal: (localId, turns, conversationId) =>
+    set((s) => ({ turns: [...s.turns.filter((t) => t.id !== localId), ...turns], ...(conversationId ? { conversationId } : {}) })),
+  setPending: (pending) => set({ pending }),
+  setDraft: (draft) => set({ draft }),
+  reset: (diagramId = null) => set({ diagramId, conversationId: null, turns: [], pending: false, draft: '' }),
+  hideAll: () => set({ turns: [] }),
 }));

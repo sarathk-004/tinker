@@ -158,3 +158,18 @@ export async function insertCommandExecution(
 export async function attachDiagramToRequest(db: Queryable, mutationRequestId: string, diagramId: string): Promise<void> {
   await db.query(`UPDATE mutation_requests SET diagram_id = $2 WHERE id = $1`, [mutationRequestId, diagramId]);
 }
+
+/** One execution record per AI/parser plan (all of its steps committed together as a single version). */
+export async function insertPlanExecution(
+  db: Queryable,
+  input: { mutationRequestId: string; diagramId: string; actorId: string; source: 'PARSER' | 'AI'; commands: DiagramCommand[]; expectedVersion: number; resultVersion: number },
+): Promise<string> {
+  const { rows } = await db.query<{ id: string }>(
+    `INSERT INTO command_executions
+       (mutation_request_id, diagram_id, actor_id, command_type, command_payload, status, expected_version, result_version, completed_at)
+     VALUES ($1, $2, $3, $4, $5::jsonb, 'SUCCEEDED', $6, $7, now())
+     RETURNING id`,
+    [input.mutationRequestId, input.diagramId, input.actorId, `${input.source}_PLAN`, JSON.stringify({ source: input.source, commands: input.commands }), input.expectedVersion, input.resultVersion],
+  );
+  return rows[0]!.id;
+}

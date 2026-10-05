@@ -37,6 +37,13 @@ const envSchema = z
     /** `dev` signs and verifies tokens with a throwaway local key through /dev/auth/login. Development only. */
     AUTH_MODE: z.enum(['supabase', 'dev']).optional(),
     RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(120),
+    /** Server-side only. Without it AI commands answer 503 AI_UNAVAILABLE and manual editing is unaffected. */
+    GEMINI_API_KEY: z.string().min(8).optional(),
+    GEMINI_MODEL: z.string().min(1).default('gemini-3.8-flash'),
+    /** Total wall-clock budget for interpreting one AI request, including every provider retry (decision D07). */
+    AI_DEADLINE_MS: z.coerce.number().int().min(500).max(60_000).default(15_000),
+    AI_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(10_000).default(10),
+    AI_MAX_CONCURRENT: z.coerce.number().int().min(1).max(100).default(2),
   })
   .superRefine((env, ctx) => {
     const need = (key: string, message = 'is required in production') =>
@@ -68,6 +75,14 @@ export interface Config {
   supabaseUrl: string | undefined;
   jwtAudience: string;
   rateLimitPerMinute: number;
+  ai: {
+    /** Secret. Never log or return it. */
+    apiKey: string | undefined;
+    model: string;
+    deadlineMs: number;
+    ratePerMinute: number;
+    maxConcurrent: number;
+  };
 }
 
 export class ConfigError extends Error {
@@ -111,5 +126,12 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     supabaseUrl: e.SUPABASE_URL,
     jwtAudience: e.JWT_AUDIENCE,
     rateLimitPerMinute: e.RATE_LIMIT_PER_MINUTE,
+    ai: {
+      apiKey: e.GEMINI_API_KEY,
+      model: e.GEMINI_MODEL,
+      deadlineMs: e.AI_DEADLINE_MS,
+      ratePerMinute: e.AI_RATE_LIMIT_PER_MINUTE,
+      maxConcurrent: e.AI_MAX_CONCURRENT,
+    },
   };
 }

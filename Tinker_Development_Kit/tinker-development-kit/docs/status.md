@@ -1,40 +1,40 @@
 # Development status
 
 Updated: 2026-10-05
-Active milestone: I4 implemented on branch `implementation-4` (stack: main <- implementation-1 <- 2 <- 3 <- 4). Branches 1-3 are pushed; implementation-4 is committed locally and NOT pushed. Next: I5 (typed command interpretation through the server).
+Active milestone: I5 implemented on branch `implementation-5` (stack: main <- implementation-1 <- 2 <- 3 <- 4 <- 5). Branches 1-4 are pushed; implementation-5 is committed locally and NOT pushed. Next: I6 (read-only architecture advice).
 
 ## See it locally
-Terminals: `npm run dev:db -w @tinker/server` (once: `npm run db:migrate -w @tinker/server`), then `npm run dev:api:supabase` (your Supabase project) or `npm run dev:api` (local dev login), then `npm run dev`, and open http://localhost:5173/ . The main editor is now the durable editor. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to the root `.env` (restart `npm run dev`), or enter them once on the sign-in screen. Remove the old `VITE_GEMINI_*` lines from that `.env` (LC18). The dev pages `engine-demo.html` and `api-demo.html` still exist for debugging.
+Terminals: `npm run dev:db -w @tinker/server`, then `npm run dev:api:supabase` (your Supabase project) or `npm run dev:api` (local dev login), then `npm run dev`; open http://localhost:5173/ and type in the command bar. Plain commands work with no key. For free-form requests put `GEMINI_API_KEY=...` in `server/.env` (or `server/.env.supabase.local`), restart the API, and run `npm run check:gemini` first (LC22).
 
-## I4 completion record (verified 2026-10-05)
+## I5 completion record (verified 2026-10-05)
 | Task | Where | Evidence |
 |---|---|---|
-| Login, workspace and diagram loading using the existing UI | `LoginScreen`, `DiagramBar`, `workspaceStore`, `App` | Live: dev login -> workspace -> first diagram auto-created; list/switch/new/rename inline; refresh keeps the session and reopens the last diagram |
-| Canonical graph + presentation mapped into React Flow | `diagram/adapters.ts`, `diagram/store.ts` | `adapters.test.ts` (12 tests) + live canvas |
-| Every structural UI action through the command client | `diagram/store.ts` -> `document/session.ts` -> `api/client.ts` | Live: add, edit dialog (rename/subtype/connect), advisor multi-step action, keyboard delete of a connected node (one REMOVE_NODE, no stray errors), all reach `Saved`; the database shows matching versions, revisions and command records |
-| Serialized per-diagram writes incl. drag-end and metadata | `session.ts` queue | `session.test.ts` (19 tests): ordering with expected versions 1,2,3; coalesced drags; a drag is ordered before a following command; positions of removed nodes never sent |
-| Optimistic state separate from acknowledged; stable keys; reconcile full documents | session overlay + queue | tests above; live: a dragged position persisted across refresh |
-| Preserve draft and stop queued writes on conflict; reload/recovery | `session.ts`, `StatusBanners` | Tests (conflict stops the queue, draft stored, reload, re-apply, stale position save conflicts) + live two-tab demo: stale tab refused, nothing overwritten, "Re-apply" produced both tabs' work (4 nodes) |
-| pending/saved/failed status, safe navigation | `SaveBadge`, `App` listeners | Live: Saved / Not saved - Retry; a lost response retried 6 times with one key left exactly ONE new node in the database. `beforeunload` guard and switch-diagram flush are implemented (the browser prompt itself was not exercised live) |
-| Remove direct browser Gemini calls | `src/ai/*` moved to `legacy/prototype-ai/`; Settings modal and VoiceControl deleted | `check:boundaries` with zero exemptions plus new rules (no Gemini endpoints/SDKs in `src`; no whole-`import.meta.env`); build output has no Gemini key shapes; manual editing works with AI disabled |
-Commands: `npm run typecheck` PASS; `npm test` PASS (shared 17, server 113, frontend 42); `npm run check:boundaries` PASS; `npm run build` PASS.
-Gate: sign in, create a diagram, add/connect/edit/drag, refresh and recover the same diagram (verified); two-tab stale write with no silent overwrite (verified live); manual editing works with AI disabled (the command bar is visibly disabled).
-Review findings fixed during I4: aliasing the whole `import.meta.env` in `config.ts` would have embedded every VITE_* variable from a developer's `.env` (including a stale Gemini key) in the bundle; the edit dialog listed raw UUIDs. Both fixed; the first now has a permanent guard.
+| Provider gateway interface + deterministic fake | `modules/ai/providers/{types,fake,gemini}.ts` | adapter tests with a fake `fetch` (key only in the header, never in URL/errors; response shapes; HTTP status mapping; abort = timeout); scripted fake provider used by all service tests |
+| Parser fast path (explicit ids / unambiguous names) | `modules/ai/application/parser.ts` | 24 tests: gate command and variants, partial names, UUIDs, wiring when unconnected, reversed direction, several connections, unknown/ambiguous references, add/connect/disconnect/remove/rename, typed reset refused; "make the database faster" is NOT parsed as an add (a real bug found by the tests) |
+| Gemini with validated structured output | `providers/gemini.ts`, `domain/model-output.ts`, `application/prompt.ts` | strict schema rejects unknown steps/fields, RESET, >8 steps, over-long text; prompt sends aliases only (no UUIDs), strips delimiter look-alikes, bounds history and diagram size. LIVE call NOT verified (LC22) |
+| Interpretation bound to the captured version | `application/ai-service.ts` | stale expectedVersion refused before any provider call; a diagram changed WHILE the provider thinks => 409 at commit, nothing applied, same-key retry replays the 409 |
+| Stable request body/hash across retries; persist validated interpretation | idempotency identity = validated request; executions stored as `PARSER_PLAN`/`AI_PLAN` with the commands | key reuse with other text/version => 409; exact retry replays; no second provider call |
+| 15 s total deadline, cancellation, rate limit, concurrency cap | `application/interpret.ts`, `concurrency-limiter.ts` | slow provider => 504 within the deadline even when it ignores cancellation, late answer ignored (A20); 429 on the 3rd request/min test limit and on the 3rd simultaneous request; one upstream retry only inside the remaining deadline |
+| Clarification instead of guessing | parser + plan executor | unknown alias from the model => 200 CLARIFICATION, nothing applied (A19) |
+| Persist turns; link committed operations; no duplicate retry messages | `persistence/conversations.ts` | exact retry leaves exactly 2 messages; assistant turn metadata carries commandExecutionId and version; conversation id of another user/diagram => 404 before any work |
+| Retry failures separate from graph state; late completion ignored | `mutation-requests.ts` (`runIdempotentPrepared`) | provider failures mark the key RETRYABLE_FAILED (3 bounded same-key attempts then 503 without calling the provider); lease fencing test (A12) and rollback test (A11) for the AI path |
+Gate: "Put Redis between Orders and PostgreSQL" commits through the same transaction/service path as manual edits (tested over HTTP with the same result shape as manual INSERT_BETWEEN, and live in the real command bar); malformed output, timeout and stale version do not change the diagram (tests A19/A20 + stale/mid-flight).
+Mutation checks: removing the commit-time version check, trusting model output without validation, and releasing instead of bounding retries were each caught by the tests (restored afterwards).
+Commands: `npm run typecheck` PASS; `npm test` PASS (shared 17, server 220, frontend 58); `npm run check:boundaries` PASS; `npm run build` PASS (no Gemini references or key shapes in `dist`).
+Live (built-in browser, real API + Postgres, no Gemini key): typed "add Orders", "add PostgreSQL", "connect Orders to PostgreSQL", then the gate command => 3 nodes, 2 edges; unknown name => clarification listing the components; duplicate => refused by the engine with the diagram unchanged; free-form text with no model => friendly "not available" and nothing changed; after refresh the diagram and 14 saved turns returned; the database shows 4 AI_COMMAND revisions and PARSER_PLAN executions.
 
-## Limitations / risks (see later-checks.md LC14-LC21)
-- Typed and voice commands, undo, and the Conversation tab are off until I5/I7/I8.
-- Structural edits wait for the server (no ghost nodes); felt latency is unmeasured against the hosted API.
-- Not exercised: the mouse drag-to-connect gesture, multi-select delete, the unsaved-work `beforeunload` prompt, Supabase sign-up and email-confirmation flows.
-- No automated browser tests yet (LC16); the live verification was manual through the built-in browser.
-- The dev API signing key changes on every API restart, so local dev sessions end on restart.
-- The user's own Supabase-mode API and Vite were left untouched; verification used a separate dev API (:8788) and Vite (:5174).
+## Limitations / risks (see later-checks.md LC22-LC28)
+- The real Gemini endpoint has never been called. Request/response shapes come from the Interactions API reference; documentation summaries disagreed on where the output text lives, so parsing is tolerant. Run `npm run check:gemini` with a key before relying on free-form AI (LC22). Latency is unmeasured (LC23).
+- AI limits are in memory for a single API instance (D10, LC9). No global spend cap or usage metrics (LC26).
+- Typed RESET is refused on purpose (no undo yet). Voice is not built (LC28). Conversation messages are never pruned (LC27).
+- A failed typed command that did not reach a stored outcome (provider failure, rate limit, network) is shown in the chat only for the session; it is not persisted.
+- Prompt-injection defences were tested with scripted attacks, not a real model (LC24).
 
-## Earlier milestones (details are in git history and decisions.md)
-- I1: shared contracts, API foundation, boundary checks, CI. I2: pure diagram engine. I3: Postgres persistence, identity, authorization, idempotent command API, RLS. Supabase project `rnwbgjrzbliqvqradjcm`: schema applied, RLS on all tables, real login and persistence verified by the user, signing-key rotation logic verified locally (`server/test/key-rotation.test.ts`).
-- Open items from those milestones live in docs/later-checks.md (transaction pooler, real key-rotation drill, CI first run, TLS verify mode, latency, backups, Gemini model id, AI caps, member management, revision semantics).
+## Earlier milestones (details in git history, decisions.md and later-checks.md)
+I1 contracts/API foundation; I2 pure engine; I3 persistence, identity, authorization, idempotency, RLS, Supabase verified; I4 durable editor (sign-in, serialized idempotent writes, conflict drafts, browser Gemini code removed).
 
-## Next action (I5)
-Provider gateway interface plus a deterministic fake; parser fast path (explicit ids / unambiguous names); server-side Gemini with validated structured output; interpretation bound to the captured diagram version; stable request body and hash across retries; 15 s deadline, cancellation, rate limit (10/min) and concurrency cap (2); clarification for ambiguous names; persisted conversation turns. Needs a server-side Gemini key for the live smoke test (fake-provider tests do not prove connectivity) and current Gemini docs (LC8). Reference material: `legacy/prototype-ai/`.
+## Next action (I6)
+Read-only advice: `POST /v1/diagrams/{id}/ai/ask` and bounded conversation context; compute downstream dependencies and cycles deterministically (the engine already has `downstreamNodeIds`; add cycle detection), give the computed topology and the diagram version to the explanation provider, return validated highlight ids for transient display, and prove advice never writes graph, presentation, revision or execution state. Gate: "What happens if Orders goes down?" explains the computed dependencies while the version and graph stay unchanged. Reuses the provider gateway, limits and conversation persistence from I5.
 
 ## Handoff template
 - Active task / milestone:

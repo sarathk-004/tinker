@@ -156,3 +156,49 @@ describe('api client', () => {
     expect(calls[0]!.init.method).toBe('GET');
   });
 });
+
+describe('api client: typed commands', () => {
+  const aiSpec = { method: 'POST' as const, path: `/v1/diagrams/${U(1)}/ai/command`, body: { expectedVersion: 1, input: { type: 'TEXT', text: 'add Redis' } }, idempotencyKey: 'key-ai-0123456' };
+  const applied = {
+    status: 'APPLIED',
+    source: 'PARSER',
+    interpretation: { commands: [{ type: 'ADD_NODE', summary: 'Added Redis' }] },
+    conversationId: U(5),
+    messages: [],
+    diagram: { id: U(1), version: 2, graph: { schemaVersion: 1, nodes: [], edges: [] }, presentation: { nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } } },
+  };
+
+  it('validates and returns the answer', async () => {
+    const { client } = setup([json(200, applied)]);
+    const res = await client.mutate.ai(aiSpec);
+    expect(res.data.status).toBe('APPLIED');
+  });
+
+  it('does not automatically retry provider failures or rate limits: they reach the user at once', async () => {
+    for (const [status, code] of [[504, 'AI_TIMEOUT'], [502, 'AI_PROVIDER_ERROR'], [503, 'AI_UNAVAILABLE'], [429, 'RATE_LIMITED']] as const) {
+      const { client, calls } = setup([json(status, envelope(code))]);
+      const error = (await client.mutate.ai(aiSpec).catch((e) => e)) as ApiError;
+      expect(error.code).toBe(code);
+      expect(error.retryable).toBe(false);
+      expect(calls, code).toHaveLength(1);
+    }
+  });
+
+  it('still retries a lost response with the same key (replay-safe)', async () => {
+    const { client, calls } = setup([new TypeError('offline'), json(200, applied)]);
+    await client.mutate.ai(aiSpec);
+    expect(calls).toHaveLength(2);
+    expect(new Set(calls.map((c) => (c.init.headers as Record<string, string>)['idempotency-key']))).toEqual(new Set(['key-ai-0123456']));
+  });
+
+  it('manual commands keep their automatic retry of the same codes', async () => {
+    const { client, calls } = setup([json(503, envelope('AI_UNAVAILABLE')), json(200, doc())]);
+    await client.mutate.command(spec);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('loads the saved conversation', async () => {
+    const { client } = setup([json(200, { conversationId: null, messages: [] })]);
+    expect(await client.conversation(U(1))).toEqual({ conversationId: null, messages: [] });
+  });
+});
