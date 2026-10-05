@@ -66,3 +66,9 @@ Date for all records below: 2026-10-05 (I0). "User" = explicit answer in chat; "
 - Rate limit: fixed window, in-memory, per user, 120 requests/minute (`RATE_LIMIT_PER_MINUTE`), 429 with Retry-After (single-instance only, D10).
 - CORS exposes `x-request-id`, `idempotent-replayed` and `retry-after` so the I4 client can read them.
 - Workspace/member management routes (create workspace, invite, roles) are NOT built; tests grant roles directly in SQL. Diagram listing is capped at 200 without pagination.
+
+## I3 Supabase wiring (2026-10-05)
+- Project: `rnwbgjrzbliqvqradjcm` (region ap-southeast-1, Postgres 17). URL is not a secret and is in `server/.env.supabase.local` (gitignored via `*.local`). The browser-side publishable key is public by design; the boundary check now allows `VITE_*PUBLISHABLE*` names but still rejects other `VITE_*KEY/SECRET/TOKEN/PASSWORD`.
+- Schema applied to the Supabase project through the Supabase connector (`apply_migration` named `initial_schema`), then recorded in node-pg-migrate's `pgmigrations` table so `npm run db:migrate` against Supabase is a no-op. Future migrations: apply with `npm run db:migrate` once `DATABASE_URL` is set (preferred) so both tools agree.
+- Database TLS is explicit: `DATABASE_SSL=off|verify|no-verify` (+ `DATABASE_SSL_CA_FILE`). `sslmode` in the URL is stripped so the policy cannot be overridden by a pasted Supabase URL. `no-verify` is rejected in production. Use the Supabase session pooler (port 5432) for the API; transaction-mode pooling (6543) is untested.
+- The API must connect as a role that owns the tables or bypasses RLS (Supabase `postgres` does both); `check:supabase` verifies this because otherwise RLS-with-no-policies would make every read silently empty.

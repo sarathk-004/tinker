@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import pg from 'pg';
 import { runner } from 'node-pg-migrate';
 import { describe, expect, it, inject } from 'vitest';
+import { createPool } from '../src/infrastructure/database/pool.ts';
 
 const adminUrl = () => inject('dbUrl');
 const dbUrlFor = (name: string) => adminUrl().replace(/\/[^/]+$/, `/${name}`);
@@ -54,5 +55,25 @@ describe('migrations are reversible and repeatable on a scratch database', () =>
     const afterUp = await withClient(dbUrlFor(name), (c) => c.query(`SELECT count(*)::int AS n FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'pgmigrations'`));
     expect(afterUp.rows[0].n).toBe(9);
     await withClient(adminUrl(), (c) => c.query(`DROP DATABASE ${name}`));
+  });
+});
+
+describe('connection TLS policy', () => {
+  it('ignores sslmode in the URL: policy comes only from DATABASE_SSL (a Supabase-style ?sslmode=require cannot force TLS on a server without it)', async () => {
+    const pool = createPool(`${adminUrl()}?sslmode=require`, { mode: 'off' });
+    try {
+      expect((await pool.query('SELECT 1 AS ok')).rows[0].ok).toBe(1);
+    } finally {
+      await pool.end();
+    }
+  });
+
+  it('requesting TLS against a server without TLS fails loudly instead of silently downgrading', async () => {
+    const pool = createPool(adminUrl(), { mode: 'no-verify' });
+    try {
+      await expect(pool.query('SELECT 1')).rejects.toThrow(/SSL/i);
+    } finally {
+      await pool.end();
+    }
   });
 });

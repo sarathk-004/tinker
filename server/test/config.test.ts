@@ -33,6 +33,15 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ AUTH_MODE: 'supabase' })).toThrow(/SUPABASE_URL/);
   });
 
+  it('database TLS: off by default, verify/no-verify selectable, no-verify forbidden in production', () => {
+    expect(loadConfig({}).databaseSsl).toBe('off');
+    expect(loadConfig({ DATABASE_SSL: 'verify', DATABASE_SSL_CA_FILE: '/tmp/ca.pem' })).toMatchObject({ databaseSsl: 'verify', databaseSslCaFile: '/tmp/ca.pem' });
+    expect(() => loadConfig({ DATABASE_SSL: 'sometimes' })).toThrow(ConfigError);
+    const prod = { NODE_ENV: 'production', ...PROD_BASE, CORS_ORIGINS: 'https://a.example.com' };
+    expect(() => loadConfig({ ...prod, DATABASE_SSL: 'no-verify' })).toThrow(/no-verify/);
+    expect(loadConfig({ ...prod, DATABASE_SSL: 'verify' }).databaseSsl).toBe('verify');
+  });
+
   it('rejects wildcard, path-bearing and malformed origins', () => {
     for (const bad of ['*', 'https://app.example.com/', 'https://app.example.com/path', 'app.example.com', 'ftp://x.example.com']) {
       expect(() => loadConfig({ CORS_ORIGINS: bad }), bad).toThrow(ConfigError);

@@ -62,6 +62,14 @@
             <button id="login">Sign in<small>no password: dev only</small></button>
           </div>
         </section>
+        <section aria-label="Sign in with Supabase" id="supabase-box">
+          <h2>1b. Sign in with Supabase (real)</h2>
+          <p style="margin:0 0 8px;color:var(--muted)">Needs the API started with <code>npm run dev:api:supabase</code>. You type your own Supabase user's email and password; nothing is stored.</p>
+          <input id="sb-key" type="text" placeholder="sb_publishable_… (public key)" aria-label="Supabase publishable key" />
+          <input id="sb-email" type="email" placeholder="Supabase user email" aria-label="Supabase email" autocomplete="username" />
+          <input id="sb-password" type="password" placeholder="Password" aria-label="Supabase password" autocomplete="current-password" />
+          <button id="sb-login">Sign in with Supabase<small>your token is checked by the API against Supabase's public keys</small></button>
+        </section>
         <section aria-label="Diagrams">
           <h2>2. Your saved diagrams</h2>
           <ul id="list" class="diagrams"></ul>

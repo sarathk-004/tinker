@@ -32,7 +32,7 @@ async function main(): Promise<void> {
     verifier = createSupabaseVerifier(config.supabaseUrl, config.jwtAudience);
   }
 
-  const pool = createPool(config.databaseUrl);
+  const pool = createPool(config.databaseUrl, { mode: config.databaseSsl, caFile: config.databaseSslCaFile });
   try {
     await pool.query('SELECT 1');
   } catch {

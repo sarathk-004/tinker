@@ -8,6 +8,8 @@
     "start": "tsx --env-file-if-exists=.env src/main.ts",
     "typecheck": "tsc -p tsconfig.json",
     "dev:db": "tsx scripts/dev-db.ts",
+    "dev:api:supabase": "tsx watch --env-file=.env.supabase.local src/main.ts",
+    "check:supabase": "tsx --env-file-if-exists=.env.supabase.local scripts/check-supabase.ts",
     "test": "vitest run",
     "db:migrate": "node-pg-migrate -m migrations up",
     "db:migrate:down": "node-pg-migrate -m migrations down",

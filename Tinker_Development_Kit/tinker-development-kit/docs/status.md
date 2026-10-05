@@ -20,12 +20,16 @@ Active milestone: I3 implemented on branch `implementation-3` (stacked: main <- 
 | Concurrency | same | A06: 2 and 10 simultaneous writers at one version: exactly one wins; stale/future versions never apply |
 | Durability | | A05: API and pool replaced, identical document; also live (below) |
 | Rate limits, request bounds | `infrastructure/http/rate-limiter.ts`, `app.ts` | unit + HTTP 429 with Retry-After; 1 MiB body cap |
-Commands: `npm run typecheck` PASS; `npm test` 113 PASS (shared 17, server 96); `npm run check:boundaries` PASS; `npm run build` PASS (dist holds only the production app).
+Commands: `npm run typecheck` PASS; `npm test` 116 PASS (shared 17, server 99); `npm run check:boundaries` PASS; `npm run build` PASS (dist holds only the production app).
 Live check on localhost (built-in browser against the running API and dev Postgres): signed in, created a diagram, added Orders and PostgreSQL, connected, inserted Redis (lands beside the stacked nodes at (300,115)), simulated a drag (v6), retried an edit (returned the original result with Idempotent-Replayed, server unchanged), stale edit refused with 409, reload after an API restart and re-login returned the same diagram at the same version. The live run found two bugs that unit tests missed (CORS did not expose `Idempotent-Replayed`; insert-between placed nodes far below) and both are fixed with tests.
 Gate: acknowledged state survives API restart (tested and live); an exact retry returns its original result; two writes from the same version give one success and one conflict; cross-workspace access is denied.
 
+## Supabase verification (project rnwbgjrzbliqvqradjcm)
+Verified: JWKS reachable (one ES256 key; asymmetric only, which my verifier supports); forged token with the correct issuer and audience but a foreign key is rejected 401; garbage token rejected 401 (`npm run check:supabase -w @tinker/server`). Schema applied via the Supabase connector: 10 tables, RLS on all, `anon` and `authenticated` hold no privileges, advisors show only 10 INFO "RLS enabled, no policy" notes (intended). My SQL (user upsert, personal workspace, reservation, `FOR UPDATE`, conditional update, revision) ran on Supabase Postgres 17 as the `postgres` role (owner, bypasses RLS) inside a rolled-back transaction; no data left behind.
+NOT yet verified (needs things only the user can supply): (1) a real Supabase user token (confirms the `iss`/`aud`/claim shapes of real tokens), (2) the API's own connection to Supabase Postgres over TLS and the full API flow on it (needs the DB password in `server/.env.supabase.local`), (3) session pooler vs transaction pooler behaviour. Steps are in the README ("Using the real Supabase project").
+
 ## Limitations / risks (read these)
-- NOT verified against a real Supabase project: JWKS fetch, key rotation, token claim shapes, Supabase-hosted Postgres, its RLS/role defaults, connection pooling (the pg pool uses a direct connection; PgBouncer transaction mode untested). Needs SUPABASE_URL and a project.
+- Supabase items above that are still unverified; key rotation behaviour untested.
 - CI (`.github/workflows/ci.yml`) has not run on GitHub; tests now start embedded Postgres (Linux binary package should install via the lockfile, unverified there).
 - No workspace/member management routes; roles other than OWNER are only reachable through SQL today. Diagram list capped at 200, no pagination.
 - No per-request token/user caching: each request does a user upsert transaction plus membership queries. p95 targets are unmeasured (I9).

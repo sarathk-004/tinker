@@ -15,6 +15,13 @@ Open http://localhost:5173/api-demo.html (saved diagrams) or /engine-demo.html (
 Configuration is validated at startup (`src/infrastructure/config/config.ts`); an invalid environment exits with a message that names variables but never prints values.
 Production needs `DATABASE_URL`, `SUPABASE_URL` and `CORS_ORIGINS` (exact origins, no wildcard) and rejects `AUTH_MODE=dev`. Never put server secrets in `VITE_*` variables.
 
+## Using the real Supabase project
+The project URL is in `server/.env.supabase.local` (gitignored). The schema is already applied there. To run the API against it:
+1. In Supabase: Connect > Session pooler, copy the Postgres connection string and put it in `server/.env.supabase.local` as `DATABASE_URL=...` (plus `DATABASE_SSL=no-verify` for local development). Never paste it into chat or commit it.
+2. `npm run check:supabase -w @tinker/server` checks the key set, forged-token rejection, TLS connection and RLS. Optional: `SUPABASE_ACCESS_TOKEN=<a real user JWT>` in the same file verifies a live token.
+3. Stop the dev-mode API, then `npm run dev:api:supabase`.
+4. Open http://localhost:5173/api-demo.html, use "1b. Sign in with Supabase" with the publishable key and a user created in Supabase (Authentication > Users). The API verifies that real token against Supabase's published keys.
+
 ## Checks (repo root)
 | Command | What it does |
 |---|---|

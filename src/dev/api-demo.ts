@@ -41,7 +41,7 @@ async function api<T>(req: SentRequest): Promise<Api<T>> {
   const replayed = res.headers.get('idempotent-replayed') === 'true' || (typeof json === 'object' && json !== null && (json as { replayed?: boolean }).replayed === true);
   if (!req.quiet) $('sent').textContent = `${req.method} ${req.path}${req.key ? `\nIdempotency-Key: ${req.key}` : ''}${req.body !== undefined ? `\n\n${JSON.stringify(req.body, null, 2)}` : ''}`;
   if (!req.quiet) $('answer').textContent = `HTTP ${res.status}${replayed ? '  (Idempotent-Replayed: true)' : ''}\n\n${JSON.stringify(json, null, 2)}`;
-  if (res.status === 401) signOut('Your session expired or is invalid. Please sign in again.');
+  if (res.status === 401) signOut('The API rejected this sign-in. Dev login tokens only work with npm run dev:api; Supabase tokens only with npm run dev:api:supabase. Sign in again.');
   return { status: res.status, json, replayed };
 }
 
@@ -158,6 +158,33 @@ $('login').onclick = async () => {
   }
 };
 $('logout').onclick = () => signOut('Signed out.');
+
+// Real Supabase sign-in (password grant). The publishable key is designed to be public; the password is typed by the user
+// and sent only to Supabase. The API then verifies the returned JWT against Supabase's published signing keys.
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? 'https://rnwbgjrzbliqvqradjcm.supabase.co';
+const envKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+if (envKey) ($('sb-key') as HTMLInputElement).value = envKey;
+$('sb-login').onclick = async () => {
+  const apikey = ($('sb-key') as HTMLInputElement).value.trim();
+  const email = ($('sb-email') as HTMLInputElement).value.trim();
+  const password = ($('sb-password') as HTMLInputElement).value;
+  if (!apikey || !email || !password) return setStatus('bad', 'Enter the publishable key, email and password.');
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', apikey },
+      body: JSON.stringify({ email, password }),
+    });
+    const json = await res.json();
+    ($('sb-password') as HTMLInputElement).value = '';
+    if (!res.ok || !json.access_token) return setStatus('bad', `Supabase refused the sign-in: ${json.error_description ?? json.msg ?? res.status}`);
+    token = json.access_token as string;
+    safeSet(TOKEN_KEY, token);
+    await afterSession();
+  } catch {
+    setStatus('bad', 'Could not reach Supabase.');
+  }
+};
 
 $('new').onclick = async () => {
   const ws = workspaceId();

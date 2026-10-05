@@ -25,6 +25,12 @@ const envSchema = z
     CORS_ORIGINS: z.string().optional(),
     /** Server-only database role connection string. The API will not start without it (tests inject a pool). */
     DATABASE_URL: z.url().optional(),
+    /**
+     * TLS to Postgres. `off` (local), `verify` (check the server certificate; give the CA via DATABASE_SSL_CA_FILE when it is not
+     * publicly trusted, as with Supabase) or `no-verify` (encrypted but unauthenticated: development only).
+     */
+    DATABASE_SSL: z.enum(['off', 'verify', 'no-verify']).default('off'),
+    DATABASE_SSL_CA_FILE: z.string().min(1).optional(),
     /** Supabase project URL; JWTs are verified against its JWKS (issuer = <url>/auth/v1). */
     SUPABASE_URL: z.url().optional(),
     JWT_AUDIENCE: z.string().min(1).default('authenticated'),
@@ -39,6 +45,9 @@ const envSchema = z
       if (!env.CORS_ORIGINS?.trim()) need('CORS_ORIGINS');
       if (!env.DATABASE_URL) need('DATABASE_URL');
       if (!env.SUPABASE_URL) need('SUPABASE_URL');
+      if (env.DATABASE_SSL === 'no-verify') {
+        need('DATABASE_SSL', 'no-verify is not allowed in production (use verify with DATABASE_SSL_CA_FILE)');
+      }
     }
     if (env.AUTH_MODE === 'dev' && env.NODE_ENV !== 'development') {
       need('AUTH_MODE', 'dev auth is allowed only when NODE_ENV=development');
@@ -53,6 +62,8 @@ export interface Config {
   logLevel: (typeof LOG_LEVELS)[number];
   corsOrigins: string[];
   databaseUrl: string | undefined;
+  databaseSsl: 'off' | 'verify' | 'no-verify';
+  databaseSslCaFile: string | undefined;
   authMode: 'supabase' | 'dev';
   supabaseUrl: string | undefined;
   jwtAudience: string;
@@ -93,6 +104,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     logLevel: e.LOG_LEVEL,
     corsOrigins: rawOrigins,
     databaseUrl: e.DATABASE_URL,
+    databaseSsl: e.DATABASE_SSL,
+    databaseSslCaFile: e.DATABASE_SSL_CA_FILE,
     // Dev auth (unauthenticated local login) is NEVER a default: NODE_ENV itself defaults to development.
     authMode: e.AUTH_MODE ?? 'supabase',
     supabaseUrl: e.SUPABASE_URL,

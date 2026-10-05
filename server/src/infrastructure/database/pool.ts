@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import pg from 'pg';
 
 // BIGINT (int8) columns hold diagram versions and small counters; return them as numbers, not strings.
@@ -8,9 +9,28 @@ export type PoolClient = pg.PoolClient;
 /** Anything that can run a query: the pool or a transaction client. */
 export type Queryable = Pick<pg.Pool, 'query'>;
 
-export function createPool(connectionString: string): Pool {
+export interface SslOptions {
+  mode: 'off' | 'verify' | 'no-verify';
+  caFile?: string | undefined;
+}
+
+/**
+ * Remove `sslmode` from the URL (it would override the explicit `ssl` option) and build the TLS settings deterministically.
+ * Postgres connection strings from Supabase carry `?sslmode=require`; here TLS policy comes only from DATABASE_SSL.
+ */
+function tlsFor(connectionString: string, ssl: SslOptions): { connectionString: string; ssl?: pg.ClientConfig['ssl'] } {
+  const url = new URL(connectionString);
+  url.searchParams.delete('sslmode');
+  const cleaned = url.toString();
+  if (ssl.mode === 'off') return { connectionString: cleaned };
+  if (ssl.mode === 'no-verify') return { connectionString: cleaned, ssl: { rejectUnauthorized: false } };
+  const ca = ssl.caFile ? { ca: readFileSync(ssl.caFile, 'utf8') } : {};
+  return { connectionString: cleaned, ssl: { rejectUnauthorized: true, ...ca } };
+}
+
+export function createPool(connectionString: string, ssl: SslOptions = { mode: 'off' }): Pool {
   return new pg.Pool({
-    connectionString,
+    ...tlsFor(connectionString, ssl),
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,

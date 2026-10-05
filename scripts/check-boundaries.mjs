@@ -73,7 +73,8 @@ for (const { dir, forbid } of rules) {
 }
 
 // Secrets must not be exposed through VITE_* variables (committed examples and typings).
-const secretish = /VITE_[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)/;
+// Supabase publishable keys are public by design (sb_publishable_...), so VITE_*PUBLISHABLE* names are allowed.
+const secretish = /VITE_(?![A-Z0-9_]*PUBLISHABLE)[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)/;
 const exempt = new Set([
   // Legacy prototype path; removed in I4/I7 ("no browser secret remains in the new production path").
   'src/vite-env.d.ts',
