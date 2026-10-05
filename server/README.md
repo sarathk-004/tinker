@@ -2,14 +2,18 @@
 
 Fastify API (modular monolith). Contracts live in `../shared` (`@tinker/shared`); the browser imports only that package.
 
-## Local setup
+## Local setup (no Docker needed)
 ```bash
-npm ci                         # repo root, installs all workspaces
-cp server/.env.example server/.env
-npm run dev:api                # http://127.0.0.1:8787  (GET /health)
-npm run dev                    # frontend, http://localhost:5173
+npm ci                                   # repo root, installs all workspaces
+cp server/.env.example server/.env       # AUTH_MODE=dev gives a local login without Supabase
+npm run dev:db  -w @tinker/server        # terminal 1: real Postgres on 127.0.0.1:54329 (data in server/.data/)
+npm run db:migrate -w @tinker/server     # once, and after pulling new migrations
+npm run dev:api                          # terminal 2: API on http://127.0.0.1:8787 (GET /health, /health/ready)
+npm run dev                              # terminal 3: frontend on http://localhost:5173
 ```
-Configuration is validated at startup (`src/infrastructure/config/config.ts`); an invalid environment exits with a message that names variables but never prints values. `CORS_ORIGINS` (exact origins, no wildcard) is required when `NODE_ENV=production`. Never put server secrets in `VITE_*` variables.
+Open http://localhost:5173/api-demo.html (saved diagrams) or /engine-demo.html (pure engine). Both are development-only pages.
+Configuration is validated at startup (`src/infrastructure/config/config.ts`); an invalid environment exits with a message that names variables but never prints values.
+Production needs `DATABASE_URL`, `SUPABASE_URL` and `CORS_ORIGINS` (exact origins, no wildcard) and rejects `AUTH_MODE=dev`. Never put server secrets in `VITE_*` variables.
 
 ## Checks (repo root)
 | Command | What it does |
@@ -20,21 +24,23 @@ Configuration is validated at startup (`src/infrastructure/config/config.ts`); a
 | `npm run build` | frontend production build |
 | `npm run check` | typecheck + tests + boundaries |
 
-## Database (migrations only until I3)
-```bash
-docker compose up -d postgres            # local Postgres 17 on 127.0.0.1:54329
-npm run db:migrate -w @tinker/server     # node-pg-migrate, reads DATABASE_URL from server/.env
-npm run db:migrate:create -w @tinker/server -- add-users   # new migration in server/migrations/
-```
-No schema exists yet; the first migrations arrive with I3. Supabase is the hosting target (decision S4); the API will use a server-only role.
+## Database
+`npm run db:migrate -w @tinker/server` applies `server/migrations/*.sql` (node-pg-migrate, `-- Up/Down Migration` markers); `db:migrate:down` reverts the last one; `db:migrate:create -- <name>` scaffolds a new file.
+Row level security is on for every table with no policies: only the owning server role can read or write, even if a Supabase role is granted access by mistake.
+`docker-compose.yml` remains as an alternative Postgres if you prefer Docker. Supabase is the hosting target (decision S4) and has not been exercised yet.
+Tests (`npm test -w @tinker/server`) start their own throwaway Postgres on a random port; they never touch the dev database.
 
 ## Layout
 ```
-src/app.ts                         Fastify factory (request ids, CORS, error envelope, 404)
-src/main.ts                        process entry, graceful shutdown
-src/infrastructure/{config,http,auth}
-src/modules/diagrams/http          /v1/diagrams/:id/commands and /presentation (validate, then 501 until I3)
-test/                              API and config tests (app.inject; no network or DB)
+src/app.ts                                   Fastify factory (request ids, CORS, error envelope, health, route wiring)
+src/main.ts                                  process entry: config, pool, verifier, graceful shutdown
+src/infrastructure/{config,http,auth,database,idempotency}
+src/modules/identity                         user + personal workspace provisioning, dev login
+src/modules/workspaces/access.ts             roles and authorization (404 vs 403)
+src/modules/diagrams/domain                  pure engine (no I/O)
+src/modules/diagrams/{application,persistence,http}   service, SQL, routes
+migrations/                                  versioned SQL
+test/                                        unit + integration tests (real Postgres)
 ```
-Protected routes authenticate first. Until the Supabase verifier lands in I3 the default authenticator answers 401 to every `/v1/diagrams/*` request; tests inject their own.
+Every protected route runs: authenticate -> rate limit -> request shape -> authorize -> idempotency reservation -> version/domain checks -> atomic commit.
 `npm start` runs through `tsx` and is a development convenience; the production build/start path is an I9 task.

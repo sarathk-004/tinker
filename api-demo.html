@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tinker — Saved diagrams preview (dev)</title>
+    <style>
+      :root { color-scheme: light; --ink:#26251e; --muted:#6b6a60; --line:#cfcdc4; --bg:#f7f7f4; --accent:#f54e00; --ok:#1a7f37; --bad:#b42318; }
+      * { box-sizing: border-box; }
+      body { margin:0; font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; color:var(--ink); background:var(--bg); }
+      header { padding:16px 24px; border-bottom:1px solid var(--line); background:#fff; }
+      h1 { margin:0 0 4px; font-size:18px; }
+      header p { margin:0; color:var(--muted); max-width:90ch; }
+      main { display:grid; grid-template-columns: 360px 1fr; gap:16px; padding:16px 24px; }
+      @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+      section { background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:16px; }
+      h2 { margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+      button { display:block; width:100%; text-align:left; margin:0 0 8px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); font:inherit; cursor:pointer; }
+      button:hover:not(:disabled) { border-color:var(--ink); }
+      button:disabled { opacity:.45; cursor:not-allowed; }
+      button small { display:block; color:var(--muted); }
+      input[type=email], input[type=text] { width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:6px; font:inherit; margin-bottom:8px; }
+      #canvas { width:100%; height:300px; background: radial-gradient(var(--line) 1px, transparent 1px) 0 0/16px 16px; border-radius:6px; }
+      .node rect { fill:#fff; stroke:var(--ink); stroke-width:1.5; rx:8; }
+      .node.new rect { stroke:var(--accent); stroke-width:3; }
+      .node text.name { font-weight:600; font-size:14px; }
+      .node text.meta { font-size:11px; fill:var(--muted); }
+      .edge { stroke:var(--ink); stroke-width:1.8; fill:none; }
+      .edge-label { font-size:11px; fill:var(--muted); }
+      .status { padding:8px 10px; border-radius:6px; margin:0 0 10px; }
+      .status.ok { background:#e7f5ec; color:var(--ok); }
+      .status.bad { background:#fdecea; color:var(--bad); }
+      .status.idle { background:#f1f0ea; color:var(--muted); }
+      .kv { display:grid; grid-template-columns: auto 1fr; gap:2px 12px; font-size:13px; margin-bottom:8px; }
+      .kv dt { color:var(--muted); } .kv dd { margin:0; word-break:break-all; }
+      pre { margin:0; padding:10px; background:#f1f0ea; border-radius:6px; overflow:auto; max-height:220px; font-size:12px; }
+      .row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+      @media (max-width: 1200px) { .row { grid-template-columns:1fr; } }
+      ul.diagrams { list-style:none; margin:0 0 8px; padding:0; }
+      ul.diagrams li button { margin:0 0 4px; }
+      ul.diagrams li.active button { border-color:var(--accent); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Saved diagrams preview <span style="color:var(--accent)">(I3, development only)</span></h1>
+      <p>
+        This page talks to the real API and the real local database: sign in, create a diagram, edit it, then refresh the page or restart the API and load it again.
+        It is not the real editor yet (that is I4). The sign-in here is a throwaway local login, not Supabase.
+      </p>
+    </header>
+    <main>
+      <div>
+        <section aria-label="Sign in">
+          <h2>1. Sign in (local dev login)</h2>
+          <div id="auth-out" style="display:none">
+            <dl class="kv"><dt>Signed in</dt><dd id="who"></dd><dt>Workspace</dt><dd id="ws"></dd></dl>
+            <button id="logout">Sign out</button>
+          </div>
+          <div id="auth-in">
+            <input id="email" type="email" value="ada@example.com" aria-label="Email" />
+            <button id="login">Sign in<small>no password: dev only</small></button>
+          </div>
+        </section>
+        <section aria-label="Diagrams">
+          <h2>2. Your saved diagrams</h2>
+          <ul id="list" class="diagrams"></ul>
+          <button id="new">+ New diagram<small>saved in the database immediately</small></button>
+        </section>
+        <section aria-label="Edits">
+          <h2>3. Edit the open diagram</h2>
+          <button id="add-orders" disabled>Add “Orders”</button>
+          <button id="add-pg" disabled>Add “PostgreSQL”</button>
+          <button id="connect" disabled>Connect Orders → PostgreSQL</button>
+          <button id="insert" disabled>Insert Redis between them<small>one atomic step</small></button>
+          <button id="drag" disabled>Simulate a drag: move Orders down 40px<small>position save: version +1, no revision</small></button>
+          <button id="rename" disabled>Rename the diagram</button>
+        </section>
+        <section aria-label="Safety checks">
+          <h2>4. Safety checks</h2>
+          <button id="retry" disabled>Send the last edit again (same key)<small>a lost-response retry: must NOT apply twice</small></button>
+          <button id="stale" disabled>Send an edit with an old version<small>must be refused (409): no silent overwrite</small></button>
+          <button id="reload" disabled>Reload from server<small>after refresh or API restart: same diagram, same version</small></button>
+          <button id="delete" disabled>Delete the diagram<small>soft delete</small></button>
+        </section>
+      </div>
+      <div>
+        <section aria-label="Diagram">
+          <h2>Open diagram</h2>
+          <div id="status" class="status idle">Sign in to start.</div>
+          <dl class="kv"><dt>Name</dt><dd id="d-name">—</dd><dt>Version</dt><dd id="d-version">—</dd><dt>Id</dt><dd id="d-id">—</dd></dl>
+          <svg id="canvas" role="img" aria-label="Diagram preview"></svg>
+        </section>
+        <div class="row">
+          <section aria-label="Request"><h2>Last request</h2><pre id="sent">—</pre></section>
+          <section aria-label="Response"><h2>Server answer</h2><pre id="answer">—</pre></section>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/dev/api-demo.ts"></script>
+  </body>
+</html>

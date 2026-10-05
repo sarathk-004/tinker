@@ -7,6 +7,7 @@
     "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
     "start": "tsx --env-file-if-exists=.env src/main.ts",
     "typecheck": "tsc -p tsconfig.json",
+    "dev:db": "tsx scripts/dev-db.ts",
     "test": "vitest run",
     "db:migrate": "node-pg-migrate -m migrations up",
     "db:migrate:down": "node-pg-migrate -m migrations down",
@@ -17,6 +18,7 @@
     "@fastify/cors": "^11.0.0",
     "@tinker/shared": "*",
     "fastify": "^5.12.5",
+    "jose": "^6.2.12",
     "node-pg-migrate": "^9.0.0",
     "pg": "^8.23.1",
     "tsx": "^4.23.15",
@@ -24,6 +26,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "@types/pg": "^8.23.1"
+    "@types/pg": "^8.23.1",
+    "embedded-postgres": "^18.4.0-beta.17"
   }
 }

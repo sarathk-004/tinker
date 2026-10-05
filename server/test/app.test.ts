@@ -1,105 +1,103 @@
-import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { errorEnvelopeSchema, healthResponseSchema } from '@tinker/shared';
 import { buildApp } from '../src/app.ts';
 import { loadConfig } from '../src/infrastructure/config/config.ts';
+import { call, createDiagramFor, key, startHarness, type Harness, type TestUser } from './support/harness.ts';
 
 const DIAGRAM = '11111111-1111-4111-8111-111111111111';
 const NODE_A = '22222222-2222-4222-8222-222222222222';
-const KEY = '6f1d2c3a-8b7e-4f10-9a11-0123456789ab';
-const config = loadConfig({ NODE_ENV: 'test', LOG_LEVEL: 'silent' });
 
-const headers = { authorization: 'Bearer test', 'idempotency-key': KEY, 'content-type': 'application/json' };
-const post = (app: FastifyInstance, payload: unknown, h: Record<string, string> = headers, id = DIAGRAM) =>
-  app.inject({ method: 'POST', url: `/v1/diagrams/${id}/commands`, headers: h, payload: JSON.stringify(payload) });
-
-function expectEnvelope(res: { statusCode: number; json: () => unknown }, status: number, code: string) {
-  expect(res.statusCode).toBe(status);
-  const parsed = errorEnvelopeSchema.safeParse(res.json());
-  expect(parsed.success, JSON.stringify(res.json())).toBe(true);
+function expectEnvelope(res: { status: number; body: unknown }, status: number, code: string) {
+  expect(res.status, JSON.stringify(res.body)).toBe(status);
+  const parsed = errorEnvelopeSchema.safeParse(res.body);
+  expect(parsed.success, JSON.stringify(res.body)).toBe(true);
   expect(parsed.success && parsed.data.error.code).toBe(code);
 }
 
-describe('API foundation (authenticated test app)', () => {
-  let app: FastifyInstance;
+describe('API foundation (real auth, real database)', () => {
+  let h: Harness;
+  let user: TestUser;
   beforeAll(async () => {
-    app = await buildApp({ config, logger: false, authenticate: async () => ({ userId: 'test-user' }) });
+    h = await startHarness();
+    user = await h.newUser();
   });
-  afterAll(() => app.close());
+  afterAll(() => h.close());
 
-  it('serves /health without authentication', async () => {
-    const locked = await buildApp({ config, logger: false });
-    const res = await locked.inject({ method: 'GET', url: '/health' });
-    expect(res.statusCode).toBe(200);
-    expect(healthResponseSchema.safeParse(res.json()).success).toBe(true);
-    await locked.close();
+  it('serves liveness without authentication and readiness when the database is reachable', async () => {
+    const live = await call(h, null, 'GET', '/health');
+    expect(live.status).toBe(200);
+    expect(healthResponseSchema.safeParse(live.body).success).toBe(true);
+    expect((await call(h, null, 'GET', '/health/ready')).status).toBe(200);
   });
 
-  it('echoes a safe request id and generates one otherwise', async () => {
-    const supplied = await app.inject({ method: 'GET', url: '/health', headers: { 'x-request-id': 'req-abc-12345' } });
+  it('echoes a safe request id and regenerates unsafe ones', async () => {
+    const supplied = await call(h, null, 'GET', '/health', undefined, { 'x-request-id': 'req-abc-12345' });
     expect(supplied.headers['x-request-id']).toBe('req-abc-12345');
-    const unsafe = await app.inject({ method: 'GET', url: '/health', headers: { 'x-request-id': 'bad id\twith spaces' } });
-    expect(unsafe.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+    const unsafe = await call(h, null, 'GET', '/health', undefined, { 'x-request-id': 'bad id\twith spaces' });
+    expect(String(unsafe.headers['x-request-id'])).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  it('returns the error envelope with the request id for unknown routes', async () => {
-    const res = await app.inject({ method: 'GET', url: '/nope', headers: { 'x-request-id': 'req-abc-12345' } });
+  it('answers unknown routes with the error envelope', async () => {
+    const res = await call(h, null, 'GET', '/nope', undefined, { 'x-request-id': 'req-abc-12345' });
     expectEnvelope(res, 404, 'NOT_FOUND');
-    expect(res.json().error.requestId).toBe('req-abc-12345');
+    expect((res.body as { error: { requestId: string } }).error.requestId).toBe('req-abc-12345');
+  });
+
+  it('answers 401 before parsing or validating anything when credentials are missing or bad', async () => {
+    const noToken = await h.app.inject({ method: 'POST', url: `/v1/diagrams/${DIAGRAM}/commands`, headers: { 'content-type': 'application/json' }, payload: '{not json' });
+    expectEnvelope({ status: noToken.statusCode, body: noToken.json() }, 401, 'UNAUTHENTICATED');
+    const garbage = await call(h, null, 'GET', '/v1/me', undefined, { authorization: 'Bearer not.a.jwt' });
+    expectEnvelope(garbage, 401, 'UNAUTHENTICATED');
+    const wrongScheme = await call(h, null, 'GET', '/v1/me', undefined, { authorization: 'Basic abc' });
+    expectEnvelope(wrongScheme, 401, 'UNAUTHENTICATED');
   });
 
   it('rejects malformed JSON, wrong content type and oversized bodies consistently', async () => {
-    const malformed = await app.inject({ method: 'POST', url: `/v1/diagrams/${DIAGRAM}/commands`, headers, payload: '{not json' });
-    expectEnvelope(malformed, 400, 'INVALID_REQUEST');
-    const wrongType = await app.inject({
-      method: 'POST', url: `/v1/diagrams/${DIAGRAM}/commands`, headers: { ...headers, 'content-type': 'text/plain' }, payload: 'x',
-    });
-    expectEnvelope(wrongType, 400, 'INVALID_REQUEST');
-    const huge = await app.inject({
-      method: 'POST', url: `/v1/diagrams/${DIAGRAM}/commands`, headers, payload: JSON.stringify({ pad: 'x'.repeat(1024 * 1024) }),
-    });
-    expectEnvelope(huge, 413, 'PAYLOAD_TOO_LARGE');
+    const url = `/v1/diagrams/${DIAGRAM}/commands`;
+    const base = user.headers({ 'idempotency-key': key() });
+    const malformed = await h.app.inject({ method: 'POST', url, headers: base, payload: '{not json' });
+    expectEnvelope({ status: malformed.statusCode, body: malformed.json() }, 400, 'INVALID_REQUEST');
+    const wrongType = await h.app.inject({ method: 'POST', url, headers: { ...base, 'content-type': 'text/plain' }, payload: 'x' });
+    expectEnvelope({ status: wrongType.statusCode, body: wrongType.json() }, 400, 'INVALID_REQUEST');
+    const huge = await h.app.inject({ method: 'POST', url, headers: base, payload: JSON.stringify({ pad: 'x'.repeat(1024 * 1024) }) });
+    expectEnvelope({ status: huge.statusCode, body: huge.json() }, 413, 'PAYLOAD_TOO_LARGE');
   });
 
-  it('rejects bad diagram ids and missing or invalid idempotency keys', async () => {
-    expectEnvelope(await post(app, { expectedVersion: 1, command: { type: 'RESET' } }, headers, 'not-a-uuid'), 400, 'INVALID_REQUEST');
-    const { 'idempotency-key': _omit, ...noKey } = headers;
-    expectEnvelope(await post(app, { expectedVersion: 1, command: { type: 'RESET' } }, noKey), 400, 'INVALID_REQUEST');
-    expectEnvelope(await post(app, { expectedVersion: 1, command: { type: 'RESET' } }, { ...headers, 'idempotency-key': 'short' }), 400, 'INVALID_REQUEST');
-  });
-
-  it('rejects an invalid envelope as INVALID_REQUEST and an invalid command as INVALID_COMMAND', async () => {
-    expectEnvelope(await post(app, { command: { type: 'RESET' } }), 400, 'INVALID_REQUEST');
-    expectEnvelope(await post(app, { expectedVersion: 0, command: { type: 'RESET' } }), 400, 'INVALID_REQUEST');
-    expectEnvelope(await post(app, { expectedVersion: 1, command: { type: 'DROP_TABLE' } }), 400, 'INVALID_COMMAND');
-    expectEnvelope(await post(app, { expectedVersion: 1, command: { type: 'REMOVE_NODE', nodeId: 'orders' } }), 400, 'INVALID_COMMAND');
-    expectEnvelope(await post(app, { expectedVersion: 1 }), 400, 'INVALID_REQUEST');
+  it('rejects bad ids, missing or invalid idempotency keys, and malformed bodies (400) without touching data', async () => {
+    const reset = { expectedVersion: 1, command: { type: 'RESET' } };
+    expectEnvelope(await call(h, user, 'POST', '/v1/diagrams/not-a-uuid/commands', reset, { 'idempotency-key': key() }), 400, 'INVALID_REQUEST');
+    expectEnvelope(await call(h, user, 'POST', `/v1/diagrams/${DIAGRAM}/commands`, reset), 400, 'INVALID_REQUEST');
+    expectEnvelope(await call(h, user, 'POST', `/v1/diagrams/${DIAGRAM}/commands`, reset, { 'idempotency-key': 'short' }), 400, 'INVALID_REQUEST');
+    const k = { 'idempotency-key': key() };
+    expectEnvelope(await call(h, user, 'POST', `/v1/diagrams/${DIAGRAM}/commands`, { command: { type: 'RESET' } }, k), 400, 'INVALID_REQUEST');
+    expectEnvelope(await call(h, user, 'POST', `/v1/diagrams/${DIAGRAM}/commands`, { expectedVersion: 0, command: { type: 'RESET' } }, k), 400, 'INVALID_REQUEST');
+    expectEnvelope(await call(h, user, 'POST', `/v1/diagrams/${DIAGRAM}/commands`, { expectedVersion: 1, command: { type: 'DROP_TABLE' } }, k), 400, 'INVALID_COMMAND');
+    expectEnvelope(await call(h, user, 'POST', `/v1/diagrams/${DIAGRAM}/commands`, { expectedVersion: 1, command: { type: 'REMOVE_NODE', nodeId: 'orders' } }, k), 400, 'INVALID_COMMAND');
+    expectEnvelope(await call(h, user, 'PATCH', `/v1/diagrams/${DIAGRAM}/presentation`, { expectedVersion: 2 }, k), 400, 'INVALID_REQUEST');
+    expectEnvelope(await call(h, user, 'DELETE', `/v1/diagrams/${DIAGRAM}`, undefined, k), 400, 'INVALID_REQUEST');
   });
 
   it('does not echo submitted values in validation details', async () => {
-    const res = await post(app, { expectedVersion: 1, command: { type: 'REMOVE_NODE', nodeId: 'SECRET-VALUE-123' } });
-    expect(JSON.stringify(res.json())).not.toContain('SECRET-VALUE-123');
+    const res = await call(h, user, 'POST', `/v1/diagrams/${DIAGRAM}/commands`, { expectedVersion: 1, command: { type: 'REMOVE_NODE', nodeId: 'SECRET-VALUE-123' } }, { 'idempotency-key': key() });
+    expect(JSON.stringify(res.body)).not.toContain('SECRET-VALUE-123');
   });
 
-  it('accepts a valid command at the contract layer, then reports not implemented', async () => {
-    const res = await post(app, { expectedVersion: 14, command: { type: 'REMOVE_NODE', nodeId: NODE_A } });
-    expectEnvelope(res, 501, 'NOT_IMPLEMENTED');
-  });
-
-  it('validates the presentation patch contract', async () => {
-    const patch = (payload: unknown) =>
-      app.inject({ method: 'PATCH', url: `/v1/diagrams/${DIAGRAM}/presentation`, headers, payload: JSON.stringify(payload) });
-    expectEnvelope(await patch({ expectedVersion: 2 }), 400, 'INVALID_REQUEST');
-    expectEnvelope(await patch({ expectedVersion: 2, nodePositions: { [NODE_A]: { x: 'a', y: 1 } } }), 400, 'INVALID_REQUEST');
-    expectEnvelope(await patch({ expectedVersion: 2, nodePositions: { [NODE_A]: { x: 1, y: 1 } } }), 501, 'NOT_IMPLEMENTED');
+  it('an unknown diagram is a uniform 404 and valid commands run for real', async () => {
+    expectEnvelope(await call(h, user, 'POST', `/v1/diagrams/${DIAGRAM}/commands`, { expectedVersion: 1, command: { type: 'REMOVE_NODE', nodeId: NODE_A } }, { 'idempotency-key': key() }), 404, 'DIAGRAM_NOT_FOUND');
+    const { diagram } = await createDiagramFor(h, user);
+    expect(diagram.version).toBe(1);
   });
 });
 
-describe('authentication ordering', () => {
-  it('answers 401 before validating anything when no verifier is installed (default)', async () => {
+describe('without a database or verifier', () => {
+  const config = loadConfig({ NODE_ENV: 'test', LOG_LEVEL: 'silent' });
+
+  it('answers 401 for every protected route (default authenticator)', async () => {
     const app = await buildApp({ config, logger: false });
-    const res = await app.inject({ method: 'POST', url: `/v1/diagrams/${DIAGRAM}/commands`, headers: { 'content-type': 'application/json' }, payload: '{not json' });
-    expectEnvelope(res, 401, 'UNAUTHENTICATED');
+    const res = await app.inject({ method: 'GET', url: '/v1/me' });
+    expect(res.statusCode).toBe(401);
+    expect((await app.inject({ method: 'GET', url: '/health' })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/health/ready' })).statusCode).toBe(503);
     await app.close();
   });
 });
@@ -111,6 +109,10 @@ describe('CORS', () => {
     expect(allowed.headers['access-control-allow-origin']).toBe('https://app.example.com');
     const denied = await app.inject({ method: 'GET', url: '/health', headers: { origin: 'https://evil.example.com' } });
     expect(denied.headers['access-control-allow-origin']).toBeUndefined();
+    // Browsers can only read these response headers cross-origin if they are exposed (the I4 client depends on them).
+    expect(String(allowed.headers['access-control-expose-headers'])).toEqual(expect.stringContaining('idempotent-replayed'));
+    expect(String(allowed.headers['access-control-expose-headers'])).toEqual(expect.stringContaining('retry-after'));
+    expect(String(allowed.headers['access-control-expose-headers'])).toEqual(expect.stringContaining('x-request-id'));
     await app.close();
   });
 });

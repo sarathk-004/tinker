@@ -23,13 +23,27 @@ const envSchema = z
     LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
     /** Comma-separated exact origins allowed by CORS. Required in production. */
     CORS_ORIGINS: z.string().optional(),
-    /** Required from I3 onward; optional while the API has no persistence. */
+    /** Server-only database role connection string. The API will not start without it (tests inject a pool). */
     DATABASE_URL: z.url().optional(),
+    /** Supabase project URL; JWTs are verified against its JWKS (issuer = <url>/auth/v1). */
+    SUPABASE_URL: z.url().optional(),
+    JWT_AUDIENCE: z.string().min(1).default('authenticated'),
+    /** `dev` signs and verifies tokens with a throwaway local key through /dev/auth/login. Development only. */
+    AUTH_MODE: z.enum(['supabase', 'dev']).optional(),
+    RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(120),
   })
   .superRefine((env, ctx) => {
-    if (env.NODE_ENV === 'production' && !env.CORS_ORIGINS?.trim()) {
-      ctx.addIssue({ code: 'custom', path: ['CORS_ORIGINS'], message: 'is required in production' });
+    const need = (key: string, message = 'is required in production') =>
+      ctx.addIssue({ code: 'custom', path: [key], message });
+    if (env.NODE_ENV === 'production') {
+      if (!env.CORS_ORIGINS?.trim()) need('CORS_ORIGINS');
+      if (!env.DATABASE_URL) need('DATABASE_URL');
+      if (!env.SUPABASE_URL) need('SUPABASE_URL');
     }
+    if (env.AUTH_MODE === 'dev' && env.NODE_ENV !== 'development') {
+      need('AUTH_MODE', 'dev auth is allowed only when NODE_ENV=development');
+    }
+    if (env.AUTH_MODE === 'supabase' && !env.SUPABASE_URL) need('SUPABASE_URL', 'is required when AUTH_MODE=supabase');
   });
 
 export interface Config {
@@ -39,6 +53,10 @@ export interface Config {
   logLevel: (typeof LOG_LEVELS)[number];
   corsOrigins: string[];
   databaseUrl: string | undefined;
+  authMode: 'supabase' | 'dev';
+  supabaseUrl: string | undefined;
+  jwtAudience: string;
+  rateLimitPerMinute: number;
 }
 
 export class ConfigError extends Error {
@@ -75,5 +93,10 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     logLevel: e.LOG_LEVEL,
     corsOrigins: rawOrigins,
     databaseUrl: e.DATABASE_URL,
+    // Dev auth (unauthenticated local login) is NEVER a default: NODE_ENV itself defaults to development.
+    authMode: e.AUTH_MODE ?? 'supabase',
+    supabaseUrl: e.SUPABASE_URL,
+    jwtAudience: e.JWT_AUDIENCE,
+    rateLimitPerMinute: e.RATE_LIMIT_PER_MINUTE,
   };
 }

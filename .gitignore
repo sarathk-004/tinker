@@ -32,3 +32,6 @@ dist-ssr
 
 # Retrieval index (regenerable): rebuild with the graphify skill
 graphify-out/
+
+# Local dev Postgres data (server/scripts/dev-db.ts)
+.data/

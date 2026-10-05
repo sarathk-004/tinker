@@ -39,7 +39,7 @@ Read: architecture, Phase 3 sections 3/8/9/12/15.
 - [x] Add validated configuration, health endpoint, request IDs and consistent errors.
 - [x] Define graph/presentation runtime schemas, complete NodeKind enum and all command discriminated unions.
 - [x] Define canonical diagram responses, errors, UUID/version constraints and limits.
-- [ ] Add DB migrations/run scripts and local setup docs using actual choices. (scripts, compose file and docs added; NOT run against a database: Docker daemon unavailable)
+- [x] Add DB migrations/run scripts and local setup docs using actual choices. (verified in I3 on real Postgres 18.4: up, down, up)
 - [x] Add contract boundary checks and CI for meaningful existing scripts.
 Gate: frontend and API start locally; malformed command input is rejected consistently; browser imports only contract DTOs/schemas, not backend logic.
 
@@ -56,17 +56,17 @@ Gate: Orders → PostgreSQL becomes Orders → Redis → PostgreSQL with one val
 
 ## I3 — Identity, persistence and command API
 Read: contract-decisions D01–D06/D09–D10, Phase 3 sections 2/5–7/9/13/17.
-- [ ] Create schema constraints/indexes once, with versioned migrations.
-- [ ] Verify managed tokens server-side; map identities to internal users.
-- [ ] Provision personal workspace/membership atomically and idempotently.
-- [ ] Implement authorized create/list/load/rename/soft-delete routes.
-- [ ] Implement command and presentation routes with expectedVersion.
-- [ ] Implement operation reservation, payload hashing, stored response replay and lease fencing.
-- [ ] Execute conditional update + revision + execution completion in one transaction.
-- [ ] Reauthorize retries and scope conversation/revision IDs to the authorized diagram.
-- [ ] Bound requests and implement stated single-instance rate/concurrency rules.
-- [ ] Verify DB access policies and prevent public table exposure.
-- [ ] Integration-test concurrent duplicate keys, stale versions, replay after later edits, revoked access and rollback.
+- [x] Create schema constraints/indexes once, with versioned migrations.
+- [x] Verify managed tokens server-side; map identities to internal users. (verified with locally signed tokens through the same code path; NOT yet against a live Supabase project)
+- [x] Provision personal workspace/membership atomically and idempotently.
+- [x] Implement authorized create/list/load/rename/soft-delete routes.
+- [x] Implement command and presentation routes with expectedVersion.
+- [x] Implement operation reservation, payload hashing, stored response replay and lease fencing.
+- [x] Execute conditional update + revision + execution completion in one transaction.
+- [x] Reauthorize retries (done). Scoping conversation/revision IDs to the authorized diagram: no such routes exist yet; enforced when they arrive in I5/I8. (partial)
+- [x] Bound requests and implement stated single-instance rate/concurrency rules. (1 MiB body cap and 120 req/min/user done; the 10/min and 2-concurrent AI caps arrive with the AI routes in I5)
+- [x] Verify DB access policies and prevent public table exposure. (RLS enabled with no policies on every table, tested with a non-owner role on local Postgres; not yet checked on Supabase itself)
+- [x] Integration-test concurrent duplicate keys, stale versions, replay after later edits, revoked access and rollback.
 Gate: acknowledged state survives API restart; an exact retry returns its original result; two writes from the same version produce one success and one conflict. Cross-workspace access is denied.
 
 ## I4 — Durable manual editor

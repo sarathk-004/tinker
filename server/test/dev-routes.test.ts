@@ -43,7 +43,7 @@ describe('dev engine preview (development only)', () => {
   });
 
   it('is not registered in test or production', async () => {
-    for (const env of [{ NODE_ENV: 'test' }, { NODE_ENV: 'production', CORS_ORIGINS: 'https://app.example.com' }]) {
+    for (const env of [{ NODE_ENV: 'test' }, { NODE_ENV: 'production', CORS_ORIGINS: 'https://app.example.com', DATABASE_URL: 'postgres://u:p@h/db', SUPABASE_URL: 'https://x.supabase.co' }]) {
       const app = await buildApp({ config: loadConfig({ ...env, LOG_LEVEL: 'silent' }), logger: false });
       const res = await app.inject({ method: 'GET', url: '/dev/engine/sample' });
       expect(res.statusCode).toBe(404);

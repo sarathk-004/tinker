@@ -3,15 +3,29 @@ import cors from '@fastify/cors';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { LIMITS, type HealthResponse } from '@tinker/shared';
 import type { Config } from './infrastructure/config/config.ts';
-import { rejectAllAuthenticator, type Authenticator } from './infrastructure/auth/authenticator.ts';
+import { createJwtAuthenticator, rejectAllAuthenticator, type Authenticator } from './infrastructure/auth/authenticator.ts';
+import type { LocalSigner, TokenVerifier } from './infrastructure/auth/verifier.ts';
+import type { Pool } from './infrastructure/database/pool.ts';
+import { createRateLimiter, type RateLimiter } from './infrastructure/http/rate-limiter.ts';
+import type { TestHooks } from './infrastructure/idempotency/mutation-requests.ts';
+import { registerDevAuthRoutes } from './modules/identity/dev-auth-routes.ts';
 import { AppError, toErrorResponse } from './infrastructure/http/errors.ts';
 import { registerDevEngineRoutes } from './modules/diagrams/http/dev-routes.ts';
-import { registerDiagramRoutes } from './modules/diagrams/http/routes.ts';
+import { registerApiRoutes } from './modules/diagrams/http/routes.ts';
 
 export interface BuildAppOptions {
   config: Config;
-  /** Defaults to rejecting every request until real token verification exists (I3). */
+  /** Database pool. Without it protected routes answer 503 after authentication. */
+  pool?: Pool;
+  /** Verifies bearer tokens (Supabase JWKS or the local dev signer). Without one every protected route answers 401. */
+  verifier?: TokenVerifier;
+  /** Override authentication entirely (tests). */
   authenticate?: Authenticator;
+  /** Present only in AUTH_MODE=dev: enables POST /dev/auth/login. */
+  devSigner?: LocalSigner;
+  rateLimiter?: RateLimiter;
+  /** Test-only: fault injection into the commit path and a short lease. */
+  hooks?: TestHooks;
   /** Tests disable logging. */
   logger?: boolean;
 }
@@ -35,11 +49,20 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
           },
   });
 
+  // Body-less requests (DELETE, or any client that always sends Content-Type: application/json) must not be rejected
+  // for an empty body. Everything else keeps Fastify's hardened parser (prototype-poisoning protection, 400 on bad JSON).
+  const parseJson = app.getDefaultJsonParser('error', 'error');
+  app.removeContentTypeParser('application/json');
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (request, body, done) => {
+    if (typeof body === 'string' && body.trim() === '') return done(null, undefined);
+    return parseJson(request, body as string, done);
+  });
+
   await app.register(cors, {
     origin: config.corsOrigins,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['authorization', 'content-type', 'idempotency-key', 'x-request-id'],
-    exposedHeaders: ['x-request-id'],
+    exposedHeaders: ['x-request-id', 'idempotent-replayed', 'retry-after'],
     maxAge: 600,
   });
 
@@ -49,6 +72,10 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   app.setErrorHandler((error, request, reply) => {
     const { status, body } = toErrorResponse(error, request.id);
+    if (body.error.code === 'RATE_LIMITED') {
+      const seconds = (body.error.details as { retryAfterSeconds?: number } | undefined)?.retryAfterSeconds;
+      if (seconds) reply.header('retry-after', String(seconds));
+    }
     if (status >= 500) request.log.error({ err: error }, 'request failed');
     else request.log.info({ code: body.error.code }, 'request rejected');
     return reply.status(status).send(body);
@@ -65,10 +92,32 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     time: new Date().toISOString(),
   }));
 
-  // Unauthenticated, stateless engine preview: development only, never in test or production.
-  if (config.nodeEnv === 'development') await registerDevEngineRoutes(app);
+  // Readiness (separate from liveness, D10): can we reach the database?
+  app.get('/health/ready', async () => {
+    if (!options.pool) throw new AppError('SERVICE_UNAVAILABLE', 'The database is not configured.');
+    try {
+      await options.pool.query('SELECT 1');
+    } catch {
+      throw new AppError('SERVICE_UNAVAILABLE', 'The database is unreachable.');
+    }
+    return { status: 'ok' as const };
+  });
 
-  await registerDiagramRoutes(app, options.authenticate ?? rejectAllAuthenticator);
+  // Unauthenticated, stateless engine preview and dev login: development only, never in test or production.
+  if (config.nodeEnv === 'development') {
+    await registerDevEngineRoutes(app);
+    if (options.devSigner && config.authMode === 'dev') await registerDevAuthRoutes(app, options.devSigner);
+  }
+
+  const authenticate =
+    options.authenticate ??
+    (options.pool && options.verifier ? createJwtAuthenticator(options.pool, options.verifier) : rejectAllAuthenticator);
+  await registerApiRoutes(app, {
+    ...(options.pool ? { pool: options.pool } : {}),
+    authenticate,
+    rateLimiter: options.rateLimiter ?? createRateLimiter({ limit: config.rateLimitPerMinute }),
+    ...(options.hooks ? { hooks: options.hooks } : {}),
+  });
 
   return app;
 }

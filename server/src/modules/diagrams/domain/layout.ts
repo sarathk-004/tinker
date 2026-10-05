@@ -32,12 +32,24 @@ function overlaps(a: Position, b: Position): boolean {
   );
 }
 
-/** First free spot at or near `wanted`: tries the spot itself, then steps down/up alternately. Deterministic. */
+// Candidate offsets around the wanted spot, nearest first. Ties prefer sideways over up/down, then up, then right (left-to-right flow). Built once.
+const OFFSETS: ReadonlyArray<readonly [number, number]> = (() => {
+  const list: Array<[number, number]> = [];
+  for (let i = -3; i <= 3; i++) for (let j = -6; j <= 6; j++) list.push([i * (NODE_WIDTH + CLEARANCE), j * STEP]);
+  return list.sort((a, b) => a[0] ** 2 + a[1] ** 2 - (b[0] ** 2 + b[1] ** 2) || Math.abs(a[1]) - Math.abs(b[1]) || a[1] - b[1] || b[0] - a[0]);
+})();
+
+/**
+ * First free spot at or near `wanted`: the spot itself, then the nearest free grid slot around it (so a node inserted between
+ * two vertically stacked nodes lands beside them, not far below). Falls back to scanning downwards. Deterministic.
+ */
 function nearestFreeSpot(wanted: Position, taken: Position[]): Position {
-  for (let i = 0; i <= MAX_STEPS; i++) {
-    const magnitude = Math.ceil(i / 2) * STEP;
-    const dy = i === 0 ? 0 : i % 2 === 1 ? magnitude : -magnitude;
-    const candidate = { x: wanted.x, y: wanted.y + dy };
+  for (const [dx, dy] of OFFSETS) {
+    const candidate = { x: wanted.x + dx, y: wanted.y + dy };
+    if (!taken.some((t) => overlaps(candidate, t))) return candidate;
+  }
+  for (let i = 1; i <= MAX_STEPS; i++) {
+    const candidate = { x: wanted.x, y: wanted.y + 7 * STEP + i * STEP };
     if (!taken.some((t) => overlaps(candidate, t))) return candidate;
   }
   return wanted;

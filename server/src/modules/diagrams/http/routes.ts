@@ -1,51 +1,142 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
   API_PREFIX,
+  commandRequestSchema,
+  createDiagramRequestSchema,
   diagramCommandSchema,
+  expectedVersionQuerySchema,
   idempotencyKeySchema,
   presentationPatchRequestSchema,
+  renameDiagramRequestSchema,
   uuidSchema,
   versionSchema,
+  type MeResponse,
 } from '@tinker/shared';
 import type { Authenticator } from '../../../infrastructure/auth/authenticator.ts';
+import type { Pool } from '../../../infrastructure/database/pool.ts';
 import { AppError, parseOrThrow } from '../../../infrastructure/http/errors.ts';
+import type { RateLimiter } from '../../../infrastructure/http/rate-limiter.ts';
+import type { RunResult, TestHooks } from '../../../infrastructure/idempotency/mutation-requests.ts';
+import { listWorkspaces } from '../../workspaces/access.ts';
+import {
+  createDiagram,
+  deleteDiagram,
+  executeCommand,
+  listDiagrams,
+  loadDiagram,
+  patchPresentation,
+  presentOutcome,
+  renameDiagram,
+  type Actor,
+  type ServiceDeps,
+} from '../application/diagram-service.ts';
 
-const paramsSchema = z.object({ diagramId: uuidSchema });
+export interface ApiDeps {
+  pool?: Pool;
+  authenticate: Authenticator;
+  rateLimiter: RateLimiter;
+  hooks?: TestHooks;
+}
+
+const diagramParams = z.object({ diagramId: uuidSchema });
+const workspaceParams = z.object({ workspaceId: uuidSchema });
 const commandEnvelopeSchema = z.object({ expectedVersion: versionSchema, command: z.unknown() });
 
-function validateMutationHeadersAndParams(request: FastifyRequest): void {
-  parseOrThrow(paramsSchema, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
-  parseOrThrow(
-    idempotencyKeySchema,
-    request.headers['idempotency-key'],
-    'INVALID_REQUEST',
-    'A valid Idempotency-Key header is required.',
-  );
+function actorOf(request: FastifyRequest): Actor {
+  const auth = request.auth;
+  if (!auth) throw new AppError('UNAUTHENTICATED', 'Authentication is required.'); // unreachable: hook always sets it
+  return { userId: auth.userId, requestId: request.id };
+}
+
+function idempotencyKeyOf(request: FastifyRequest): string {
+  return parseOrThrow(idempotencyKeySchema, request.headers['idempotency-key'], 'INVALID_REQUEST', 'A valid Idempotency-Key header is required.');
+}
+
+function send(reply: FastifyReply, request: FastifyRequest, result: RunResult) {
+  const outcome = presentOutcome(result, request.id);
+  if (result.replayed) reply.header('idempotent-replayed', 'true');
+  return reply.status(outcome.status).send(outcome.body);
 }
 
 /**
- * I1: routes authenticate first, validate the contract, then answer 501.
- * Execution (idempotency, authorization, persistence) arrives in I3 behind the same validation.
+ * Order on every protected route (LLD sections 17/18): authenticate (hook) -> rate limit (hook) -> request shape
+ * (params, headers, body schema; reveals nothing about stored data) -> authorise against the database ->
+ * idempotency reservation -> version/domain checks and atomic commit.
  */
-export async function registerDiagramRoutes(root: FastifyInstance, authenticate: Authenticator): Promise<void> {
-  // Encapsulated scope: the authentication hook protects only these routes, never /health.
+export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): Promise<void> {
   await root.register(async (app) => {
     app.addHook('onRequest', async (request) => {
-      request.auth = await authenticate(request);
+      if (!request.url.startsWith(`${API_PREFIX}/`)) return;
+      request.auth = await deps.authenticate(request);
+      deps.rateLimiter.check(request.auth.userId);
     });
 
-    app.post(`${API_PREFIX}/diagrams/:diagramId/commands`, async (request) => {
-      validateMutationHeadersAndParams(request);
+    const pool = deps.pool;
+    if (!pool) {
+      // No database configured: authenticated callers get a clear 503, everyone else 401.
+      app.all(`${API_PREFIX}/*`, async () => {
+        throw new AppError('SERVICE_UNAVAILABLE', 'The database is not configured.');
+      });
+      return;
+    }
+    const svc: ServiceDeps = { pool, ...(deps.hooks ? { hooks: deps.hooks } : {}) };
+
+    app.get(`${API_PREFIX}/me`, async (request): Promise<MeResponse> => {
+      const auth = request.auth!;
+      return {
+        user: { id: auth.userId, email: auth.email, displayName: auth.displayName },
+        workspaces: await listWorkspaces(pool, auth.userId),
+      };
+    });
+
+    app.get(`${API_PREFIX}/workspaces`, async (request) => ({ workspaces: await listWorkspaces(pool, request.auth!.userId) }));
+
+    app.get(`${API_PREFIX}/workspaces/:workspaceId/diagrams`, async (request) => {
+      const { workspaceId } = parseOrThrow(workspaceParams, request.params, 'INVALID_REQUEST', 'Invalid workspace id.');
+      return listDiagrams(svc, actorOf(request), workspaceId);
+    });
+
+    app.post(`${API_PREFIX}/workspaces/:workspaceId/diagrams`, async (request, reply) => {
+      const { workspaceId } = parseOrThrow(workspaceParams, request.params, 'INVALID_REQUEST', 'Invalid workspace id.');
+      const key = idempotencyKeyOf(request);
+      const body = parseOrThrow(createDiagramRequestSchema, request.body, 'INVALID_REQUEST', 'Invalid diagram.');
+      return send(reply, request, await createDiagram(svc, actorOf(request), workspaceId, key, body));
+    });
+
+    app.get(`${API_PREFIX}/diagrams/:diagramId`, async (request) => {
+      const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
+      return loadDiagram(svc, actorOf(request), diagramId);
+    });
+
+    app.patch(`${API_PREFIX}/diagrams/:diagramId`, async (request, reply) => {
+      const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
+      const key = idempotencyKeyOf(request);
+      const body = parseOrThrow(renameDiagramRequestSchema, request.body, 'INVALID_REQUEST', 'Invalid rename request.');
+      return send(reply, request, await renameDiagram(svc, actorOf(request), diagramId, key, body));
+    });
+
+    app.delete(`${API_PREFIX}/diagrams/:diagramId`, async (request, reply) => {
+      const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
+      const key = idempotencyKeyOf(request);
+      const query = parseOrThrow(expectedVersionQuerySchema, request.query, 'INVALID_REQUEST', 'expectedVersion query parameter is required.');
+      return send(reply, request, await deleteDiagram(svc, actorOf(request), diagramId, key, query));
+    });
+
+    app.post(`${API_PREFIX}/diagrams/:diagramId/commands`, async (request, reply) => {
+      const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
+      const key = idempotencyKeyOf(request);
       const envelope = parseOrThrow(commandEnvelopeSchema, request.body, 'INVALID_REQUEST', 'Invalid command request.');
       parseOrThrow(diagramCommandSchema, envelope.command, 'INVALID_COMMAND', 'Invalid command.');
-      throw new AppError('NOT_IMPLEMENTED', 'Command execution is not implemented yet.');
+      const body = parseOrThrow(commandRequestSchema, envelope, 'INVALID_COMMAND', 'Invalid command.');
+      return send(reply, request, await executeCommand(svc, actorOf(request), diagramId, key, body));
     });
 
-    app.patch(`${API_PREFIX}/diagrams/:diagramId/presentation`, async (request) => {
-      validateMutationHeadersAndParams(request);
-      parseOrThrow(presentationPatchRequestSchema, request.body, 'INVALID_REQUEST', 'Invalid presentation update.');
-      throw new AppError('NOT_IMPLEMENTED', 'Presentation updates are not implemented yet.');
+    app.patch(`${API_PREFIX}/diagrams/:diagramId/presentation`, async (request, reply) => {
+      const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
+      const key = idempotencyKeyOf(request);
+      const body = parseOrThrow(presentationPatchRequestSchema, request.body, 'INVALID_REQUEST', 'Invalid presentation update.');
+      return send(reply, request, await patchPresentation(svc, actorOf(request), diagramId, key, body));
     });
   });
 }

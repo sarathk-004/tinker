@@ -295,6 +295,19 @@ describe('placement of new nodes', () => {
   });
 });
 
+describe('inserting between vertically stacked nodes', () => {
+  it('places the new node beside them near the midpoint instead of far below', () => {
+    const doc = ordersToPostgres();
+    const stacked: DiagramDoc = { ...doc, presentation: { ...doc.presentation, nodePositions: { [ORDERS]: { x: 40, y: 40 }, [POSTGRES]: { x: 40, y: 190 } } } };
+    const out = expectOk(stacked, { type: 'INSERT_BETWEEN', sourceNodeId: ORDERS, targetNodeId: POSTGRES, node: { name: 'Redis', kind: 'CACHE' } });
+    const redis = out.graph.nodes.find((n) => n.name === 'Redis')?.id ?? '';
+    const at = out.presentation.nodePositions[redis]!;
+    expect(Math.abs(at.y - 115)).toBeLessThanOrEqual(130); // within one row of the midpoint
+    expect(Math.abs(at.x - 40) >= 220 || Math.abs(at.y - 40) >= 90).toBe(true);
+    expect(Math.abs(at.x - 40) >= 220 || Math.abs(at.y - 190) >= 90).toBe(true);
+  });
+});
+
 describe('RESET', () => {
   it('clears nodes, edges and positions but keeps the viewport', () => {
     const out = expectOk(ordersToPostgres(), { type: 'RESET' });

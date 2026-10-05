@@ -1,37 +1,40 @@
 # Development status
 
 Updated: 2026-10-05
-Active milestone: I2 implemented on branch `implementation-2` (stacked on `implementation-1`, which is stacked on `main`). Nothing pushed; awaiting user verification on localhost. Next: I3.
-Branch stack: main (6e0130d) <- implementation-1 (800b847, 6e28119) <- implementation-2.
+Active milestone: I3 implemented on branch `implementation-3` (stacked: main <- implementation-1 <- implementation-2 <- implementation-3). implementation-1 and implementation-2 are pushed; implementation-3 is committed locally only, nothing pushed. Next: I4 (durable manual editor).
 
-## See it locally
-`npm run dev` (frontend, :5173) and `npm run dev:api` (API, :8787), then open http://localhost:5173/engine-demo.html and press the eight buttons. The main editor at `/` is unchanged until I4 wires it to the engine.
+## See it locally (three terminals)
+1. `npm run dev:db -w @tinker/server` (Postgres), once: `npm run db:migrate -w @tinker/server`
+2. `npm run dev:api` (needs `server/.env`: copy `server/.env.example`)
+3. `npm run dev`, then open http://localhost:5173/api-demo.html (I3), http://localhost:5173/engine-demo.html (I2). The main editor at `/` is unchanged until I4.
 
-## I1 (done, see git log for 800b847): shared contracts, API foundation, boundary checks, CI. Migration scripts still unverified against a live Postgres.
-
-## I2 completion record (verified 2026-10-05)
-| Task | Paths | Verification |
+## I3 completion record (verified 2026-10-05)
+| Area | Paths | Verification |
 |---|---|---|
-| Extract framework-independent operations (add/remove/rename/update/connect/disconnect/insert/reset) | `server/src/modules/diagrams/domain/engine.ts` | `server/test/domain/engine.test.ts` |
-| Injected ids; deterministic | `NewId` parameter; sequence-id tests | same input + id source gives equal output |
-| Node deletion removes incident edges and position (P1, no bridging) | `engine.ts` removeNode | A03 test |
-| Reject unknown endpoints, duplicates, self-loops, ambiguous inserts/disconnects, limits | `engine.ts` | A02 + parallel-edge + limit tests; every reason code asserted |
-| Relationship/metadata policy | insert copies both onto both edges (D06) | A01 test |
-| Downstream traversal with cycle protection | `domain/analysis.ts` | `analysis.test.ts` incl. A04 |
-| Immutability, referential integrity, atomic failure | deep-frozen inputs; unchanged-JSON assertion after every error; post-condition check | purity test + helper in every test |
-| Placement without overlap (P2) | `domain/layout.ts` | overlap test over 12 adds; found via browser check |
-Commands: `npm run typecheck` PASS; `npm test` 67 PASS (shared 17, server 50); `npm run check:boundaries` PASS (legacy VITE_* warnings only); `npm run build` PASS and `dist/` holds only `index.html` (demo page excluded).
-Gate: Orders -> PostgreSQL becomes Orders -> Redis -> PostgreSQL with one operation (test + live page); invalid operations leave the document unchanged (tests + live page: EDGE_REQUIRED and NODE_NOT_FOUND refusals). Live check was done by driving http://localhost:5173/engine-demo.html in the built-in browser against the running API: all 8 buttons behaved as described; Redis lands at (200,170), existing nodes did not move.
+| Schema, indexes, RLS | `server/migrations/1760000000000_initial-schema.sql` | up -> down -> up on Postgres 18.4 (also in `database-policy.test.ts` on a scratch DB); RLS on all 10 tables; non-owner role sees 0 rows and cannot insert |
+| Token verification, user + personal workspace provisioning | `infrastructure/auth/{verifier,authenticator}.ts`, `modules/identity/users.ts` | `identity.test.ts`: valid, expired, wrong audience/issuer/key, tampered, `alg:none`, HS256, missing sub all 401; JWKS outage 503; 12 concurrent first requests create exactly 1 user/workspace/membership |
+| Authorization (404 vs 403, role table) | `modules/workspaces/access.ts` | A13 (cross-workspace uniform 404 on every route), A14 (viewer 403 on all writes), editor cannot delete, A15 (revoked membership: no replay), mid-flight revocation aborts and releases the key |
+| Create/list/load/rename/soft-delete, commands, presentation | `modules/diagrams/{http,application,persistence}` | `diagrams-api.test.ts` lifecycle tests incl. the gate scenario through HTTP |
+| Idempotency, leases, replay | `infrastructure/idempotency/mutation-requests.ts` | A07 (10 simultaneous duplicates: one mutation), A08, A09 (changed body/version/path/method), A10 (replay after later edits does not regress), failure replay, create idempotency, 7-day expiry -> 410, crashed-holder takeover, live lease blocks, A12 fencing (late holder cannot commit) |
+| Conditional update + revision + execution + response in one transaction | `diagram-service.ts` | A11: injected failures after the revision and before response storage roll everything back and release the key |
+| Concurrency | same | A06: 2 and 10 simultaneous writers at one version: exactly one wins; stale/future versions never apply |
+| Durability | | A05: API and pool replaced, identical document; also live (below) |
+| Rate limits, request bounds | `infrastructure/http/rate-limiter.ts`, `app.ts` | unit + HTTP 429 with Retry-After; 1 MiB body cap |
+Commands: `npm run typecheck` PASS; `npm test` 113 PASS (shared 17, server 96); `npm run check:boundaries` PASS; `npm run build` PASS (dist holds only the production app).
+Live check on localhost (built-in browser against the running API and dev Postgres): signed in, created a diagram, added Orders and PostgreSQL, connected, inserted Redis (lands beside the stacked nodes at (300,115)), simulated a drag (v6), retried an edit (returned the original result with Idempotent-Replayed, server unchanged), stale edit refused with 409, reload after an API restart and re-login returned the same diagram at the same version. The live run found two bugs that unit tests missed (CORS did not expose `Idempotent-Replayed`; insert-between placed nodes far below) and both are fixed with tests.
+Gate: acknowledged state survives API restart (tested and live); an exact retry returns its original result; two writes from the same version give one success and one conflict; cross-workspace access is denied.
 
-## Limitations / risks
-- The engine is not yet reachable through the real command API (I3) or the editor (I4); only the dev preview exercises it.
-- Dev routes are unauthenticated by design and only exist when NODE_ENV=development.
-- Placement is a heuristic (nearest free spot); crowded diagrams may place nodes far from the midpoint. "Auto layout" (explicit full re-layout) is not built yet.
-- `layoutGraph` uses dagre on the server; its output was only checked for determinism and non-overlap, not aesthetics.
-- Migration tooling still unverified (no Docker daemon).
+## Limitations / risks (read these)
+- NOT verified against a real Supabase project: JWKS fetch, key rotation, token claim shapes, Supabase-hosted Postgres, its RLS/role defaults, connection pooling (the pg pool uses a direct connection; PgBouncer transaction mode untested). Needs SUPABASE_URL and a project.
+- CI (`.github/workflows/ci.yml`) has not run on GitHub; tests now start embedded Postgres (Linux binary package should install via the lockfile, unverified there).
+- No workspace/member management routes; roles other than OWNER are only reachable through SQL today. Diagram list capped at 200, no pagination.
+- No per-request token/user caching: each request does a user upsert transaction plus membership queries. p95 targets are unmeasured (I9).
+- Dev login is unauthenticated by design and only exists with `AUTH_MODE=dev` + `NODE_ENV=development`; the dev signing key rotates on every API restart.
+- Vitest prints "something prevents 2 Vite servers from exiting" at the end of the server suite (process still exits and no postgres/temp dirs are left); cause not investigated.
+- Presentation saves, renames and deletes create no revision (decision recorded); history/restore behaviour for them is an I8 question.
 
-## Next action (I3)
-Identity, persistence and the command API (needs a working Postgres and a Supabase project). Read D01-D06/D09-D10 (accepted in decisions.md) and Phase 3 sections 2, 5-7, 9, 13, 17. Prerequisites to confirm with the user: Supabase project URL/JWKS, Postgres for local/integration tests (start Docker Desktop or provide a database).
+## Next action (I4)
+Durable manual editor: login (Supabase in production, dev login locally), workspace/diagram loading, React Flow mapping of canonical graph + presentation, every structural UI action through a command client with stable idempotency keys, per-diagram write serialization, conflict/draft recovery, saved/failed status, remove direct browser Gemini calls from the migrated path. Needs from the user: Supabase project (URL, anon key for the browser auth client) when real login is wanted; otherwise I4 can use the dev login.
 
 ## Handoff template
 - Active task / milestone:

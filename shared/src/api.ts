@@ -68,3 +68,56 @@ export const healthResponseSchema = z.strictObject({
   time: z.iso.datetime(),
 });
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
+
+export const workspaceRoleSchema = z.enum(['OWNER', 'EDITOR', 'VIEWER']);
+export type WorkspaceRole = z.infer<typeof workspaceRoleSchema>;
+
+export const workspaceSummarySchema = z.strictObject({
+  id: uuidSchema,
+  name: z.string(),
+  role: workspaceRoleSchema,
+  personal: z.boolean(),
+});
+export type WorkspaceSummary = z.infer<typeof workspaceSummarySchema>;
+
+export const meResponseSchema = z.strictObject({
+  user: z.strictObject({ id: uuidSchema, email: z.string().nullable(), displayName: z.string().nullable() }),
+  workspaces: z.array(workspaceSummarySchema),
+});
+export type MeResponse = z.infer<typeof meResponseSchema>;
+
+export const workspacesResponseSchema = z.strictObject({ workspaces: z.array(workspaceSummarySchema) });
+
+/** Newest first; capped (no pagination yet). */
+export const diagramListResponseSchema = z.strictObject({ diagrams: z.array(diagramSummarySchema) });
+export type DiagramListResponse = z.infer<typeof diagramListResponseSchema>;
+
+/** Full diagram: metadata plus the canonical document. Returned by create, load, rename and presentation saves. */
+export const diagramDetailSchema = z
+  .strictObject({
+    diagramId: uuidSchema,
+    workspaceId: uuidSchema,
+    name: diagramNameSchema,
+    version: versionSchema,
+    graph: graphSchema,
+    presentation: presentationSchema,
+    updatedAt: z.iso.datetime(),
+    replayed: z.boolean().optional(),
+  })
+  .superRefine((doc, ctx) => {
+    for (const issue of findPresentationIntegrityIssues(doc.graph, doc.presentation)) {
+      ctx.addIssue({ code: 'custom', message: issue.message, path: ['presentation', ...issue.path] });
+    }
+  });
+export type DiagramDetail = z.infer<typeof diagramDetailSchema>;
+
+export const deleteDiagramResponseSchema = z.strictObject({
+  diagramId: uuidSchema,
+  version: versionSchema,
+  deleted: z.literal(true),
+  replayed: z.boolean().optional(),
+});
+export type DeleteDiagramResponse = z.infer<typeof deleteDiagramResponseSchema>;
+
+/** DELETE /v1/diagrams/{id}?expectedVersion=n (deletion participates in the version counter, D05). */
+export const expectedVersionQuerySchema = z.strictObject({ expectedVersion: z.coerce.number().int().min(1) });

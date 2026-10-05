@@ -12,10 +12,11 @@ Retrieval index: `graphify-out/` built from `6e0130d` on 2026-10-05 (333 nodes).
 | Build + typecheck | `npm run build` (`tsc -b && vite build`) | PASS, 37s; 526 kB JS chunk warning (>500 kB) |
 | Preview | `npm run preview` | not run |
 | Typecheck all workspaces | `npm run typecheck` | PASS (I1) |
-| Tests (Vitest: shared, server) | `npm test` | 67 tests PASS (I2: shared 17, server 50) |
+| Tests (Vitest: shared, server) | `npm test` | 113 tests PASS (I3: shared 17, server 96; server tests start an isolated real Postgres) |
 | Boundary check | `npm run check:boundaries` (`--strict` fails on legacy VITE_* key refs) | PASS (I1) |
-| API dev server | `npm run dev:api` (server/.env from server/.env.example) | /health 200 verified (I1) |
-| DB migrate | `npm run db:migrate -w @tinker/server` | NOT verified (no Docker daemon) |
+| API dev server | `npm run dev:api` (server/.env from server/.env.example; needs `dev:db` first) | /health, /health/ready 200 verified (I3) |
+| Local database | `npm run dev:db -w @tinker/server` (embedded Postgres 18.4 on :54329, data in `server/.data/`) | running; migrations up/down/up verified |
+| DB migrate | `npm run db:migrate -w @tinker/server` (reads `server/.env` DATABASE_URL) | PASS on Postgres 18.4 |
 | CI | `.github/workflows/ci.yml` | not yet run on GitHub |
 | Lint / format | none | no eslint config |
 
@@ -35,6 +36,8 @@ Retrieval index: `graphify-out/` built from `6e0130d` on 2026-10-05 (333 nodes).
 | Backend | `server/src/{app,main}.ts`, `infrastructure/{config,http,auth}`, `modules/diagrams/http` | Fastify 5 |
 | Diagram engine (pure) | `server/src/modules/diagrams/domain/{engine,layout,analysis,types}.ts` | I2 |
 | Dev engine preview (localhost, dev only) | `engine-demo.html`, `src/dev/engine-demo.ts`, `server/src/modules/diagrams/http/dev-routes.ts` | http://localhost:5173/engine-demo.html with `npm run dev` + `npm run dev:api` |
+| Persistence, idempotency, identity, access | `server/src/infrastructure/{database,idempotency,auth}`, `server/src/modules/{identity,workspaces}`, `server/src/modules/diagrams/{application,persistence,http}`, `server/migrations/*.sql` | I3 |
+| Dev saved-diagrams preview (localhost, dev only) | `api-demo.html`, `src/dev/api-demo.ts`, `src/dev/diagram-svg.ts` | http://localhost:5173/api-demo.html |
 | DB migrations | `server/migrations/` (empty until I3), `docker-compose.yml` | |
 
 ## Mutation entry points (every call that changes the diagram)
