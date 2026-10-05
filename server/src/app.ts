@@ -5,6 +5,7 @@ import { LIMITS, type HealthResponse } from '@tinker/shared';
 import type { Config } from './infrastructure/config/config.ts';
 import { rejectAllAuthenticator, type Authenticator } from './infrastructure/auth/authenticator.ts';
 import { AppError, toErrorResponse } from './infrastructure/http/errors.ts';
+import { registerDevEngineRoutes } from './modules/diagrams/http/dev-routes.ts';
 import { registerDiagramRoutes } from './modules/diagrams/http/routes.ts';
 
 export interface BuildAppOptions {
@@ -63,6 +64,9 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     service: 'tinker-api',
     time: new Date().toISOString(),
   }));
+
+  // Unauthenticated, stateless engine preview: development only, never in test or production.
+  if (config.nodeEnv === 'development') await registerDevEngineRoutes(app);
 
   await registerDiagramRoutes(app, options.authenticate ?? rejectAllAuthenticator);
 

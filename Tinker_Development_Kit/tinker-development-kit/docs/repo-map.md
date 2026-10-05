@@ -12,7 +12,7 @@ Retrieval index: `graphify-out/` built from `6e0130d` on 2026-10-05 (333 nodes).
 | Build + typecheck | `npm run build` (`tsc -b && vite build`) | PASS, 37s; 526 kB JS chunk warning (>500 kB) |
 | Preview | `npm run preview` | not run |
 | Typecheck all workspaces | `npm run typecheck` | PASS (I1) |
-| Tests (Vitest: shared, server) | `npm test` | 33 tests PASS (I1) |
+| Tests (Vitest: shared, server) | `npm test` | 67 tests PASS (I2: shared 17, server 50) |
 | Boundary check | `npm run check:boundaries` (`--strict` fails on legacy VITE_* key refs) | PASS (I1) |
 | API dev server | `npm run dev:api` (server/.env from server/.env.example) | /health 200 verified (I1) |
 | DB migrate | `npm run db:migrate -w @tinker/server` | NOT verified (no Docker daemon) |
@@ -33,6 +33,8 @@ Retrieval index: `graphify-out/` built from `6e0130d` on 2026-10-05 (333 nodes).
 | Build config | `vite.config.ts`, `tsconfig.json` (strict, noUnused*), `tsconfig.node.json`, `tailwind.config.js`, `postcss.config.js`, `vercel.json` (SPA rewrite) | |
 | Shared contracts (Zod schemas, DTOs, errors, limits) | `shared/src/*` (`@tinker/shared`); frontend door `src/contracts/index.ts` | |
 | Backend | `server/src/{app,main}.ts`, `infrastructure/{config,http,auth}`, `modules/diagrams/http` | Fastify 5 |
+| Diagram engine (pure) | `server/src/modules/diagrams/domain/{engine,layout,analysis,types}.ts` | I2 |
+| Dev engine preview (localhost, dev only) | `engine-demo.html`, `src/dev/engine-demo.ts`, `server/src/modules/diagrams/http/dev-routes.ts` | http://localhost:5173/engine-demo.html with `npm run dev` + `npm run dev:api` |
 | DB migrations | `server/migrations/` (empty until I3), `docker-compose.yml` | |
 
 ## Mutation entry points (every call that changes the diagram)

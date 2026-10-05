@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tinker — Diagram engine preview (dev)</title>
+    <style>
+      :root { color-scheme: light; --ink:#26251e; --muted:#6b6a60; --line:#cfcdc4; --bg:#f7f7f4; --accent:#f54e00; --ok:#1a7f37; --bad:#b42318; }
+      * { box-sizing: border-box; }
+      body { margin:0; font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; color:var(--ink); background:var(--bg); }
+      header { padding:16px 24px; border-bottom:1px solid var(--line); background:#fff; }
+      h1 { margin:0 0 4px; font-size:18px; }
+      header p { margin:0; color:var(--muted); max-width:78ch; }
+      main { display:grid; grid-template-columns: 340px 1fr; gap:16px; padding:16px 24px; }
+      @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+      section { background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px 14px; }
+      h2 { margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+      button { display:block; width:100%; text-align:left; margin:0 0 8px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); font:inherit; cursor:pointer; }
+      button:hover { border-color:var(--ink); }
+      button small { display:block; color:var(--muted); }
+      #canvas { width:100%; height:340px; background:
+        radial-gradient(var(--line) 1px, transparent 1px) 0 0/16px 16px; border-radius:6px; }
+      .node rect { fill:#fff; stroke:var(--ink); stroke-width:1.5; rx:8; }
+      .node.new rect { stroke:var(--accent); stroke-width:3; }
+      .node text.name { font-weight:600; font-size:14px; }
+      .node text.meta { font-size:11px; fill:var(--muted); }
+      .edge { stroke:var(--ink); stroke-width:1.8; fill:none; }
+      .edge-label { font-size:11px; fill:var(--muted); }
+      .status { padding:8px 10px; border-radius:6px; margin:0 0 10px; }
+      .status.ok { background:#e7f5ec; color:var(--ok); }
+      .status.bad { background:#fdecea; color:var(--bad); }
+      .status.idle { background:#f1f0ea; color:var(--muted); }
+      pre { margin:0; padding:10px; background:#f1f0ea; border-radius:6px; overflow:auto; max-height:240px; font-size:12px; }
+      .row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+      @media (max-width: 1200px) { .row { grid-template-columns:1fr; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Diagram engine preview <span style="color:var(--accent)">(I2, development only)</span></h1>
+      <p>
+        This page shows the new rule-checking engine working. It is not the real editor and nothing is saved.
+        Each button sends one command to the local API, which either applies it cleanly or refuses it and leaves the diagram untouched.
+      </p>
+    </header>
+    <main>
+      <section aria-label="Commands">
+        <h2>Try a command</h2>
+        <button id="load">1. Load sample<small>Orders → PostgreSQL</small></button>
+        <button id="insert">2. Insert Redis between Orders and PostgreSQL<small>one operation: edge removed, node + 2 edges added</small></button>
+        <button id="insert-again">3. Insert a node where no connection exists<small>should be refused; diagram unchanged</small></button>
+        <button id="remove-redis">4. Remove Redis<small>plain removal: node, its connections and position go, nothing is auto-reconnected</small></button>
+        <button id="add">5. Add a node “Queue”<small>existing nodes keep their positions; only the new one is placed</small></button>
+        <button id="connect-dupe">6. Connect Orders → PostgreSQL (SQL)<small>adds it if missing; press again and it is refused as a duplicate</small></button>
+        <button id="downstream">7. What is downstream of Orders?<small>follows connections forward; safe with loops</small></button>
+        <button id="remove-ghost">8. Remove a node that does not exist<small>should be refused</small></button>
+      </section>
+      <div>
+        <section aria-label="Diagram" style="margin-bottom:16px">
+          <h2>Diagram</h2>
+          <div id="status" class="status idle">Click “Load sample” to start.</div>
+          <svg id="canvas" role="img" aria-label="Diagram preview"></svg>
+        </section>
+        <div class="row">
+          <section aria-label="Command"><h2>Last command sent</h2><pre id="sent">—</pre></section>
+          <section aria-label="Response"><h2>Engine answer</h2><pre id="answer">—</pre></section>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/dev/engine-demo.ts"></script>
+  </body>
+</html>

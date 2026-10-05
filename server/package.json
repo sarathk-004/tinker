@@ -13,6 +13,7 @@
     "db:migrate:create": "node-pg-migrate -m migrations create"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^1.1.8",
     "@fastify/cors": "^11.0.0",
     "@tinker/shared": "*",
     "fastify": "^5.12.5",

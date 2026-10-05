@@ -45,13 +45,13 @@ Gate: frontend and API start locally; malformed command input is rejected consis
 
 ## I2 — Diagram domain engine
 Read: Phase 3 section 8; acceptance domain cases.
-- [ ] Extract framework-independent add/remove/rename/update/connect/disconnect/insert/reset operations.
-- [ ] Inject ID generation into the engine rather than binding tests to DB or clock.
-- [ ] Remove incident edges and presentation entries on node deletion.
-- [ ] Reject unknown endpoints, duplicates, unsupported self-loops and ambiguous insert operations.
-- [ ] Preserve relationship/metadata semantics or document the chosen replacement policy.
-- [ ] Add deterministic downstream traversal with cycle protection.
-- [ ] Verify input immutability, referential integrity and atomic insertion failures.
+- [x] Extract framework-independent add/remove/rename/update/connect/disconnect/insert/reset operations.
+- [x] Inject ID generation into the engine rather than binding tests to DB or clock.
+- [x] Remove incident edges and presentation entries on node deletion.
+- [x] Reject unknown endpoints, duplicates, unsupported self-loops and ambiguous insert operations.
+- [x] Preserve relationship/metadata semantics or document the chosen replacement policy.
+- [x] Add deterministic downstream traversal with cycle protection.
+- [x] Verify input immutability, referential integrity and atomic insertion failures.
 Gate: Orders → PostgreSQL becomes Orders → Redis → PostgreSQL with one valid operation. Invalid operations leave the input document unchanged.
 
 ## I3 — Identity, persistence and command API
