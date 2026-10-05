@@ -1,7 +1,7 @@
 # Development status
 
 Updated: 2026-10-05
-Active milestone: I3 implemented on branch `implementation-3` (stacked: main <- implementation-1 <- implementation-2 <- implementation-3). implementation-1 and implementation-2 are pushed; implementation-3 is committed locally only, nothing pushed. Next: I4 (durable manual editor).
+Active milestone: I3 complete and pushed (branch `implementation-3`) (stacked: main <- implementation-1 <- implementation-2 <- implementation-3). implementation-1 and implementation-2 are pushed; implementation-3 is committed locally only, nothing pushed. Next: I4 (durable manual editor).
 
 ## See it locally (three terminals)
 1. `npm run dev:db -w @tinker/server` (Postgres), once: `npm run db:migrate -w @tinker/server`
@@ -26,7 +26,8 @@ Gate: acknowledged state survives API restart (tested and live); an exact retry 
 
 ## Supabase verification (project rnwbgjrzbliqvqradjcm)
 Verified: JWKS reachable (one ES256 key; asymmetric only, which my verifier supports); forged token with the correct issuer and audience but a foreign key is rejected 401; garbage token rejected 401 (`npm run check:supabase -w @tinker/server`). Schema applied via the Supabase connector: 10 tables, RLS on all, `anon` and `authenticated` hold no privileges, advisors show only 10 INFO "RLS enabled, no policy" notes (intended). My SQL (user upsert, personal workspace, reservation, `FOR UPDATE`, conditional update, revision) ran on Supabase Postgres 17 as the `postgres` role (owner, bypasses RLS) inside a rolled-back transaction; no data left behind.
-NOT yet verified (needs things only the user can supply): (1) a real Supabase user token (confirms the `iss`/`aud`/claim shapes of real tokens), (2) the API's own connection to Supabase Postgres over TLS and the full API flow on it (needs the DB password in `server/.env.supabase.local`), (3) session pooler vs transaction pooler behaviour. Steps are in the README ("Using the real Supabase project").
+User-verified (2026-10-05): signed in with a real Supabase user through api-demo against the API in `dev:api:supabase` mode; diagram changes appeared in the Supabase tables. This covers items (1) and (2) below; I did not observe it myself (no credentials), so real-token claim shapes are confirmed only by that result. Still open: (3) pooler mode and key rotation.
+Previously unverified, now resolved by the user's test except (3): (1) a real Supabase user token (confirms the `iss`/`aud`/claim shapes of real tokens), (2) the API's own connection to Supabase Postgres over TLS and the full API flow on it (needs the DB password in `server/.env.supabase.local`), (3) session pooler vs transaction pooler behaviour. Steps are in the README ("Using the real Supabase project").
 
 ## Limitations / risks (read these)
 - Supabase items above that are still unverified; key rotation behaviour untested.
