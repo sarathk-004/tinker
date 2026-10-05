@@ -1,0 +1,10 @@
+stateDiagram-v2
+ [*] --> Pending
+ Pending --> Running
+ Running --> Completed
+ Running --> RetryableFailure
+ RetryableFailure --> Pending
+ Running --> DeadLetter
+ Completed --> [*]
+ DeadLetter --> [*]
+

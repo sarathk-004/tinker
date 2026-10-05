@@ -1,0 +1,16 @@
+sequenceDiagram
+ actor User
+ participant UI
+ participant API
+ participant DB
+ Note over UI: Client holds v14
+ Note over DB: Database holds v15
+ User->>UI: Add Redis
+ UI->>API: expectedVersion 14
+ API->>DB: Conditional update for v14
+ DB-->>API: Zero rows updated
+ API-->>UI: 409 DIAGRAM_VERSION_CONFLICT
+ UI->>API: Get latest diagram
+ API-->>UI: Diagram v15
+ UI-->>User: Preserve draft and offer reload
+

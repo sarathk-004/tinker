@@ -1,0 +1,15 @@
+sequenceDiagram
+ actor User
+ participant UI
+ participant Store as Zustand
+ participant API
+ participant DB
+ User->>UI: Add Redis
+ UI->>Store: Optimistic command
+ UI->>API: Command, v14, idempotency key
+ API->>API: Validate through domain engine
+ API->>DB: Atomic mutation
+ DB-->>API: Canonical graph v15
+ API-->>Store: Reconcile response
+ Store-->>UI: Confirm state
+

@@ -1,0 +1,11 @@
+flowchart TD
+ REQ["Request"] --> AUTH["Authenticate and authorize"]
+ AUTH --> IDEM["Check idempotency"]
+ IDEM --> SCHEMA["Validate schema"]
+ SCHEMA --> DOMAIN["Validate domain"]
+ DOMAIN --> VERSION["Check expected version"]
+ VERSION --> APPLY["Apply command"]
+ APPLY --> SAVE["Atomic persistence"]
+ SAVE --> REV["Revision and execution result"]
+ REV --> RESPONSE["Canonical response"]
+

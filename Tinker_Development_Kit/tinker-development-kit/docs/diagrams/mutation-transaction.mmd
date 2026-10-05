@@ -1,0 +1,18 @@
+sequenceDiagram
+ participant API
+ participant Domain
+ participant DB
+ API->>DB: BEGIN
+ API->>DB: Check idempotency
+ DB-->>API: New request
+ API->>DB: Load diagram v14
+ DB-->>API: Graph
+ API->>Domain: Validate and execute command
+ Domain-->>API: Proposed graph
+ API->>DB: Conditional UPDATE for v14
+ DB-->>API: Updated to v15
+ API->>DB: INSERT revision v15
+ API->>DB: Complete execution record
+ API->>DB: COMMIT
+ API-->>Domain: Canonical result v15
+

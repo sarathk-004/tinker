@@ -1,0 +1,68 @@
+erDiagram
+ USER ||--o{ WORKSPACE_MEMBERSHIP : belongs_to
+ WORKSPACE ||--o{ WORKSPACE_MEMBERSHIP : contains
+ WORKSPACE ||--o{ DIAGRAM : owns
+ USER ||--o{ WORKSPACE : creates
+ USER ||--o{ DIAGRAM : creates
+ DIAGRAM ||--o{ DIAGRAM_REVISION : has
+ USER ||--o{ DIAGRAM_REVISION : creates
+ DIAGRAM ||--o{ CONVERSATION : has
+ USER ||--o{ CONVERSATION : owns
+ CONVERSATION ||--o{ CONVERSATION_MESSAGE : contains
+ USER ||--o{ COMMAND_EXECUTION : executes
+ DIAGRAM ||--o{ COMMAND_EXECUTION : receives
+ USER {
+  uuid id PK
+  string external_auth_id UK
+  string email
+  string display_name
+ }
+ WORKSPACE {
+  uuid id PK
+  string name
+  uuid created_by FK
+ }
+ WORKSPACE_MEMBERSHIP {
+  uuid workspace_id PK,FK
+  uuid user_id PK,FK
+  string role
+ }
+ DIAGRAM {
+  uuid id PK
+  uuid workspace_id FK
+  jsonb graph
+  jsonb presentation
+  bigint version
+  timestamp deleted_at
+ }
+ DIAGRAM_REVISION {
+  uuid id PK
+  uuid diagram_id FK
+  bigint version
+  jsonb graph
+  jsonb presentation
+  uuid created_by FK
+ }
+ CONVERSATION {
+  uuid id PK
+  uuid diagram_id FK
+  uuid user_id FK
+ }
+ CONVERSATION_MESSAGE {
+  uuid id PK
+  uuid conversation_id FK
+  string role
+  text content
+  jsonb metadata
+ }
+ COMMAND_EXECUTION {
+  uuid id PK
+  uuid diagram_id FK
+  uuid actor_id FK
+  uuid idempotency_key
+  string payload_hash
+  string status
+  bigint expected_version
+  bigint result_version
+ }
+
