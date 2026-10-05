@@ -7,6 +7,7 @@ Shared instructions for coding agents. Full dev kit: `Tinker_Development_Kit/tin
 Read docs/status.md and the current milestone in docs/implementation-plan.md, then only the
 architecture/contract sections and source files the task touches. Accepted records in docs/decisions.md
 override proposals in docs/contract-decisions.md. Use docs/repo-map.md for verified commands and entry points.
+Deferred verifications live in docs/later-checks.md: add new ones there, and treat any whose trigger has arrived as a blocker.
 Retrieval: `graphify-out/GRAPH_REPORT.md` / `graphify query "..."` are hints only; verify with rg and real files.
 
 ## Architectural invariants

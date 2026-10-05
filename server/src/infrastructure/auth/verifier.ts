@@ -1,6 +1,7 @@
-import { createRemoteJWKSet, errors as joseErrors, generateKeyPair, exportJWK, SignJWT, createLocalJWKSet, jwtVerify } from 'jose';
+import { errors as joseErrors, generateKeyPair, exportJWK, SignJWT, createLocalJWKSet, jwtVerify } from 'jose';
 import type { JWTVerifyGetKey } from 'jose';
 import { AppError } from '../http/errors.ts';
+import { createHttpKeyFetcher, createKeyStore, KeysUnavailableError, type KeyStoreOptions } from './key-store.ts';
 
 /** What we trust from a verified token: the provider's subject id (never a user id from a request body). */
 export interface TokenClaims {
@@ -36,17 +37,27 @@ export function createTokenVerifier({ issuer, audience, keys }: VerifierOptions)
         displayName: name,
       };
     } catch (error) {
+      // Our own signal that the key provider is down or returned garbage: not the caller's fault.
+      if (error instanceof KeysUnavailableError) throw new AppError('SERVICE_UNAVAILABLE', 'Authentication is temporarily unavailable.');
+      // Everything jose raises about the TOKEN itself (bad signature, expired, wrong audience, unknown key...) is a 401.
       if (error instanceof joseErrors.JOSEError) throw new AppError('UNAUTHENTICATED', 'Invalid or expired credentials.');
-      // JWKS fetch failures etc.: the provider is unreachable, not the caller's fault.
       throw new AppError('SERVICE_UNAVAILABLE', 'Authentication is temporarily unavailable.');
     }
   };
 }
 
-/** Supabase: verify against the project's published JWKS (issuer `<url>/auth/v1`). Not exercised against a live project yet. */
-export function createSupabaseVerifier(supabaseUrl: string, audience: string): TokenVerifier {
+/**
+ * Supabase: verify against the project's published JWKS (issuer `<url>/auth/v1`). Key handling (rotation, revocation window,
+ * provider outages) is in key-store.ts and covered by test/key-rotation.test.ts. `options` exists for tests.
+ */
+export function createSupabaseVerifier(
+  supabaseUrl: string,
+  audience: string,
+  options: { fetchKeys?: KeyStoreOptions['fetchKeys'] } & Omit<KeyStoreOptions, 'fetchKeys'> = {},
+): TokenVerifier {
   const issuer = `${supabaseUrl.replace(/\/$/, '')}/auth/v1`;
-  const keys = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`), { cooldownDuration: 30_000 });
+  const { fetchKeys, ...rest } = options;
+  const keys = createKeyStore({ fetchKeys: fetchKeys ?? createHttpKeyFetcher(`${issuer}/.well-known/jwks.json`), ...rest });
   return createTokenVerifier({ issuer, audience, keys });
 }
 
