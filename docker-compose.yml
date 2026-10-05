@@ -1,0 +1,19 @@
+# Local development database only. Credentials are throwaway and the port is bound to loopback.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: tinker
+      POSTGRES_PASSWORD: tinker
+      POSTGRES_DB: tinker
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - tinker-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tinker -d tinker"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  tinker-pgdata:

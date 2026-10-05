@@ -1,0 +1,17 @@
+{
+  "name": "@tinker/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Runtime schemas and DTOs shared by the Tinker frontend and API. No business logic.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}

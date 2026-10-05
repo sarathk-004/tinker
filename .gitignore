@@ -29,3 +29,6 @@ dist-ssr
 
 # Build artifacts
 *.tsbuildinfo
+
+# Retrieval index (regenerable): rebuild with the graphify skill
+graphify-out/

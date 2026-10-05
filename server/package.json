@@ -1,0 +1,28 @@
+{
+  "name": "@tinker/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
+    "start": "tsx --env-file-if-exists=.env src/main.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "db:migrate": "node-pg-migrate -m migrations up",
+    "db:migrate:down": "node-pg-migrate -m migrations down",
+    "db:migrate:create": "node-pg-migrate -m migrations create"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@tinker/shared": "*",
+    "fastify": "^5.12.5",
+    "node-pg-migrate": "^9.0.0",
+    "pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.23.1"
+  }
+}
