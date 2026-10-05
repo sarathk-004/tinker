@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "npm run dev -w @tinker/server",
+    "dev:api:supabase": "npm run dev:api:supabase -w @tinker/server",
+    "check:supabase": "npm run check:supabase -w @tinker/server",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b && npm run typecheck --workspaces --if-present",
