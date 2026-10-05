@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, ArrowRight } from 'lucide-react';
-import { processArchitectureInstruction } from '../ai/orchestrator';
 import { TinkerLogo } from './TinkerLogo';
 
 interface PromptItem {
@@ -80,10 +79,6 @@ export const TypewriterPrompt: React.FC = () => {
     return () => clearTimeout(timer);
   }, [displayedText, isDeleting, isPaused, fullText, currentPrompt.prefix.length]);
 
-  const handleRunCommand = (cmd: string) => {
-    processArchitectureInstruction(cmd);
-  };
-
   // Render prefix normal, highlight bolded in Geist Mono
   const renderStyledText = () => {
     const prefixLen = currentPrompt.prefix.length;
@@ -117,11 +112,7 @@ export const TypewriterPrompt: React.FC = () => {
         </div>
 
         {/* Animated Typewriter Card with Geist Mono and Bolded Text */}
-        <button
-          onClick={() => handleRunCommand(currentPrompt.fullCommand)}
-          title="Click to run this command"
-          className="pointer-events-auto group px-6 py-4 rounded-lg bg-white border border-[#e6e5e0] hover:border-[#26251e] transition-all flex items-center justify-between gap-4 w-full shadow-xs cursor-pointer text-left"
-        >
+        <div className="pointer-events-auto group px-6 py-4 rounded-lg bg-white border border-[#e6e5e0] flex items-center justify-between gap-4 w-full shadow-xs text-left">
           <div className="flex items-center gap-3 overflow-hidden">
             <span className="text-[#f54e00] font-mono text-sm font-semibold flex-shrink-0">&gt;</span>
             <div className="font-mono text-sm leading-relaxed truncate">
@@ -131,22 +122,26 @@ export const TypewriterPrompt: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-1.5 text-xs font-mono text-[#807d72] group-hover:text-[#26251e] flex-shrink-0 pl-2 border-l border-[#e6e5e0]">
-            <span className="hidden sm:inline">Run</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform text-[#f54e00]" />
+            <span className="hidden sm:inline">AI soon</span>
+            <ArrowRight className="w-3.5 h-3.5 text-[#f54e00]" />
           </div>
-        </button>
+        </div>
+
+        <p className="mt-3 text-xs text-[#5a5852] pointer-events-auto">
+          Typed and voice commands return in an upcoming update. Start with <strong>Add Node</strong> in the toolbar above.
+        </p>
 
         {/* Quick prompt chips below */}
         <div className="flex flex-wrap items-center justify-center gap-1.5 mt-3 pointer-events-auto">
           {TYPEWRITER_PROMPTS.slice(0, 3).map((item, idx) => (
-            <button
+            <span
               key={idx}
-              onClick={() => handleRunCommand(item.fullCommand)}
-              className="px-2.5 py-1 rounded-md bg-white hover:bg-[#fafaf7] border border-[#e6e5e0] hover:border-[#cfcdc4] text-[11px] font-mono text-[#5a5852] hover:text-[#26251e] transition-all"
+              title="Example of what typed commands will be able to do"
+              className="px-2.5 py-1 rounded-md bg-white border border-[#e6e5e0] text-[11px] font-mono text-[#5a5852]"
             >
               <Sparkles className="w-3 h-3 text-[#f54e00] inline mr-1" />
               {item.highlight}
-            </button>
+            </span>
           ))}
         </div>
       </div>

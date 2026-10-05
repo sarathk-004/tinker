@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useConversationStore } from '../ai/conversationStore';
 import { useDiagramStore } from '../diagram/store';
+import type { NewNodeSpec } from '../diagram/adapters';
 import {
   MessageSquare,
   Lightbulb,
@@ -11,10 +12,8 @@ import {
   User,
   PlusCircle,
   CheckCircle2,
-  Volume2,
   Play,
 } from 'lucide-react';
-import { speakWithGeminiVoice } from '../ai/geminiVoice';
 import { TinkerLogo } from './TinkerLogo';
 
 interface Suggestion {
@@ -32,6 +31,22 @@ export const SidebarPanel: React.FC = () => {
   const clearTurns = useConversationStore((s) => s.clear);
   const nodes = useDiagramStore((s) => s.nodes);
   const store = useDiagramStore();
+
+  // Suggestions are sequences of ordinary commands. The server assigns node ids, so each step waits for the previous one.
+  const insertOrWire = async (source: string, target: string, spec: NewNodeSpec) => {
+    if (store.edges.some((e) => e.source === source && e.target === target)) {
+      await store.insertBetween(source, target, spec); // one atomic INSERT_BETWEEN
+      return;
+    }
+    const id = await store.addNode(spec); // no connection to split: add the node and wire it in
+    if (!id) return;
+    await store.connect(source, id);
+    await store.connect(id, target);
+  };
+  const addAndConnect = async (from: string, spec: NewNodeSpec, label: string) => {
+    const id = await store.addNode(spec);
+    if (id) await store.connect(from, id, label);
+  };
 
   const [isOpen, setIsOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'advisor' | 'conversation'>('advisor');
@@ -102,26 +117,26 @@ export const SidebarPanel: React.FC = () => {
     const list: Suggestion[] = [];
     if (nodes.length === 0) return list;
 
-    const hasClient = nodes.some((n) => n.data.type === 'client' || n.id.includes('client'));
+    const hasClient = nodes.some((n) => n.data.type === 'client' || n.data.label.toLowerCase().includes('client'));
     const hasGateway = nodes.some(
-      (n) => n.data.type === 'gateway' || n.id.includes('gateway') || n.id.includes('alb')
+      (n) => n.data.type === 'gateway' || n.data.label.toLowerCase().includes('gateway') || n.data.label.toLowerCase().includes('alb')
     );
     const hasDatabase = nodes.some(
-      (n) => n.data.type === 'database' || n.id.includes('postgres') || n.id.includes('rds')
+      (n) => n.data.type === 'database' || n.data.label.toLowerCase().includes('postgres') || n.data.label.toLowerCase().includes('rds')
     );
     const hasCache = nodes.some(
-      (n) => n.data.type === 'cache' || n.id.includes('redis') || n.id.includes('cache')
+      (n) => n.data.type === 'cache' || n.data.label.toLowerCase().includes('redis') || n.data.label.toLowerCase().includes('cache')
     );
     const hasQueue = nodes.some(
-      (n) => n.data.type === 'queue' || n.id.includes('sqs') || n.id.includes('queue')
+      (n) => n.data.type === 'queue' || n.data.label.toLowerCase().includes('sqs') || n.data.label.toLowerCase().includes('queue')
     );
     const hasStorage = nodes.some(
-      (n) => n.data.type === 'storage' || n.id.includes('s3') || n.id.includes('storage')
+      (n) => n.data.type === 'storage' || n.data.label.toLowerCase().includes('s3') || n.data.label.toLowerCase().includes('storage')
     );
     const hasAuth = nodes.some(
       (n) =>
-        n.id.includes('auth') ||
-        n.id.includes('cognito') ||
+        n.data.label.toLowerCase().includes('auth') ||
+        n.data.label.toLowerCase().includes('cognito') ||
         (n.data.subType && n.data.subType.toLowerCase().includes('auth'))
     );
     const serviceNodes = nodes.filter((n) => n.data.type === 'service');
@@ -139,7 +154,7 @@ export const SidebarPanel: React.FC = () => {
         apply: () => {
           const clientNode = nodes.find((n) => n.data.type === 'client') || nodes[0];
           const firstService = serviceNodes[0];
-          store.insertBetween(clientNode.id, firstService.id, {
+          void insertOrWire(clientNode.id, firstService.id, {
             label: 'API Gateway',
             type: 'gateway',
             awsIcon: 'api-gateway',
@@ -163,13 +178,7 @@ export const SidebarPanel: React.FC = () => {
           const dbNode = nodes.find((n) => n.data.type === 'database');
           const svc = serviceNodes[0];
           if (dbNode && svc) {
-            const cacheId = store.addNode({
-              label: 'Redis Cache',
-              type: 'cache',
-              awsIcon: 'redis',
-              subType: 'Amazon ElastiCache',
-            });
-            store.connect(svc.id, cacheId, 'reads (cache aside)');
+            void addAndConnect(svc.id, { label: 'Redis Cache', type: 'cache', awsIcon: 'redis', subType: 'Amazon ElastiCache' }, 'reads (cache aside)');
           }
         },
       });
@@ -187,7 +196,7 @@ export const SidebarPanel: React.FC = () => {
         actionLabel: 'Insert SQS Queue',
         apply: () => {
           if (serviceNodes.length >= 2) {
-            store.insertBetween(serviceNodes[0].id, serviceNodes[1].id, {
+            void insertOrWire(serviceNodes[0].id, serviceNodes[1].id, {
               label: 'Task Queue',
               type: 'queue',
               awsIcon: 'sqs',
@@ -210,13 +219,7 @@ export const SidebarPanel: React.FC = () => {
         actionLabel: 'Add S3 Bucket',
         apply: () => {
           const svc = serviceNodes[0] || nodes[0];
-          const s3Id = store.addNode({
-            label: 'S3 Storage',
-            type: 'storage',
-            awsIcon: 's3',
-            subType: 'Amazon S3 Bucket',
-          });
-          store.connect(svc.id, s3Id, 'puts assets');
+          void addAndConnect(svc.id, { label: 'S3 Storage', type: 'storage', awsIcon: 's3', subType: 'Amazon S3 Bucket' }, 'puts assets');
         },
       });
     }
@@ -233,13 +236,7 @@ export const SidebarPanel: React.FC = () => {
         actionLabel: 'Add Cognito Auth',
         apply: () => {
           const gw = nodes.find((n) => n.data.type === 'gateway') || nodes[0];
-          const authId = store.addNode({
-            label: 'Cognito Auth',
-            type: 'service',
-            awsIcon: 'cognito',
-            subType: 'AWS Cognito',
-          });
-          store.connect(gw.id, authId, 'validates JWT');
+          void addAndConnect(gw.id, { label: 'Cognito Auth', type: 'service', awsIcon: 'cognito', subType: 'AWS Cognito' }, 'validates JWT');
         },
       });
     }
@@ -508,15 +505,6 @@ export const SidebarPanel: React.FC = () => {
                             )}
                           </span>
 
-                          {turn.role === 'assistant' && (
-                            <button
-                              onClick={() => speakWithGeminiVoice(turn.text)}
-                              title="Listen to response"
-                              className="text-[#807d72] hover:text-[#f54e00] p-0.5 rounded transition-colors"
-                            >
-                              <Volume2 className="w-3 h-3" />
-                            </button>
-                          )}
                         </div>
 
                         <div className="text-[11.5px] text-[#26251e] whitespace-pre-wrap leading-relaxed">

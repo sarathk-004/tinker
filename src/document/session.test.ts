@@ -1,0 +1,367 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CommandResponse, DiagramCommand, DiagramDetail, Graph, Presentation } from '../contracts';
+import { ApiError, type MutationSpec } from '../api/client';
+import { ConflictError, RefusedError, SessionClosedError, createDocumentSession, newNodeIds, type SessionApi, type SessionStorage } from './session';
+
+const DIAGRAM = '11111111-1111-4111-8111-111111111111';
+const uid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
+/** A pretend server with real versioning and idempotency, plus knobs to inject failures and delays. */
+function fakeServer() {
+  const s = {
+    version: 1,
+    name: 'Test',
+    graph: { schemaVersion: 1, nodes: [], edges: [] } as Graph,
+    presentation: { nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } } as Presentation,
+    nextId: 100,
+    /** Every request that reached the server logic (after any injected failure), for assertions. */
+    received: [] as MutationSpec[],
+    stored: new Map<string, { status: 'ok'; result: unknown } | { status: 'error'; error: ApiError }>(),
+    failures: [] as Array<ApiError | 'lost-response'>,
+    gate: undefined as undefined | Promise<void>,
+    loads: 0,
+  };
+  const detail = (): DiagramDetail => ({ diagramId: DIAGRAM, workspaceId: uid(9), name: s.name, version: s.version, graph: s.graph, presentation: s.presentation, updatedAt: '2026-01-01T00:00:00.000Z' });
+
+  function apply(spec: MutationSpec): CommandResponse | DiagramDetail {
+    const body = spec.body as { expectedVersion: number; command?: DiagramCommand; name?: string; nodePositions?: Record<string, { x: number; y: number }>; viewport?: Presentation['viewport'] };
+    if (body.expectedVersion !== s.version) throw new ApiError('DIAGRAM_VERSION_CONFLICT', 'conflict', 409, { expectedVersion: body.expectedVersion, currentVersion: s.version });
+    if (spec.path.endsWith('/commands')) {
+      const c = body.command!;
+      if (c.type === 'ADD_NODE') {
+        const id = uid(s.nextId++);
+        s.graph = { ...s.graph, nodes: [...s.graph.nodes, { id, name: c.node.name, kind: c.node.kind, metadata: {} }] };
+        s.presentation = { ...s.presentation, nodePositions: { ...s.presentation.nodePositions, [id]: { x: 0, y: 0 } } };
+      } else if (c.type === 'REMOVE_NODE') {
+        if (!s.graph.nodes.some((n) => n.id === c.nodeId)) throw new ApiError('DOMAIN_VALIDATION_FAILED', 'That node does not exist.', 422, { reason: 'NODE_NOT_FOUND' });
+        s.graph = { ...s.graph, nodes: s.graph.nodes.filter((n) => n.id !== c.nodeId) };
+        const { [c.nodeId]: _gone, ...rest } = s.presentation.nodePositions;
+        s.presentation = { ...s.presentation, nodePositions: rest };
+      }
+      s.version += 1;
+      return { diagramId: DIAGRAM, version: s.version, appliedCommand: { type: c.type }, graph: s.graph, presentation: s.presentation };
+    }
+    if (spec.path.endsWith('/presentation')) {
+      for (const id of Object.keys(body.nodePositions ?? {})) {
+        if (!s.graph.nodes.some((n) => n.id === id)) throw new ApiError('DOMAIN_VALIDATION_FAILED', 'unknown node', 422, { reason: 'NODE_NOT_FOUND' });
+      }
+      s.presentation = { nodePositions: { ...s.presentation.nodePositions, ...(body.nodePositions ?? {}) }, viewport: body.viewport ?? s.presentation.viewport };
+    } else {
+      s.name = body.name!;
+    }
+    s.version += 1;
+    return detail();
+  }
+
+  async function handle(spec: MutationSpec) {
+    if (s.gate) await s.gate;
+    const prior = s.stored.get(spec.idempotencyKey);
+    const failure = s.failures.shift();
+    if (failure instanceof ApiError) throw failure; // request never reached the logic
+    if (prior) {
+      if (prior.status === 'ok') return { data: prior.result, replayed: true };
+      throw prior.error;
+    }
+    s.received.push(spec);
+    try {
+      const result = apply(spec);
+      s.stored.set(spec.idempotencyKey, { status: 'ok', result });
+      if (failure === 'lost-response') throw new ApiError('NETWORK_ERROR', 'response lost', 0, undefined, undefined, true); // applied, but the client never heard
+      return { data: result, replayed: false };
+    } catch (e) {
+      if (e instanceof ApiError && e.code !== 'NETWORK_ERROR') s.stored.set(spec.idempotencyKey, { status: 'error', error: e });
+      throw e;
+    }
+  }
+
+  const api: SessionApi = {
+    loadDiagram: async () => {
+      s.loads += 1;
+      return detail();
+    },
+    mutate: {
+      command: (spec) => handle(spec) as never,
+      detail: (spec) => handle(spec) as never,
+    },
+  };
+  return { s, api, detail, bump: () => { s.version += 1; s.name = `Edited elsewhere v${s.version}`; } };
+}
+
+function memoryStorage(): SessionStorage & { data: Map<string, string> } {
+  const data = new Map<string, string>();
+  return { data, get: (k) => data.get(k) ?? null, set: (k, v) => void data.set(k, v), remove: (k) => void data.delete(k) };
+}
+
+let keyCounter = 0;
+async function newSession(opts: { debounce?: number } = {}) {
+  const server = fakeServer();
+  const storage = memoryStorage();
+  keyCounter = 0;
+  const session = createDocumentSession({ api: server.api, storage, newKey: () => `key-${String(++keyCounter).padStart(10, '0')}`, positionDebounceMs: opts.debounce ?? 350 });
+  await session.open(DIAGRAM);
+  return { ...server, session, storage };
+}
+
+const add = (name: string): DiagramCommand => ({ type: 'ADD_NODE', node: { name, kind: 'SERVICE' } });
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+describe('document session: structural commands', () => {
+  it('opens a diagram and exposes the canonical document', async () => {
+    const { session } = await newSession();
+    const state = session.getState();
+    expect(state.diagram).toMatchObject({ id: DIAGRAM, version: 1 });
+    expect(state.status).toBe('idle');
+    expect(state.pending).toBe(0);
+  });
+
+  it('confirm-then-apply: the document changes only when the server acknowledges, and the caller learns the new node id', async () => {
+    const { session, s } = await newSession();
+    let release!: () => void;
+    s.gate = new Promise<void>((r) => (release = r));
+    const before = session.getState().graph;
+    const done = session.command(add('Orders'), 'Add Orders');
+    await tick();
+    expect(session.getState().graph.nodes).toHaveLength(0); // not applied locally
+    expect(session.getState()).toMatchObject({ status: 'saving', pending: 1 });
+    release();
+    const res = await done;
+    expect(session.getState().graph.nodes).toHaveLength(1);
+    expect(session.getState()).toMatchObject({ status: 'idle', pending: 0 });
+    expect(session.getState().diagram?.version).toBe(2);
+    expect(newNodeIds(before, res.graph)).toHaveLength(1);
+  });
+
+  it('serializes writes: queued commands are sent one at a time, in order, each with the version the previous one produced', async () => {
+    const { session, s } = await newSession();
+    await Promise.all([session.command(add('A'), 'A'), session.command(add('B'), 'B'), session.command(add('C'), 'C')]);
+    expect(s.received.map((r) => (r.body as { expectedVersion: number }).expectedVersion)).toEqual([1, 2, 3]);
+    expect(s.received.map((r) => (r.body as { command: { node: { name: string } } }).command.node.name)).toEqual(['A', 'B', 'C']);
+    expect(session.getState().graph.nodes.map((n) => n.name)).toEqual(['A', 'B', 'C']);
+    expect(session.getState().diagram?.version).toBe(4);
+  });
+
+  it('a domain refusal (422) rejects only that command, changes nothing, and the queue carries on', async () => {
+    const { session, s } = await newSession();
+    const refused = session.command({ type: 'REMOVE_NODE', nodeId: uid(999) }, 'Remove ghost');
+    const fine = session.command(add('After'), 'Add After');
+    await expect(refused).rejects.toBeInstanceOf(RefusedError);
+    await expect(refused).rejects.toMatchObject({ reason: 'NODE_NOT_FOUND' });
+    await fine;
+    expect(s.received).toHaveLength(2);
+    expect((s.received[1]!.body as { expectedVersion: number }).expectedVersion).toBe(1); // a refusal does not consume a version
+    expect(session.getState().graph.nodes).toHaveLength(1);
+    expect(session.getState().notice?.text).toContain('does not exist');
+  });
+});
+
+describe('document session: transient failures never apply a write twice', () => {
+  it('holds the queue on a transient failure and resumes with the SAME key and body', async () => {
+    const { session, s } = await newSession();
+    s.failures.push(new ApiError('NETWORK_ERROR', 'offline', 0, undefined, undefined, true));
+    const done = session.command(add('Orders'), 'Add Orders');
+    await tick();
+    expect(session.getState()).toMatchObject({ status: 'failed', pending: 1 });
+    expect(session.getState().graph.nodes).toHaveLength(0);
+    session.retry();
+    await done;
+    expect(s.received).toHaveLength(1);
+    expect(session.getState().graph.nodes).toHaveLength(1);
+    expect(session.getState().status).toBe('idle');
+  });
+
+  it('a lost response (the server applied the write but the client never heard) is recovered by replay: exactly one node', async () => {
+    const { session, s } = await newSession();
+    s.failures.push('lost-response');
+    const done = session.command(add('Orders'), 'Add Orders');
+    await tick();
+    expect(session.getState().status).toBe('failed');
+    expect(s.graph.nodes).toHaveLength(1); // the server did apply it
+    session.retry(); // resend with the same key
+    await done;
+    expect(s.graph.nodes).toHaveLength(1);
+    expect(s.version).toBe(2);
+    expect(session.getState().graph.nodes).toHaveLength(1);
+    expect(session.getState().diagram?.version).toBe(2);
+  });
+
+  it('later commands wait behind a held queue and are not sent out of order', async () => {
+    const { session, s } = await newSession();
+    s.failures.push(new ApiError('NETWORK_ERROR', 'offline', 0, undefined, undefined, true));
+    const first = session.command(add('First'), 'First');
+    const second = session.command(add('Second'), 'Second');
+    await tick();
+    expect(s.received).toHaveLength(0);
+    session.retry();
+    await Promise.all([first, second]);
+    expect(s.received.map((r) => (r.body as { command: { node: { name: string } } }).command.node.name)).toEqual(['First', 'Second']);
+  });
+});
+
+describe('document session: stale writes and conflicts', () => {
+  it('a conflict stops the queue, rejects the write, keeps a draft, and never overwrites the newer version', async () => {
+    const { session, s, bump, storage } = await newSession();
+    bump(); // another tab edited the diagram
+    const stale = session.command(add('Mine'), 'Add Mine');
+    const queued = session.command(add('Also mine'), 'Add Also mine');
+    await expect(stale).rejects.toBeInstanceOf(ConflictError);
+    await expect(queued).rejects.toBeInstanceOf(ConflictError);
+    const state = session.getState();
+    expect(state.status).toBe('conflict');
+    expect(state.conflict).toMatchObject({ expectedVersion: 1, currentVersion: 2, draftCount: 2 });
+    expect(state.conflict?.descriptions).toEqual(['Add Mine', 'Add Also mine']);
+    expect(s.graph.nodes).toHaveLength(0); // nothing was applied on the server
+    expect(s.received).toHaveLength(1); // the queued write was never even sent
+    expect(JSON.parse(storage.data.get(`tinker_draft_${DIAGRAM}`)!).items).toHaveLength(2);
+    await expect(session.command(add('Blocked'), 'x')).rejects.toBeInstanceOf(ConflictError); // writes stay stopped
+  });
+
+  it('reload latest discards the draft and resumes editing on the server version', async () => {
+    const { session, bump, storage } = await newSession();
+    bump();
+    await session.command(add('Mine'), 'Add Mine').catch(() => undefined);
+    await session.reloadLatest();
+    expect(session.getState().status).toBe('idle');
+    expect(session.getState().conflict).toBeNull();
+    expect(session.getState().diagram?.version).toBe(2);
+    expect(storage.data.size).toBe(0);
+    await session.command(add('Fresh'), 'Add Fresh');
+    expect(session.getState().graph.nodes.map((n) => n.name)).toEqual(['Fresh']);
+  });
+
+  it('re-apply loads the latest version and re-submits the kept changes as new requests', async () => {
+    const { session, s, bump, storage } = await newSession();
+    bump();
+    await session.command(add('Mine'), 'Add Mine').catch(() => undefined);
+    const keysBefore = s.received.map((r) => r.idempotencyKey);
+    const result = await session.reapplyDraft();
+    expect(result).toEqual({ applied: 1, refused: 0 });
+    expect(s.graph.nodes.map((n) => n.name)).toEqual(['Mine']);
+    const reapplied = s.received[s.received.length - 1]!;
+    expect(keysBefore).not.toContain(reapplied.idempotencyKey);
+    expect((reapplied.body as { expectedVersion: number }).expectedVersion).toBe(2);
+    expect(session.getState().status).toBe('idle');
+    expect(storage.data.size).toBe(0);
+  });
+
+  it('a stale position save also conflicts instead of overwriting', async () => {
+    const { session, s, bump } = await newSession({ debounce: 10 });
+    const added = await session.command(add('A'), 'A');
+    const id = added.graph.nodes[0]!.id;
+    bump();
+    session.savePositions({ [id]: { x: 5, y: 5 } });
+    await new Promise((r) => setTimeout(r, 40));
+    expect(session.getState().status).toBe('conflict');
+    expect(s.presentation.nodePositions[id]).toEqual({ x: 0, y: 0 });
+    expect(session.getState().conflict?.draftCount).toBe(1);
+  });
+
+  it('refreshIfIdle picks up another tab\'s change only when nothing is pending', async () => {
+    const { session, bump, s } = await newSession();
+    bump();
+    expect(await session.refreshIfIdle()).toBe(true);
+    expect(session.getState().diagram?.version).toBe(2);
+    bump();
+    s.gate = new Promise(() => undefined); // keep a write in flight
+    void session.command(add('Busy'), 'Busy');
+    await tick();
+    const loadsBefore = s.loads;
+    expect(await session.refreshIfIdle()).toBe(false);
+    expect(s.loads).toBe(loadsBefore); // did not even ask
+  });
+});
+
+describe('document session: drag saves', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('shows a drag immediately, saves once after a quiet period, and coalesces many moves into one write', async () => {
+    const { session, s } = await newSession({ debounce: 300 });
+    vi.useRealTimers();
+    const id = (await session.command(add('A'), 'A')).graph.nodes[0]!.id;
+    vi.useFakeTimers();
+    for (let i = 1; i <= 5; i++) session.savePositions({ [id]: { x: i * 10, y: i * 10 } });
+    expect(session.getState().presentation.nodePositions[id]).toEqual({ x: 50, y: 50 }); // visible instantly
+    expect(session.getState().pending).toBe(1);
+    expect(s.received).toHaveLength(1); // nothing sent yet
+    await vi.advanceTimersByTimeAsync(300);
+    vi.useRealTimers();
+    await session.flush();
+    const presentationWrites = s.received.filter((r) => r.path.endsWith('/presentation'));
+    expect(presentationWrites).toHaveLength(1);
+    expect((presentationWrites[0]!.body as { nodePositions: Record<string, unknown> }).nodePositions[id]).toEqual({ x: 50, y: 50 });
+    expect(session.getState().pending).toBe(0);
+    expect(s.presentation.nodePositions[id]).toEqual({ x: 50, y: 50 });
+  });
+
+  it('an unsaved drag survives a structural acknowledgement (no snap-back) and is saved right after it, in order', async () => {
+    const { session, s } = await newSession({ debounce: 5000 });
+    vi.useRealTimers();
+    const id = (await session.command(add('A'), 'A')).graph.nodes[0]!.id;
+    session.savePositions({ [id]: { x: 77, y: 88 } });
+    const second = session.command(add('B'), 'B'); // forces the drag to be queued BEFORE this command
+    await second;
+    await session.flush();
+    expect(session.getState().presentation.nodePositions[id]).toEqual({ x: 77, y: 88 });
+    const order = s.received.map((r) => (r.path.endsWith('/presentation') ? 'drag' : 'cmd'));
+    expect(order).toEqual(['cmd', 'drag', 'cmd']);
+    expect(s.presentation.nodePositions[id]).toEqual({ x: 77, y: 88 });
+  });
+
+  it('never sends positions for a node a queued command removed', async () => {
+    const { session, s } = await newSession({ debounce: 5000 });
+    vi.useRealTimers();
+    const id = (await session.command(add('A'), 'A')).graph.nodes[0]!.id;
+    session.savePositions({ [id]: { x: 9, y: 9 } });
+    const removal = session.command({ type: 'REMOVE_NODE', nodeId: id }, 'Remove A');
+    await removal;
+    await session.flush();
+    const presentationWrites = s.received.filter((r) => r.path.endsWith('/presentation'));
+    expect(presentationWrites).toHaveLength(1); // the drag was saved before the removal...
+    expect(s.graph.nodes).toHaveLength(0);
+    expect(session.getState().status).toBe('idle'); // ...and nothing failed
+  });
+});
+
+describe('document session: lifecycle', () => {
+  it('closing rejects pending work and ignores late responses; opening another diagram resets state', async () => {
+    const { session, s } = await newSession();
+    let release!: () => void;
+    s.gate = new Promise<void>((r) => (release = r));
+    const pending = session.command(add('Late'), 'Late');
+    await tick();
+    session.close();
+    release();
+    await expect(pending).rejects.toBeInstanceOf(SessionClosedError);
+    expect(session.getState().diagram).toBeNull();
+    expect(session.getState().graph.nodes).toHaveLength(0);
+  });
+
+  it('rename goes through the same queue and updates the name from the canonical response', async () => {
+    const { session } = await newSession();
+    await session.renameDiagram('Renamed');
+    expect(session.getState().diagram?.name).toBe('Renamed');
+    expect(session.getState().diagram?.version).toBe(2);
+  });
+
+  it('flush resolves when everything is acknowledged, and rejects while held in conflict', async () => {
+    const { session, bump } = await newSession();
+    await session.flush();
+    bump();
+    void session.command(add('X'), 'X').catch(() => undefined);
+    await expect(session.flush()).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('an older stored result (replay) never regresses the document', async () => {
+    const { session, s } = await newSession();
+    await session.command(add('A'), 'A');
+    await session.command(add('B'), 'B');
+    const staleDoc = { diagramId: DIAGRAM, version: 2, appliedCommand: { type: 'ADD_NODE' as const }, graph: { schemaVersion: 1 as const, nodes: [], edges: [] }, presentation: { nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } }, replayed: true };
+    const apiWithStale: SessionApi = { ...s && { loadDiagram: async () => ({ diagramId: DIAGRAM, workspaceId: uid(9), name: 'x', version: 3, graph: session.getState().graph, presentation: session.getState().presentation, updatedAt: '' }) }, mutate: { command: async () => ({ data: staleDoc, replayed: true }), detail: async () => { throw new Error('unused'); } } };
+    const s2 = createDocumentSession({ api: apiWithStale, newKey: () => 'key-stale-0001' });
+    await s2.open(DIAGRAM);
+    const before = s2.getState().graph.nodes.length;
+    await s2.command(add('C'), 'C');
+    expect(s2.getState().graph.nodes).toHaveLength(before); // version 2 < 3: ignored
+    expect(s2.getState().diagram?.version).toBe(3);
+  });
+});

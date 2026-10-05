@@ -60,22 +60,23 @@ export const NodeEditModal: React.FC<NodeEditModalProps> = ({ nodeId, onClose })
   if (!nodeId || !node) return null;
 
   const handleSave = () => {
-    store.updateNode(nodeId, {
+    void store.editNode(nodeId, {
       label: label.trim() || node.data.label,
-      subType: subType.trim() || undefined,
+      subType: subType.trim(),
       awsIcon: selectedAwsIcon,
       type: selectedType,
+      ...(node.data.description ? { description: node.data.description } : {}),
     });
 
     if (targetConnectId && targetConnectId !== nodeId) {
-      store.connect(nodeId, targetConnectId);
+      void store.connect(nodeId, targetConnectId);
     }
 
     onClose();
   };
 
   const handleDelete = () => {
-    store.removeNode(nodeId);
+    void store.removeNode(nodeId);
     onClose();
   };
 
@@ -90,7 +91,7 @@ export const NodeEditModal: React.FC<NodeEditModalProps> = ({ nodeId, onClose })
             <AWSIcon name={selectedAwsIcon} type={selectedType} size={22} />
             <div>
               <h3 className="text-sm font-semibold text-[#26251e] tracking-tight">Edit Component</h3>
-              <p className="text-[11px] font-mono text-[#807d72]">{nodeId}</p>
+              <p className="text-[11px] font-mono text-[#807d72]">{nodeId.slice(0, 8)}</p>
             </div>
           </div>
           <button
@@ -180,7 +181,7 @@ export const NodeEditModal: React.FC<NodeEditModalProps> = ({ nodeId, onClose })
                   <option value="">-- No connection --</option>
                   {otherNodes.map((n) => (
                     <option key={n.id} value={n.id}>
-                      {n.data.label} ({n.id})
+                      {n.data.label}
                     </option>
                   ))}
                 </select>

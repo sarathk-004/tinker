@@ -12,8 +12,8 @@
 ## ✨ Features
 
 - **🗣️ Natural Voice Architecture Control**: Speak architecture changes naturally (e.g. *"Client talks to load balancer"*, *"Add Redis between them"*, *"Remove it"*).
-- **🤖 Gemini AI Integration**: Multi-turn NLU with function calling targeting automated diagram actions via Google Gemini models (`gemini-3.8-flash`).
-- **🛡️ Offline / Local Rule Fallback**: Fully functional offline rule engine for demo scenarios and instant local operations without an API key.
+- **🤖 Gemini AI Integration** *(returning in a later update, server-side)*: typed and voice commands with function calling.
+- **💾 Saved diagrams**: sign in, edit, refresh, and your diagram is still there; edits retry safely and stale tabs cannot overwrite each other.
 - **🔄 Auto-healing Connections**: Intelligently reconnects predecessor and successor nodes when intermediary nodes (like caches or proxies) are removed.
 - **⚡ Parallel & Bidirectional Edges**: Full multigraph Dagre layout support for bidirectional services and multi-channel connections.
 - **🎨 Interactive Canvas**: Powered by `@xyflow/react` with custom styled nodes, auto-layout (LR & TB), highlighting, and status feedback.
@@ -30,22 +30,27 @@ cd tinker
 npm install
 ```
 
-### 2. Configure Environment (Optional)
+### 2. Configure the environment
 
-Create a `.env` file in the project root:
+Browser settings (root `.env`; everything here is public and ships in the bundle, so **never put a secret in a `VITE_*` variable**):
 
 ```env
-VITE_GEMINI_API_KEY=your_gemini_api_key_here
-VITE_GEMINI_MODEL=gemini-3.8-flash
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxxxxx   # public by design; never the secret/service_role key
 ```
 
-> **Note**: You can also enter and test your Gemini API key directly inside the app using the settings modal (stored securely in browser `localStorage`).
+Server settings live in `server/.env` (see `server/.env.example` and `server/README.md`): database, Supabase, and later the Gemini key.
+The Gemini key is server-side only. The app no longer calls Gemini from the browser, and typed/voice commands return in a later update.
 
-### 3. Start Development Server
+### 3. Start the app
 
 ```bash
-npm run dev
+npm run dev:db  -w @tinker/server     # local Postgres (first time: npm run db:migrate -w @tinker/server)
+npm run dev:api                       # API on :8787  (or: npm run dev:api:supabase for your Supabase project)
+npm run dev                           # frontend on :5173
 ```
+
+Sign in with Supabase (or, in local development only, "Developer login" when the API runs with `AUTH_MODE=dev`).
 
 ### 4. Build for Production
 

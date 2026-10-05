@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useDiagramStore } from '../diagram/store';
 import {
   Plus,
-  RotateCcw,
   LayoutGrid,
   Trash2,
   ChevronDown,
@@ -64,7 +63,7 @@ export const ManualToolbar: React.FC = () => {
   const isPlayingFlow = store.isPlayingFlow;
 
   const handleAdd = (comp: QuickComponent) => {
-    store.addNode({
+    void store.addNode({
       label: comp.label,
       type: comp.type,
       awsIcon: comp.awsIcon,
@@ -76,19 +75,19 @@ export const ManualToolbar: React.FC = () => {
   const handleGroup = () => {
     const selected = store.selectedNodeIds;
     if (selected.length >= 2) {
-      store.groupNodes(selected, 'Backend Services');
+      void store.groupNodes(selected, 'Backend Services');
     } else if (store.nodes.length >= 2) {
       // Group all service nodes or first 3
       const serviceNodes = store.nodes
         .filter((n) => n.data.type === 'service' || n.data.type === 'database' || n.data.type === 'cache')
         .map((n) => n.id);
       const toGroup = serviceNodes.length >= 2 ? serviceNodes : store.nodes.slice(0, 3).map((n) => n.id);
-      store.groupNodes(toGroup, 'Backend Services');
+      void store.groupNodes(toGroup, 'Backend Services');
     }
   };
 
   const handleDelete = () => {
-    store.deleteSelected();
+    void store.deleteSelected();
   };
 
   const handleOpenEdit = () => {
@@ -152,7 +151,7 @@ export const ManualToolbar: React.FC = () => {
         <button
           onClick={handleGroup}
           disabled={store.nodes.length < 2}
-          title="Group selected nodes as a cluster"
+          title="Tag the selected nodes with a group name"
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[#5a5852] hover:text-[#26251e] hover:bg-[#fafaf7] disabled:opacity-40 disabled:hover:bg-transparent text-xs font-medium transition-colors"
         >
           <Layers className="w-3.5 h-3.5 text-[#807d72]" />
@@ -178,24 +177,13 @@ export const ManualToolbar: React.FC = () => {
 
         {/* Auto-Layout */}
         <button
-          onClick={() => store.applyLayout('LR')}
+          onClick={() => store.applyLayout()}
           disabled={store.nodes.length === 0}
-          title="Auto-organize layout (Left-to-Right)"
+          title="Auto-organize the whole layout (saved as a position update)"
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[#5a5852] hover:text-[#26251e] hover:bg-[#fafaf7] disabled:opacity-40 text-xs font-medium transition-colors"
         >
           <LayoutGrid className="w-3.5 h-3.5 text-[#807d72]" />
           <span className="hidden sm:inline">Layout</span>
-        </button>
-
-        {/* Undo */}
-        <button
-          onClick={() => store.undo()}
-          disabled={store.history.length === 0}
-          title="Undo previous change (Ctrl+Z)"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[#5a5852] hover:text-[#26251e] hover:bg-[#fafaf7] disabled:opacity-40 text-xs font-medium transition-colors"
-        >
-          <RotateCcw className="w-3.5 h-3.5 text-[#807d72]" />
-          <span className="hidden sm:inline">Undo</span>
         </button>
 
         <div className="h-4 w-px bg-[#e6e5e0] mx-0.5" />

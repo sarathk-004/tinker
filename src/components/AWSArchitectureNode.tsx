@@ -7,7 +7,7 @@ import { Trash2, Play } from 'lucide-react';
 import clsx from 'clsx';
 
 export const AWSArchitectureNode: React.FC<NodeProps<DiagramNode>> = memo(({ data, selected }) => {
-  const { id, label, type, awsIcon, subType, isHighlighted, isDimmed } = data;
+  const { id, label, type, awsIcon, subType, group, isHighlighted, isDimmed } = data;
   const store = useDiagramStore();
 
   // In-product timeline pastels from Cursor Design System
@@ -114,6 +114,14 @@ export const AWSArchitectureNode: React.FC<NodeProps<DiagramNode>> = memo(({ dat
             >
               {subType || type}
             </span>
+            {group && (
+              <span
+                title={`Group: ${group}`}
+                className="text-[10px] font-mono tracking-wide px-1.5 py-0.5 rounded border border-dashed border-[#cfcdc4] text-[#807d72] truncate max-w-[90px]"
+              >
+                {group}
+              </span>
+            )}
           </div>
         </div>
       </div>

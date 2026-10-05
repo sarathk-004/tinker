@@ -12,7 +12,7 @@ Retrieval index: `graphify-out/` built from `6e0130d` on 2026-10-05 (333 nodes).
 | Build + typecheck | `npm run build` (`tsc -b && vite build`) | PASS, 37s; 526 kB JS chunk warning (>500 kB) |
 | Preview | `npm run preview` | not run |
 | Typecheck all workspaces | `npm run typecheck` | PASS (I1) |
-| Tests (Vitest: shared, server) | `npm test` | 113 tests PASS (I3: shared 17, server 96; server tests start an isolated real Postgres) |
+| Tests (Vitest: shared, server) | `npm test` | 172 tests PASS (I4: shared 17, server 113, frontend 42 via `npm run test:web`; server tests start an isolated real Postgres) |
 | Boundary check | `npm run check:boundaries` (`--strict` fails on legacy VITE_* key refs) | PASS (I1) |
 | API dev server | `npm run dev:api` (server/.env from server/.env.example; needs `dev:db` first) | /health, /health/ready 200 verified (I3) |
 | Local database | `npm run dev:db -w @tinker/server` (embedded Postgres 18.4 on :54329, data in `server/.data/`) | running; migrations up/down/up verified |
@@ -36,6 +36,9 @@ Retrieval index: `graphify-out/` built from `6e0130d` on 2026-10-05 (333 nodes).
 | Backend | `server/src/{app,main}.ts`, `infrastructure/{config,http,auth}`, `modules/diagrams/http` | Fastify 5 |
 | Diagram engine (pure) | `server/src/modules/diagrams/domain/{engine,layout,analysis,types}.ts` | I2 |
 | Dev engine preview (localhost, dev only) | `engine-demo.html`, `src/dev/engine-demo.ts`, `server/src/modules/diagrams/http/dev-routes.ts` | http://localhost:5173/engine-demo.html with `npm run dev` + `npm run dev:api` |
+| Browser API client, document session, auth, workspace store, editor view | `src/api/client.ts`, `src/document/{session,instance}.ts`, `src/auth/auth.ts`, `src/workspace/workspaceStore.ts`, `src/diagram/{store,adapters,flow,inference}.ts`, `src/config.ts` | I4 (replaces the prototype store and the `src/ai` Gemini code) |
+| Login, diagram bar, banners | `src/components/{LoginScreen,DiagramBar,StatusBanners}.tsx` | I4 |
+| Prototype AI code (reference only) | `Tinker_Development_Kit/tinker-development-kit/legacy/prototype-ai/` | not compiled; input for I5/I7 |
 | Persistence, idempotency, identity, access | `server/src/infrastructure/{database,idempotency,auth}`, `server/src/modules/{identity,workspaces}`, `server/src/modules/diagrams/{application,persistence,http}`, `server/migrations/*.sql` | I3 |
 | Dev saved-diagrams preview (localhost, dev only) | `api-demo.html`, `src/dev/api-demo.ts`, `src/dev/diagram-svg.ts` | http://localhost:5173/api-demo.html |
 | DB migrations | `server/migrations/` (empty until I3), `docker-compose.yml` | |

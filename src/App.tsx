@@ -1,47 +1,102 @@
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 import { Header } from './components/Header';
 import { DiagramCanvas } from './components/DiagramCanvas';
 import { ManualToolbar } from './components/ManualToolbar';
 import { CommandBar } from './components/CommandBar';
-import { SettingsModal } from './components/SettingsModal';
 import { SidebarPanel } from './components/SidebarPanel';
-import { useDiagramStore } from './diagram/store';
+import { LoginScreen } from './components/LoginScreen';
+import { StatusBanners } from './components/StatusBanners';
+import { initAuth, signOut, useAuthStore } from './auth/auth';
+import { session } from './document/instance';
+import { useWorkspaceStore } from './workspace/workspaceStore';
+
+const Splash: React.FC<{ text: string }> = ({ text }) => (
+  <div className="min-h-screen w-screen flex items-center justify-center bg-[#f7f7f4] text-[#5a5852] text-sm gap-2">
+    <Loader2 className="w-4 h-4 animate-spin" />
+    {text}
+  </div>
+);
 
 export const App: React.FC = () => {
-  const [layoutDir, setLayoutDir] = useState<'LR' | 'TB'>('LR');
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const applyLayout = useDiagramStore((s) => s.applyLayout);
+  const status = useAuthStore((s) => s.status);
+  const { phase, error } = useWorkspaceStore();
 
-  const toggleLayout = () => {
-    const next = layoutDir === 'LR' ? 'TB' : 'LR';
-    setLayoutDir(next);
-    applyLayout(next);
-  };
+  useEffect(() => {
+    void initAuth();
+  }, []);
+
+  // Sign-in / sign-out drives loading and discarding the workspace.
+  useEffect(() => {
+    const { bootstrap, reset } = useWorkspaceStore.getState();
+    if (status === 'signedIn' && phase === 'idle') void bootstrap();
+    if (status === 'signedOut' && phase !== 'idle') reset();
+  }, [status, phase]);
+
+  useEffect(() => {
+    // Pick up edits made in another tab or device when we return to this one (only if we have nothing unsaved).
+    const onFocus = () => {
+      if (document.visibilityState === 'hidden') return;
+      void session.refreshIfIdle().then(async (changed) => {
+        if (changed) await useWorkspaceStore.getState().refreshList().catch(() => undefined);
+      });
+    };
+    // Resume held saves as soon as the network is back (same idempotency keys: never applied twice).
+    const onOnline = () => session.retry();
+    // Never let the user close the tab while changes are unsaved.
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (session.hasUnsavedWork()) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, []);
+
+  if (status === 'loading') return <Splash text="Starting…" />;
+  if (status === 'signedOut') return <LoginScreen />;
+  if (phase === 'idle' || phase === 'loading') return <Splash text="Loading your diagrams…" />;
+  if (phase === 'error') {
+    return (
+      <div className="min-h-screen w-screen flex items-center justify-center bg-[#f7f7f4] px-4">
+        <div className="max-w-sm rounded-lg bg-white border border-[#e6e5e0] p-6 text-sm text-[#26251e]">
+          <p className="font-semibold mb-1">Could not load your diagrams</p>
+          <p className="text-[#5a5852] mb-4">{error}</p>
+          <div className="flex gap-2">
+            <button onClick={() => useWorkspaceStore.setState({ phase: 'idle', error: null })} className="px-3 py-1.5 rounded-md bg-[#f54e00] text-white text-xs font-medium">
+              Try again
+            </button>
+            <button onClick={() => void signOut()} className="px-3 py-1.5 rounded-md border border-[#e6e5e0] text-xs">
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col w-screen h-screen bg-[#f7f7f4] text-[#26251e] overflow-hidden select-none font-sans">
-      <Header
-        layoutDir={layoutDir}
-        onToggleLayout={toggleLayout}
-        onOpenSettings={() => setSettingsOpen(true)}
-      />
+      <Header />
+      <StatusBanners />
 
-      <div className="flex flex-1 w-full h-[calc(100vh-3.5rem)] overflow-hidden relative">
-        {/* Left Resizable Non-Overlapping Sidechat & Advisor */}
+      <div className="flex flex-1 w-full min-h-0 overflow-hidden relative">
         <SidebarPanel />
-
-        {/* Diagram Area - flex-1 adapts to remaining width with zero overlap */}
         <main className="relative flex-1 h-full overflow-hidden bg-[#f7f7f4]">
           <DiagramCanvas />
           <ManualToolbar />
-          <CommandBar onOpenSettings={() => setSettingsOpen(true)} />
+          <CommandBar />
         </main>
       </div>
-
-      <SettingsModal
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-      />
     </div>
   );
 };

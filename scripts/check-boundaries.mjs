@@ -74,19 +74,8 @@ for (const { dir, forbid } of rules) {
 
 // Secrets must not be exposed through VITE_* variables (committed examples and typings).
 // Supabase publishable keys are public by design (sb_publishable_...), so VITE_*PUBLISHABLE* names are allowed.
+// Everything else that looks like a secret must never be exposed to the browser bundle.
 const secretish = /VITE_(?![A-Z0-9_]*PUBLISHABLE)[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)/;
-const exempt = new Set([
-  // Legacy prototype path; removed in I4/I7 ("no browser secret remains in the new production path").
-  'src/vite-env.d.ts',
-  '.env.example',
-  'src/ai/orchestrator.ts',
-  'src/ai/geminiVoice.ts',
-  'src/ai/geminiLive.ts',
-  'src/components/SettingsModal.tsx',
-  'src/components/VoiceControl.tsx',
-]);
-const strict = process.argv.includes('--strict');
-const legacy = [];
 for (const file of [...walk(join(root, 'src')), join(root, '.env.example'), join(root, 'server', '.env.example')]) {
   let text;
   try {
@@ -94,17 +83,26 @@ for (const file of [...walk(join(root, 'src')), join(root, '.env.example'), join
   } catch {
     continue;
   }
-  if (secretish.test(text)) {
-    const rel = relative(root, file).split(sep).join('/');
-    (exempt.has(rel) && !strict ? legacy : violations).push(`${rel}: VITE_* secret variable`);
+  const rel = relative(root, file).split(sep).join('/');
+  if (secretish.test(text)) violations.push(`${rel}: VITE_* secret variable`);
+}
+
+// No direct AI-provider calls or SDKs in the browser (Gemini credentials and SDK usage stay server-side).
+const providerInBrowser = /generativelanguage\.googleapis\.com|@google\/genai|@google\/generative-ai/;
+for (const file of walk(join(root, 'src'))) {
+  if (providerInBrowser.test(readFileSync(file, 'utf8'))) {
+    violations.push(relative(root, file).split(sep).join('/') + ': direct AI provider access from the browser');
   }
 }
 
-if (legacy.length > 0) {
-  console.warn(`Known legacy browser-secret references (to be removed in I4/I7; run with --strict to fail):\n  ${legacy.join('\n  ')}`);
+// Never alias or spread the whole `import.meta.env` object: Vite would embed every VITE_* variable (including stale secrets).
+const wholeEnv = /import\.meta\.env(?![.\w])/;
+for (const file of walk(join(root, 'src'))) {
+  if (wholeEnv.test(readFileSync(file, 'utf8'))) violations.push(relative(root, file).split(sep).join('/') + ': uses the whole import.meta.env object (reference each VITE_ variable by name)');
 }
+
 if (violations.length > 0) {
-  console.error(`Boundary violations:\n  ${violations.join('\n  ')}`);
+  console.error(['Boundary violations:', ...violations.map((v) => `  ${v}`)].join('\n'));
   process.exit(1);
 }
 console.log('Boundary check passed.');

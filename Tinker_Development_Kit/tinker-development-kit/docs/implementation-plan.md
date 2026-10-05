@@ -71,16 +71,16 @@ Gate: acknowledged state survives API restart; an exact retry returns its origin
 
 ## I4 — Durable manual editor
 Read: Phase 3 sections 16/5; acceptance browser cases.
-- [ ] Add login/workspace/diagram loading flows using existing UI.
-- [ ] Map canonical graph and presentation into React Flow.
-- [ ] Route every structural UI action through the command client.
-- [ ] Serialize document writes per diagram, including drag-end saves and metadata writes.
-- [ ] Keep optimistic working state separate from acknowledged state and transport retries.
-- [ ] Use stable request keys for retries; reconcile full document responses.
-- [ ] Preserve draft and stop queued writes on conflict; expose reload/recovery behavior.
-- [ ] Implement explicit pending/saved/failed status and safe navigation behavior.
-- [ ] Import legacy diagrams once with UUID mapping and validation if existing data needs it.
-- [ ] Remove direct browser Gemini calls from the migrated production path.
+- [x] Add login/workspace/diagram loading flows using existing UI.
+- [x] Map canonical graph and presentation into React Flow.
+- [x] Route every structural UI action through the command client.
+- [x] Serialize document writes per diagram, including drag-end saves and metadata writes.
+- [x] Keep optimistic working state separate from acknowledged state and transport retries. (position drags are optimistic via an overlay; structural edits are confirm-then-apply, see decisions I4)
+- [x] Use stable request keys for retries; reconcile full document responses.
+- [x] Preserve draft and stop queued writes on conflict; expose reload/recovery behavior.
+- [x] Implement explicit pending/saved/failed status and safe navigation behavior.
+- [x] Import legacy diagrams once with UUID mapping and validation if existing data needs it. (N/A: the prototype persisted nothing; verified in I0)
+- [x] Remove direct browser Gemini calls from the migrated production path.
 Gate: sign in, create diagram, add/connect/insert/drag, refresh, and recover the same diagram. In a two-tab stale-write demo, no silent overwrite occurs. Manual editing works with AI disabled.
 This is the first durable working model. Do not wait for voice or a worker to demonstrate it.
 
