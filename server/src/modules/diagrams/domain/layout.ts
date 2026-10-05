@@ -32,11 +32,11 @@ function overlaps(a: Position, b: Position): boolean {
   );
 }
 
-// Candidate offsets around the wanted spot, nearest first. Ties prefer sideways over up/down, then up, then right (left-to-right flow). Built once.
+// Candidate offsets around the wanted spot, nearest first. Ties prefer sideways over up/down, then down, then right (left-to-right flow). Built once.
 const OFFSETS: ReadonlyArray<readonly [number, number]> = (() => {
   const list: Array<[number, number]> = [];
   for (let i = -3; i <= 3; i++) for (let j = -6; j <= 6; j++) list.push([i * (NODE_WIDTH + CLEARANCE), j * STEP]);
-  return list.sort((a, b) => a[0] ** 2 + a[1] ** 2 - (b[0] ** 2 + b[1] ** 2) || Math.abs(a[1]) - Math.abs(b[1]) || a[1] - b[1] || b[0] - a[0]);
+  return list.sort((a, b) => a[0] ** 2 + a[1] ** 2 - (b[0] ** 2 + b[1] ** 2) || Math.abs(a[1]) - Math.abs(b[1]) || b[1] - a[1] || b[0] - a[0]);
 })();
 
 /**
