@@ -51,5 +51,5 @@ errors returned in the address are shown in plain words and one-time parameters 
 ## Added after the first hand-over (2026-10-06)
 - **Sign-up with email verification replaces Google sign-in** (your decision): password rules checklist, "check your email" screen with resend, neutral answers (no account probing), optional Turnstile bot check, an API-side email-confirmed check (403 `EMAIL_NOT_VERIFIED`), and a strict Content-Security-Policy generated at build time (the built app loads under it with zero violations).
 - **People bring their own AI key** (your decision): production default `AI_KEY_MODE=user`; keys checked with Google, sealed with AES-256-GCM, bound to their owner, never returned or logged, removable, rotatable. Verified live with the real model (`npm run check:byok`).
-- **The `user_api_keys` table is applied to the local database only.** It must be applied to Supabase before BYOK works there (it needs your approval, as before).
+- **The `user_api_keys` table is applied to Supabase** (2026-10-06, with your approval) as well as locally: BYOK can work there. Email delivery: Resend chosen; waiting for the sending domain and the key to be entered in Supabase (B6).
 - **The Supabase certificate is verified** and the production-mode checks pass against Supabase.
