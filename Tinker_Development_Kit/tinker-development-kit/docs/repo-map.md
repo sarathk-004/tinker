@@ -41,6 +41,8 @@ Retrieval index: `graphify-out/` built from `6e0130d` on 2026-10-05 (333 nodes).
 | Prototype AI code (reference only) | `Tinker_Development_Kit/tinker-development-kit/legacy/prototype-ai/` | not compiled; input for I5/I7 |
 | AI: parser, prompt, plan executor, provider gateway, service | `server/src/modules/ai/{domain,application,providers,persistence}`, `server/src/infrastructure/http/concurrency-limiter.ts`, `shared/src/ai.ts` | I5 |
 | Read-only advice (ask) and graph analyzer | `server/src/modules/analysis/graph-analyzer.ts`, `server/src/modules/ai/application/{advice,advice-service,provider-call}.ts`, `src/ai/{aiCommands,questions}.ts` | I6 |
+| Voice: contract, gateway, session, routes | `shared/src/voice.ts`, `server/src/modules/voice/{live-gateway,gemini-live,fake-live,voice-session,routes}.ts` | I7 |
+| Browser voice (capture, client, UI) | `src/voice/{pcm,capture,voiceClient,voice}.ts`, mic button in `src/components/CommandBar.tsx` | I7 |
 | Browser typed commands and conversation | `src/ai/{aiCommands,conversationStore}.ts`, `src/components/CommandBar.tsx` | I5 |
 | Live Gemini smoke test | `server/scripts/check-gemini.ts` (`npm run check:gemini`) | needs GEMINI_API_KEY; not yet run |
 | Persistence, idempotency, identity, access | `server/src/infrastructure/{database,idempotency,auth}`, `server/src/modules/{identity,workspaces}`, `server/src/modules/diagrams/{application,persistence,http}`, `server/migrations/*.sql` | I3 |

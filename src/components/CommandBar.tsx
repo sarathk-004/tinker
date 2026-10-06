@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Command, Loader2, MessageCircleQuestion, Mic, Sparkles } from 'lucide-react';
+import { ArrowRight, Command, Loader2, MessageCircleQuestion, Mic, MicOff, Sparkles } from 'lucide-react';
 import { submitAiAsk, submitAiCommand } from '../ai/aiCommands';
 import { looksLikeQuestion } from '../ai/questions';
 import { useConversationStore } from '../ai/conversationStore';
 import { useDiagramStore } from '../diagram/store';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
+import { voice, useVoiceStore } from '../voice/voice';
 
 const EXAMPLES = ['Put Redis between Orders and PostgreSQL', 'Add an API Gateway', 'What happens if Orders goes down?'];
 
@@ -15,6 +16,12 @@ const EXAMPLES = ['Put Redis between Orders and PostgreSQL', 'Add an API Gateway
 export const CommandBar: React.FC = () => {
   const aiAvailable = useWorkspaceStore((s) => s.features.aiCommands);
   const modelAvailable = useWorkspaceStore((s) => s.features.aiModel);
+  const voiceAvailable = useWorkspaceStore((s) => s.features.voice);
+  const voiceStatus = useVoiceStore((s) => s.status);
+  const heard = useVoiceStore((s) => s.transcript);
+  const working = useVoiceStore((s) => s.working);
+  const voiceError = useVoiceStore((s) => s.error);
+  const voiceInfo = useVoiceStore((s) => s.info);
   const pending = useConversationStore((s) => s.pending);
   const draft = useConversationStore((s) => s.draft);
   const hasDiagram = useDiagramStore((s) => s.doc.diagram !== null);
@@ -58,6 +65,24 @@ export const CommandBar: React.FC = () => {
         </div>
       )}
 
+      {(voiceStatus !== 'idle' || voiceError || voiceInfo || working) && (
+        <div role="status" aria-live="polite" className={`px-3 py-1.5 rounded-md border text-[12px] bg-white ${voiceError ? 'border-[#cf2d56]/40 text-[#7a1530]' : 'border-[#e6e5e0] text-[#26251e]'}`}>
+          {voiceError ? (
+            voiceError
+          ) : working ? (
+            <span className="flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> Doing: {working}</span>
+          ) : voiceStatus === 'connecting' ? (
+            'Starting voice…'
+          ) : heard ? (
+            <span className="italic">{heard}</span>
+          ) : voiceStatus === 'listening' ? (
+            'Listening… say a command, or ask a question.'
+          ) : (
+            voiceInfo
+          )}
+        </div>
+      )}
+
       <form
         onSubmit={submit}
         aria-disabled={disabled}
@@ -93,8 +118,24 @@ export const CommandBar: React.FC = () => {
           aria-label="Command"
           className="flex-1 bg-transparent text-sm text-[#26251e] placeholder-[#807d72] focus:outline-none disabled:cursor-not-allowed font-sans"
         />
-        <button type="button" disabled title="Voice returns in a later update" className="p-1.5 rounded-md bg-[#fafaf7] border border-[#e6e5e0] text-[#a09c92] cursor-not-allowed">
-          <Mic className="w-4 h-4" />
+        <button
+          type="button"
+          onClick={() => void voice.toggle()}
+          disabled={!voiceAvailable || disabled}
+          aria-pressed={voiceStatus === 'listening'}
+          aria-label={voiceStatus === 'listening' ? 'Stop listening' : 'Start voice'}
+          title={!voiceAvailable ? 'Voice is not available on this server' : voiceStatus === 'listening' ? 'Listening. Click to stop.' : 'Speak a command or question'}
+          className={`p-1.5 rounded-md border transition-colors ${
+            voiceStatus === 'listening'
+              ? 'bg-[#f54e00] border-[#f54e00] text-white animate-pulse'
+              : voiceStatus === 'connecting'
+              ? 'bg-[#fafaf7] border-[#e6e5e0] text-[#807d72]'
+              : voiceAvailable && !disabled
+              ? 'bg-[#fafaf7] border-[#e6e5e0] text-[#26251e] hover:border-[#cfcdc4]'
+              : 'bg-[#fafaf7] border-[#e6e5e0] text-[#a09c92] cursor-not-allowed'
+          }`}
+        >
+          {voiceStatus === 'connecting' ? <Loader2 className="w-4 h-4 animate-spin" /> : voiceAvailable ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
         </button>
         <button
           type="submit"

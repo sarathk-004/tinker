@@ -109,13 +109,13 @@ Gate: “What happens if Orders goes down?” explains the computed dependencies
 
 ## I7 — Voice integration
 Read: D08 and current provider/browser audio documentation.
-- [ ] Define authenticated WebSocket lifecycle, origin checks, token refresh and session ownership.
-- [ ] Define transcript/proposal/event schemas and browser capture format.
-- [ ] Keep partial transcripts provisional; only explicit finalized tool events propose commands.
-- [ ] Capture version and stable operation IDs; route to the existing handler.
-- [ ] Apply quotas, bounded buffers, cancellation and session cleanup.
-- [ ] Reconnect without replaying committed commands; verify duplicate tool events.
-- [ ] Remove provider credentials from client voice configuration.
+- [x] Define authenticated WebSocket lifecycle, origin checks, token refresh and session ownership.
+- [x] Define transcript/proposal/event schemas and browser capture format.
+- [x] Keep partial transcripts provisional; only explicit finalized tool events propose commands.
+- [x] Capture version and stable operation IDs; route to the existing handler.
+- [x] Apply quotas, bounded buffers, cancellation and session cleanup.
+- [x] Reconnect without replaying committed commands; verify duplicate tool events.
+- [x] Remove provider credentials from client voice configuration.
 Gate: spoken insertion works; duplicate events apply once; permission revocation/reconnect is handled; losing voice connection does not break manual editing.
 Typed-command completion does not imply voice readiness.
 

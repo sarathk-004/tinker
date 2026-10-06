@@ -8,6 +8,8 @@ import { createPool, type Pool } from '../../src/infrastructure/database/pool.ts
 import type { TestHooks } from '../../src/infrastructure/idempotency/mutation-requests.ts';
 import type { RateLimiter } from '../../src/infrastructure/http/rate-limiter.ts';
 import type { InterpretationProvider } from '../../src/modules/ai/providers/types.ts';
+import type { LiveGateway } from '../../src/modules/voice/live-gateway.ts';
+import type { VoiceSessionLimits } from '../../src/modules/voice/voice-session.ts';
 
 export interface Harness {
   app: FastifyInstance;
@@ -29,6 +31,8 @@ export interface HarnessOptions {
   rateLimiter?: RateLimiter;
   aiProvider?: InterpretationProvider;
   aiRateLimiter?: RateLimiter;
+  liveGateway?: LiveGateway;
+  voiceLimits?: Partial<VoiceSessionLimits>;
   env?: Record<string, string>;
   /** Share an existing pool/signer (simulates an API restart against the same database). */
   pool?: Pool;
@@ -48,6 +52,8 @@ export async function startHarness(options: HarnessOptions = {}): Promise<Harnes
     ...(options.rateLimiter ? { rateLimiter: options.rateLimiter } : {}),
     ...(options.aiProvider ? { aiProvider: options.aiProvider } : {}),
     ...(options.aiRateLimiter ? { aiRateLimiter: options.aiRateLimiter } : {}),
+    ...(options.liveGateway ? { liveGateway: options.liveGateway } : {}),
+    ...(options.voiceLimits ? { voiceLimits: options.voiceLimits } : {}),
   });
   return {
     app,

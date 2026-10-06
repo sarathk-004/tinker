@@ -15,11 +15,15 @@
     "db:migrate:down": "node-pg-migrate -m migrations down",
     "db:migrate:create": "node-pg-migrate -m migrations create",
     "check:gemini": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.supabase.local scripts/check-gemini.ts",
+    "check:voice": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.supabase.local scripts/check-voice.ts",
+    "check:voice:api": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.supabase.local scripts/check-voice-api.ts",
+    "probe:live": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.supabase.local scripts/probe-live.ts",
     "diagnose:gemini": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.supabase.local scripts/diagnose-gemini.ts"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.8",
     "@fastify/cors": "^11.0.0",
+    "@fastify/websocket": "^11.3.3",
     "@tinker/shared": "*",
     "fastify": "^5.12.5",
     "jose": "^6.2.12",
@@ -31,6 +35,8 @@
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/pg": "^8.23.1",
-    "embedded-postgres": "^18.4.0-beta.17"
+    "@types/ws": "^8.18.2",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "ws": "^8.22.0"
   }
 }

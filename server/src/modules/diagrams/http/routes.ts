@@ -43,6 +43,8 @@ export interface ApiDeps {
   hooks?: TestHooks;
   /** AI gateway, limits and deadline. Always present; `ai.provider.available` says whether a model is configured. */
   ai: AiRuntime;
+  /** A voice gateway is configured (shown to the browser through /v1/me). */
+  voiceAvailable?: boolean;
 }
 
 const diagramParams = z.object({ diagramId: uuidSchema });
@@ -93,7 +95,7 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
       return {
         user: { id: auth.userId, email: auth.email, displayName: auth.displayName },
         workspaces: await listWorkspaces(pool, auth.userId),
-        features: { aiCommands: true, aiModel: deps.ai.provider.available },
+        features: { aiCommands: true, aiModel: deps.ai.provider.available, voice: deps.voiceAvailable ?? false },
       };
     });
 

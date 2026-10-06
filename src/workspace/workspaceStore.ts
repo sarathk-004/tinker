@@ -4,6 +4,7 @@ import { ApiError } from '../api/client';
 import { api, session } from '../document/instance';
 import { useConversationStore } from '../ai/conversationStore';
 import { syncConversation } from '../ai/aiCommands';
+import { voice } from '../voice/voice';
 
 const lastKey = (userId: string) => `tinker_last_diagram:${userId}`;
 const remember = (userId: string | undefined, diagramId: string | null) => {
@@ -60,7 +61,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     user: null,
     workspace: null,
     diagrams: [],
-    features: { aiCommands: false, aiModel: false },
+    features: { aiCommands: false, aiModel: false, voice: false },
 
     async bootstrap() {
       set({ phase: 'loading', error: null });
@@ -91,6 +92,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     async openDiagram(id) {
       if (session.getState().diagram?.id === id) return;
       if (session.getState().diagram && !(await settleBeforeLeaving())) return;
+      voice.dispose(); // a voice session belongs to one diagram
       await session.open(id);
       remember(get().user?.id, id);
       void syncConversation(id);
@@ -101,6 +103,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       const ws = get().workspace;
       if (!ws) return;
       if (session.getState().diagram && !(await settleBeforeLeaving())) return;
+      voice.dispose();
       const created = await api.createDiagram(ws.id, name, crypto.randomUUID());
       session.adopt(created.data);
       remember(get().user?.id, created.data.diagramId);
@@ -128,6 +131,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         }
         throw e;
       }
+      voice.dispose();
       session.close();
       remember(get().user?.id, null);
       await get().refreshList();
@@ -137,9 +141,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     },
 
     reset() {
+      voice.dispose();
       session.close();
       useConversationStore.getState().reset();
-      set({ phase: 'idle', error: null, user: null, workspace: null, diagrams: [], features: { aiCommands: false, aiModel: false } });
+      set({ phase: 'idle', error: null, user: null, workspace: null, diagrams: [], features: { aiCommands: false, aiModel: false, voice: false } });
     },
   };
 });

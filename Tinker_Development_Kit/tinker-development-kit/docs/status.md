@@ -1,10 +1,24 @@
 # Development status
 
 Updated: 2026-10-06
-Active milestone: I6 implemented on branch `implementation-6` (stack: main <- implementation-1 <- ... <- 5 <- 6). Branches 1-5 are pushed; implementation-6 is committed locally and NOT pushed. Next: I7 (voice). Reminder for I9: add "Continue with Google" sign-in (LC19).
+Active milestone: I7 implemented on branch `implementation-7` (stack: main <- implementation-1 <- ... <- 6 <- 7). Branches 1-6 are pushed; implementation-7 is committed locally and NOT pushed. Next: I8 (history, restore, maintenance). Reminder for I9: add "Continue with Google" sign-in (LC19). Still needs YOU: try the microphone in your own Chrome (LC30); the built-in browser blocks it.
 
 ## See it locally
 Terminals: `npm run dev:db -w @tinker/server`, then `npm run dev:api:supabase` (your Supabase project) or `npm run dev:api` (local dev login), then `npm run dev`; open http://localhost:5173/ and type in the command bar. Plain commands work with no key. For free-form requests put `GEMINI_API_KEY=...` in `server/.env` (or `server/.env.supabase.local`), restart the API, and run `npm run check:gemini` first (LC22).
+
+## I7 completion record (verified 2026-10-06)
+| Task | Where | Evidence |
+|---|---|---|
+| Authenticated WebSocket lifecycle, origin check, token refresh, session ownership | `modules/voice/{routes,voice-session}.ts`, `shared/src/voice.ts` | Origin must be allowed (403 otherwise); token only in the first `hello` message (never the URL); bad/expired credentials 4401, strangers 4404, someone else's token in `auth` 4401; `auth` refreshes before expiry; one session per user (a newer one replaces the older, 4409); server-wide cap |
+| Transcript/proposal/event schemas, capture format | `shared/src/voice.ts` (every server message is validated in tests), `src/voice/{pcm,capture}.ts` | 16 kHz mono Int16 PCM in 100 ms frames; AudioWorklet capture; encoder tests |
+| Partials provisional; only an explicit tool call proposes | `gemini-live.ts`, `voice-session.ts` | partial transcripts change nothing (DB asserted); two tools only: `edit_diagram(request)` and `ask_about_diagram(question)`; unknown tools, wrong args and over-long text are refused |
+| Version + stable operation ids; route to the existing handler | `voice-session.ts` | each proposal goes through `executeAiCommand` / `askAdvice` (same idempotency, version check, atomic commit) with the client-reported version; stale version => DIAGRAM_VERSION_CONFLICT and nothing changes; idempotency key derived from session + tool call id |
+| Quotas, bounded buffers, cancellation, cleanup | `voice-session.ts` | chunk size, sustained audio rate, provider backpressure (drop, then close), max duration, idle timeout, hello timeout, max 3 pending proposals, `cancel`, timers and the model session released on every exit path |
+| Reconnect without replay; duplicate tool events | `voice-session.ts`, `voiceClient.ts` | the same tool call id (also while the first runs, and after) applies once; a reconnect is a NEW session so nothing old is replayed; the browser re-syncs the diagram and conversation from the server before each start |
+| No provider credentials in client voice configuration | `src/voice/*`, `gemini-live.ts` | the browser never sees a key or a model URL; the key is only in the server's outbound URL and is scrubbed from errors (test); built bundle contains no key |
+Gate: spoken insertion works (fake provider in tests; LIVE with the real model and database: `npm run check:voice` and `npm run check:voice:api` => "Put Redis between Orders and PostgreSQL" spoken by a text-to-speech voice produced one new version with Redis between them; a spoken question changed nothing); duplicate events apply once; revoking access closes the session (4404) and a downgrade to viewer refuses edits but allows questions; losing the model or the connection leaves manual editing untouched and voice can simply be started again.
+Commands: `npm run typecheck` PASS; `npm test` PASS (shared 17, server 284, frontend 78); `npm run check:boundaries` PASS; `npm run build` PASS.
+Not verified here: a real microphone in a browser (the built-in browser pane blocks it) - see LC30.
 
 ## I6 completion record (verified 2026-10-06)
 | Task | Where | Evidence |
@@ -46,8 +60,8 @@ Live (built-in browser, real API + Postgres, no Gemini key): typed "add Orders",
 ## Earlier milestones (details in git history, decisions.md and later-checks.md)
 I1 contracts/API foundation; I2 pure engine; I3 persistence, identity, authorization, idempotency, RLS, Supabase verified; I4 durable editor (sign-in, serialized idempotent writes, conflict drafts, browser Gemini code removed).
 
-## Next action (I7)
-Voice: realtime voice session that converges on the same command path (typed commands already do). Read the Phase 3 voice notes first; the wire contract is unspecified there (decision needed). Before I7, decide whether `ask` should also be reachable by voice.
+## Next action (I8)
+History, restore and maintenance: list revisions, restore as a new version (RESTORE revision, expectedVersion, idempotency), revision pruning (D11), soft-delete recovery. This is also where undo/redo (LC14) belongs. Read implementation-plan.md I8 first.
 
 ## Handoff template
 - Active task / milestone:

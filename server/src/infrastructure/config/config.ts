@@ -43,6 +43,11 @@ const envSchema = z
     GEMINI_MODEL: z.string().min(1).default('gemini-3.5-flash-lite'),
     /** `off` omits the setting. `minimal` is rejected by some models (it was by gemini-3.8-flash). */
     GEMINI_THINKING_LEVEL: z.enum(['off', 'minimal', 'low', 'medium', 'high']).default('low'),
+    /** Gemini Live model used for voice (verified against the real endpoint on 2026-10-06). */
+    GEMINI_LIVE_MODEL: z.string().min(1).default('gemini-3.8-live'),
+    /** Voice sessions: server-wide cap, and the longest one session may last (the provider's own limit is about 10 minutes). */
+    VOICE_MAX_SESSIONS: z.coerce.number().int().min(1).max(10_000).default(20),
+    VOICE_MAX_SESSION_MS: z.coerce.number().int().min(10_000).max(900_000).default(600_000),
     /** Total wall-clock budget for interpreting one AI request, including every provider retry (decision D07). */
     AI_DEADLINE_MS: z.coerce.number().int().min(500).max(60_000).default(15_000),
     AI_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(10_000).default(10),
@@ -83,10 +88,12 @@ export interface Config {
     apiKey: string | undefined;
     model: string;
     thinkingLevel: 'off' | 'minimal' | 'low' | 'medium' | 'high';
+    liveModel: string;
     deadlineMs: number;
     ratePerMinute: number;
     maxConcurrent: number;
   };
+  voice: { maxSessions: number; maxSessionMs: number };
 }
 
 export class ConfigError extends Error {
@@ -134,9 +141,11 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       apiKey: e.GEMINI_API_KEY,
       model: e.GEMINI_MODEL,
       thinkingLevel: e.GEMINI_THINKING_LEVEL,
+      liveModel: e.GEMINI_LIVE_MODEL,
       deadlineMs: e.AI_DEADLINE_MS,
       ratePerMinute: e.AI_RATE_LIMIT_PER_MINUTE,
       maxConcurrent: e.AI_MAX_CONCURRENT,
     },
+    voice: { maxSessions: e.VOICE_MAX_SESSIONS, maxSessionMs: e.VOICE_MAX_SESSION_MS },
   };
 }

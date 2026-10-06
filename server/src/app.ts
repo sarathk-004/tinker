@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { LIMITS, type HealthResponse } from '@tinker/shared';
 import type { Config } from './infrastructure/config/config.ts';
-import { createJwtAuthenticator, rejectAllAuthenticator, type Authenticator } from './infrastructure/auth/authenticator.ts';
+import { createJwtAuthenticator, createTokenAuthenticator, rejectAllAuthenticator, type Authenticator } from './infrastructure/auth/authenticator.ts';
 import type { LocalSigner, TokenVerifier } from './infrastructure/auth/verifier.ts';
 import type { Pool } from './infrastructure/database/pool.ts';
 import { createConcurrencyLimiter } from './infrastructure/http/concurrency-limiter.ts';
@@ -16,6 +16,10 @@ import { registerDevAuthRoutes } from './modules/identity/dev-auth-routes.ts';
 import { AppError, toErrorResponse } from './infrastructure/http/errors.ts';
 import { registerDevEngineRoutes } from './modules/diagrams/http/dev-routes.ts';
 import { registerApiRoutes } from './modules/diagrams/http/routes.ts';
+import { createGeminiLiveGateway } from './modules/voice/gemini-live.ts';
+import { disabledLiveGateway, type LiveGateway } from './modules/voice/live-gateway.ts';
+import { registerVoiceRoutes } from './modules/voice/routes.ts';
+import type { VoiceSessionLimits } from './modules/voice/voice-session.ts';
 
 export interface BuildAppOptions {
   config: Config;
@@ -30,6 +34,10 @@ export interface BuildAppOptions {
   rateLimiter?: RateLimiter;
   /** Override the AI provider (tests inject a deterministic fake). Defaults to Gemini when GEMINI_API_KEY is set, else disabled. */
   aiProvider?: InterpretationProvider;
+  /** Override the realtime voice gateway (tests inject a scripted fake). Defaults to Gemini Live when GEMINI_API_KEY is set. */
+  liveGateway?: LiveGateway;
+  /** Tests: shorter timers and smaller quotas for voice sessions. */
+  voiceLimits?: Partial<VoiceSessionLimits>;
   /** Override the AI rate limiter (tests). */
   aiRateLimiter?: RateLimiter;
   /** Test-only: fault injection into the commit path and a short lease. */
@@ -120,17 +128,33 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   const authenticate =
     options.authenticate ??
     (options.pool && options.verifier ? createJwtAuthenticator(options.pool, options.verifier) : rejectAllAuthenticator);
+  const ai = {
+    provider: options.aiProvider ?? (config.ai.apiKey ? createGeminiProvider({ apiKey: config.ai.apiKey, model: config.ai.model, thinkingLevel: config.ai.thinkingLevel }) : disabledProvider),
+    deadlineMs: config.ai.deadlineMs,
+    model: config.ai.model,
+    limiter: options.aiRateLimiter ?? createRateLimiter({ limit: config.ai.ratePerMinute }),
+    concurrency: createConcurrencyLimiter({ max: config.ai.maxConcurrent }),
+  };
+  const live = options.liveGateway ?? (config.ai.apiKey ? createGeminiLiveGateway({ apiKey: config.ai.apiKey, model: config.ai.liveModel }) : disabledLiveGateway);
+  const rateLimiter = options.rateLimiter ?? createRateLimiter({ limit: config.rateLimitPerMinute });
   await registerApiRoutes(app, {
     ...(options.pool ? { pool: options.pool } : {}),
     authenticate,
-    rateLimiter: options.rateLimiter ?? createRateLimiter({ limit: config.rateLimitPerMinute }),
-    ai: {
-      provider: options.aiProvider ?? (config.ai.apiKey ? createGeminiProvider({ apiKey: config.ai.apiKey, model: config.ai.model, thinkingLevel: config.ai.thinkingLevel }) : disabledProvider),
-      deadlineMs: config.ai.deadlineMs,
-      model: config.ai.model,
-      limiter: options.aiRateLimiter ?? createRateLimiter({ limit: config.ai.ratePerMinute }),
-      concurrency: createConcurrencyLimiter({ max: config.ai.maxConcurrent }),
-    },
+    rateLimiter,
+    ai,
+    voiceAvailable: live.available,
+    ...(options.hooks ? { hooks: options.hooks } : {}),
+  });
+
+  await registerVoiceRoutes(app, {
+    pool: options.pool,
+    authenticate: options.pool && options.verifier ? createTokenAuthenticator(options.pool, options.verifier) : undefined,
+    ai,
+    live,
+    rateLimiter,
+    corsOrigins: config.corsOrigins,
+    maxSessions: config.voice.maxSessions,
+    limits: { maxSessionMs: config.voice.maxSessionMs, ...options.voiceLimits },
     ...(options.hooks ? { hooks: options.hooks } : {}),
   });
 
