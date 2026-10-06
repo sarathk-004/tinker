@@ -22,6 +22,16 @@ export async function recentTurns(db: Queryable, conversationId: string, limit: 
   return rows.reverse();
 }
 
+/** The text of an ASSISTANT message, only when it sits in the caller's own conversation for this diagram. */
+export async function assistantMessageText(db: Queryable, messageId: string, diagramId: string, userId: string): Promise<string | null> {
+  const { rows } = await db.query<{ content: string }>(
+    `SELECT m.content FROM conversation_messages m JOIN conversations c ON c.id = m.conversation_id
+      WHERE m.id = $1 AND m.role = 'ASSISTANT' AND c.diagram_id = $2 AND c.user_id = $3`,
+    [messageId, diagramId, userId],
+  );
+  return rows[0]?.content ?? null;
+}
+
 interface NewMessage {
   role: 'USER' | 'ASSISTANT';
   content: string;

@@ -79,6 +79,8 @@ export class VoiceClient {
   private mic: MicCapture | undefined;
   private active = false; // a session is being set up or running
   private audioOpen = false;
+  /** True while a reply is being spoken: the microphone is not streamed so the assistant cannot hear itself. */
+  private paused = false;
   private pendingOps = 0;
   private lastToken: string | null = null;
   private diagramId: string | undefined;
@@ -135,6 +137,11 @@ export class VoiceClient {
     }
   }
 
+  /** Hold the microphone back while a spoken reply plays (and release it afterwards). */
+  pauseAudio(paused: boolean): void {
+    this.paused = paused;
+  }
+
   /** The user stopped. Pending requests are allowed to finish; then the connection is released. */
   stop(): void {
     if (!this.active) return;
@@ -161,7 +168,7 @@ export class VoiceClient {
   }
 
   private sendFrame(frame: Uint8Array): void {
-    if (!this.audioOpen || this.socket?.readyState !== OPEN) return;
+    if (!this.audioOpen || this.paused || this.socket?.readyState !== OPEN) return;
     if (this.socket.bufferedAmount > MAX_BUFFERED) return; // a slow link: drop audio rather than lag behind
     this.socket.send(frame);
   }
@@ -237,6 +244,7 @@ export class VoiceClient {
     this.generation += 1; // anything still in flight for the old session (an open microphone prompt, a late message) is ignored
     this.active = false;
     this.audioOpen = false;
+    this.paused = false;
     this.pendingOps = 0;
     clearInterval(this.refreshTimer);
     clearTimeout(this.finishTimer);

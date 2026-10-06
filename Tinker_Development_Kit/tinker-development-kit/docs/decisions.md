@@ -118,4 +118,12 @@ Date for all records below: 2026-10-05 (I0). "User" = explicit answer in chat; "
 - Binding: the browser reports the diagram version it has on screen (`context`); a proposal commits only against that version (stale => conflict, nothing applied). Each proposal has a stable operation id and an idempotency key derived from the session and the tool call id; a repeated tool call id is ignored.
 - Limits (D10): one session per user (newer replaces older), 20 sessions server-wide, 10 min per session, 45 s of silence, sustained audio 64 KB/s, provider backpressure drop-then-close, 3 pending proposals; proposals share the AI rate limit (10/min) and concurrency cap.
 - Failure behaviour: permission is re-read on every proposal and every 15 s (removed => close 4404; viewer => edits refused, questions allowed); an expired token closes with 4401 unless refreshed with `auth`; if the model connection drops the session stays up, says so, and `start` can be repeated; nothing about voice can block typing or manual editing. Reconnecting never replays committed commands: a new session has new ids, and the browser re-syncs the diagram and conversation from the server first.
-- Not built (deliberately): speaking answers back (text only), provider session resumption, per-user cost metrics (LC31), multi-instance session registry (LC32).
+- Spoken replies (added the same day): see the next section. Not built (deliberately): provider session resumption, per-user cost metrics (LC31), multi-instance session registry (LC32).
+
+## I7 spoken replies (2026-10-06)
+- The assistant's reply to a SPOKEN request (answer, question back, or edit confirmation) is read aloud; typed requests stay silent.
+- Two voices, user's choice, remembered in the browser: Gemini (natural, uses Gemini speech quota) and the browser's built-in voice (free, more robotic), plus Off. Default is Gemini when the server reports `features.speech`, otherwise the browser voice. If Gemini fails (quota, outage, timeout) that reply is read with the browser voice instead.
+- Server: `POST /v1/diagrams/{id}/ai/speak {messageId}`; view access; only the caller's own ASSISTANT messages; no free text; text cleaned and cut to about 220 characters at a sentence; models tried in order (`GEMINI_TTS_MODEL`, default `gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts`; the older preview speech models allowed only ~10 requests a day on this key); covered by the AI concurrency cap and the ordinary request limit.
+- While a reply plays the browser stops streaming the microphone (plus 0.4 s) so the assistant does not hear itself; starting to speak again stops playback.
+- Echo guard for tool calls: same-kind request with at least 70% the same words within 10 s is the same request (a failed one may be repeated).
+

@@ -91,6 +91,16 @@ interface Proposal {
 }
 
 const MAX_SEEN = 500;
+/** Two requests of the same kind this close in words, this close in time, are one request spoken once. */
+const ECHO_WINDOW_MS = 10_000;
+const ECHO_SIMILARITY = 0.7;
+const wordSet = (text: string): Set<string> => new Set(text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
+function similarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let shared = 0;
+  for (const w of a) if (b.has(w)) shared += 1;
+  return shared / (a.size + b.size - shared);
+}
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
 /**
@@ -119,6 +129,7 @@ export class VoiceSession {
   private listening = false;
   private stopping = false;
   private readonly seen = new Set<string>();
+  private readonly recent: Array<{ callId: string; at: number; kind: 'EDIT' | 'ASK'; words: Set<string> }> = [];
   private readonly queue: Proposal[] = [];
   private running = false;
   private counter = 0;
@@ -129,7 +140,7 @@ export class VoiceSession {
   private budget: number;
   private budgetAt: number;
   private newCounted = true;
-  private stats = { audioBytes: 0, droppedFrames: 0, proposals: 0, applied: 0 };
+  private stats = { audioBytes: 0, droppedFrames: 0, proposals: 0, applied: 0, echoes: 0 };
 
   constructor(
     private readonly deps: VoiceDeps,
@@ -363,14 +374,29 @@ export class VoiceSession {
         this.reject(call, operationId, call.name === LIVE_TOOLS.ask ? 'ASK' : 'EDIT', 'INVALID_REQUEST', 'The request could not be understood.');
         continue;
       }
+      // Live finding (2026-10-06): the model sometimes calls the tool twice, with different ids, for ONE utterance. A request that
+      // says nearly the same thing as one made moments ago is the same request, not a new one.
+      if (this.isEcho(proposal)) {
+        this.stats.echoes += 1;
+        this.live?.respondToTools([{ id: call.id, name: call.name, result: 'Already handled.' }]);
+        continue;
+      }
       if (this.queue.length + (this.running ? 1 : 0) >= this.deps.limits.maxPendingProposals) {
         this.reject(call, operationId, proposal.kind, 'RATE_LIMITED', 'Too many requests at once. Please wait a moment.');
         continue;
       }
       this.stats.proposals += 1;
+      this.recent.push({ callId: call.id, at: this.now(), kind: proposal.kind, words: wordSet(proposal.text) });
+      if (this.recent.length > 8) this.recent.shift();
       this.queue.push(proposal);
     }
     void this.drain();
+  }
+
+  private isEcho(proposal: Proposal): boolean {
+    const words = wordSet(proposal.text);
+    const t = this.now();
+    return this.recent.some((r) => r.kind === proposal.kind && t - r.at <= ECHO_WINDOW_MS && similarity(r.words, words) >= ECHO_SIMILARITY);
   }
 
   private onToolCancelled(ids: string[]): void {
@@ -452,6 +478,11 @@ export class VoiceSession {
         this.sendResult(result);
         return this.close('NOT_FOUND', 'This diagram is no longer available to you.');
       }
+    }
+    // A request that failed may be said again (for instance after a version conflict): it is not an echo.
+    if (result.status === 'ERROR') {
+      const index = this.recent.findIndex((r) => r.callId === proposal.callId);
+      if (index >= 0) this.recent.splice(index, 1);
     }
     this.sendResult(result);
     this.live?.respondToTools([{ id: proposal.callId, name: proposal.kind === 'EDIT' ? LIVE_TOOLS.edit : LIVE_TOOLS.ask, result: summary }]);

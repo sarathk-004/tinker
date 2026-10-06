@@ -11,6 +11,7 @@ import { getDiagramRow, insertPlanExecution, insertRevision, lockDiagramRow, upd
 import { buildAliases, executePlan, type PlanStep } from '../domain/plan.ts';
 import { appendMessages, conversationBelongsTo, createConversation, latestConversation, recentTurns } from '../persistence/conversations.ts';
 import { ProviderError, type InterpretationProvider } from '../providers/types.ts';
+import type { SpeechProvider } from '../../voice/speech-provider.ts';
 import { interpretRequest, type AiSource } from './interpret.ts';
 
 export interface AiRuntime {
@@ -19,6 +20,8 @@ export interface AiRuntime {
   deadlineMs: number;
   /** Model name, for latency metrics only. */
   model?: string;
+  /** Reads assistant messages aloud (the browser falls back to its own voice when this is unavailable). */
+  speech: SpeechProvider;
   /** Per-user AI requests per minute (D10, single instance). */
   limiter: RateLimiter;
   /** Per-user simultaneous AI requests (D10, single instance). */

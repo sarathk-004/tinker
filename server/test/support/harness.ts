@@ -9,6 +9,7 @@ import type { TestHooks } from '../../src/infrastructure/idempotency/mutation-re
 import type { RateLimiter } from '../../src/infrastructure/http/rate-limiter.ts';
 import type { InterpretationProvider } from '../../src/modules/ai/providers/types.ts';
 import type { LiveGateway } from '../../src/modules/voice/live-gateway.ts';
+import type { SpeechProvider } from '../../src/modules/voice/speech-provider.ts';
 import type { VoiceSessionLimits } from '../../src/modules/voice/voice-session.ts';
 
 export interface Harness {
@@ -32,6 +33,7 @@ export interface HarnessOptions {
   aiProvider?: InterpretationProvider;
   aiRateLimiter?: RateLimiter;
   liveGateway?: LiveGateway;
+  speechProvider?: SpeechProvider;
   voiceLimits?: Partial<VoiceSessionLimits>;
   env?: Record<string, string>;
   /** Share an existing pool/signer (simulates an API restart against the same database). */
@@ -53,6 +55,7 @@ export async function startHarness(options: HarnessOptions = {}): Promise<Harnes
     ...(options.aiProvider ? { aiProvider: options.aiProvider } : {}),
     ...(options.aiRateLimiter ? { aiRateLimiter: options.aiRateLimiter } : {}),
     ...(options.liveGateway ? { liveGateway: options.liveGateway } : {}),
+    ...(options.speechProvider ? { speechProvider: options.speechProvider } : {}),
     ...(options.voiceLimits ? { voiceLimits: options.voiceLimits } : {}),
   });
   return {

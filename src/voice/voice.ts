@@ -4,8 +4,9 @@ import { describeAiError, showOnDiagram, syncConversation } from '../ai/aiComman
 import { useConversationStore } from '../ai/conversationStore';
 import { authSource } from '../auth/auth';
 import { config } from '../config';
-import { session } from '../document/instance';
+import { api, session } from '../document/instance';
 import { startMicrophone } from './capture';
+import { speakReply, stopSpeaking, useSpeechSettings } from './speech';
 import { VoiceClient, initialVoiceView, type SocketLike, type VoiceView } from './voiceClient';
 
 export const useVoiceStore = create<VoiceView>(() => ({ ...initialVoiceView }));
@@ -35,7 +36,30 @@ function applyResult(result: VoiceResult, diagramId: string): void {
     await session.refreshIfIdle().catch(() => false);
     await syncConversation(diagramId);
     if (result.kind === 'ASK' && session.getState().diagram?.id === diagramId) showOnDiagram(result.response.analysis.affectedNodeIds);
+    await readAloud(result.response.messages, diagramId);
   })();
+}
+
+/**
+ * Read the assistant's reply to a spoken request aloud (answers, questions back, confirmations). The microphone is held back
+ * while it plays so the assistant cannot hear itself.
+ */
+async function readAloud(messages: ReadonlyArray<{ id: string; role: string; content: string }>, diagramId: string): Promise<void> {
+  const reply = [...messages].reverse().find((m) => m.role === 'ASSISTANT');
+  if (!reply) return;
+  voice.pauseAudio(true);
+  try {
+    await speakReply({
+      text: reply.content,
+      serverCanSpeak: useSpeechSettings.getState().serverCanSpeak,
+      fetchAudio: async () => {
+        const { audio, sampleRate } = await api.speak(diagramId, reply.id);
+        return { audio, sampleRate };
+      },
+    });
+  } finally {
+    setTimeout(() => voice.pauseAudio(false), 400); // let the room echo of the last words die away before listening again
+  }
 }
 
 export const voice = new VoiceClient({
@@ -64,5 +88,8 @@ export const voice = new VoiceClient({
     if (id) await syncConversation(id);
   },
   onResult: applyResult,
-  update: (patch) => useVoiceStore.setState(patch),
+  update: (patch) => {
+    if (patch.working) stopSpeaking(); // the user spoke again: stop talking over them
+    useVoiceStore.setState(patch);
+  },
 });

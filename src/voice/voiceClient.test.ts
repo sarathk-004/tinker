@@ -123,6 +123,17 @@ describe('voice client', () => {
     expect(h.view().status).toBe('listening');
   });
 
+  it('holds the microphone back while a reply is spoken (the assistant must not hear itself), then resumes', async () => {
+    const h = setup();
+    await listening(h);
+    h.client.pauseAudio(true);
+    h.frame(new Uint8Array(3200));
+    expect(h.socket.frames()).toHaveLength(0);
+    h.client.pauseAudio(false);
+    h.frame(new Uint8Array(3200));
+    expect(h.socket.frames()).toHaveLength(1);
+  });
+
   it('stop releases the microphone at once, finishes pending work, then closes', async () => {
     const h = setup();
     await listening(h);

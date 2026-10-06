@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Command, Loader2, MessageCircleQuestion, Mic, MicOff, Sparkles } from 'lucide-react';
+import { ArrowRight, Check, Command, Loader2, MessageCircleQuestion, Mic, MicOff, Sparkles, Volume2, VolumeX } from 'lucide-react';
 import { submitAiAsk, submitAiCommand } from '../ai/aiCommands';
 import { looksLikeQuestion } from '../ai/questions';
 import { useConversationStore } from '../ai/conversationStore';
 import { useDiagramStore } from '../diagram/store';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { voice, useVoiceStore } from '../voice/voice';
+import { effectiveVoice, stopSpeaking, useSpeechSettings, type ReplyVoice } from '../voice/speech';
 
 const EXAMPLES = ['Put Redis between Orders and PostgreSQL', 'Add an API Gateway', 'What happens if Orders goes down?'];
 
@@ -28,6 +29,11 @@ export const CommandBar: React.FC = () => {
   const blocked = useDiagramStore((s) => s.doc.status === 'conflict' || s.doc.status === 'blocked');
   const [input, setInput] = useState('');
   const [askMode, setAskMode] = useState(false);
+  const [voiceMenu, setVoiceMenu] = useState(false);
+  const savedVoice = useSpeechSettings((s) => s.saved);
+  const speaking = useSpeechSettings((s) => s.speaking);
+  const serverCanSpeak = useSpeechSettings((s) => s.serverCanSpeak);
+  const replyVoice = effectiveVoice(savedVoice, serverCanSpeak);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Suggestion chips in the conversation fill the bar; the user decides whether to send.
@@ -137,6 +143,50 @@ export const CommandBar: React.FC = () => {
         >
           {voiceStatus === 'connecting' ? <Loader2 className="w-4 h-4 animate-spin" /> : voiceAvailable ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
         </button>
+        {voiceAvailable && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setVoiceMenu((open) => !open)}
+              aria-haspopup="menu"
+              aria-expanded={voiceMenu}
+              aria-label="Spoken replies"
+              title={`Spoken replies: ${replyVoice === 'gemini' ? 'Gemini voice' : replyVoice === 'browser' ? 'browser voice' : 'off'}`}
+              className={`p-1.5 rounded-md border transition-colors ${speaking ? 'bg-[#26251e] border-[#26251e] text-white' : 'bg-[#fafaf7] border-[#e6e5e0] text-[#26251e] hover:border-[#cfcdc4]'}`}
+            >
+              {replyVoice === 'off' ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
+            {voiceMenu && (
+              <div role="menu" className="absolute bottom-full right-0 mb-2 w-64 rounded-md border border-[#e6e5e0] bg-white shadow-lg p-1 text-[12px] text-[#26251e] z-40">
+                <div className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-[#807d72]">Read replies aloud</div>
+                {([
+                  ['gemini', 'Gemini voice', 'Natural voice. Uses your Gemini quota.', serverCanSpeak],
+                  ['browser', 'Browser voice', 'Free, built into your browser. More robotic.', true],
+                  ['off', 'Off', 'Replies stay text only.', true],
+                ] as Array<[ReplyVoice, string, string, boolean]>).map(([value, label, hint, enabled]) => (
+                  <button
+                    key={value}
+                    role="menuitemradio"
+                    aria-checked={replyVoice === value}
+                    disabled={!enabled}
+                    onClick={() => {
+                      useSpeechSettings.getState().choose(value);
+                      if (value === 'off') stopSpeaking();
+                      setVoiceMenu(false);
+                    }}
+                    className="w-full flex items-start gap-2 px-2 py-1.5 rounded text-left hover:bg-[#fafaf7] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="w-3.5 pt-0.5">{replyVoice === value && <Check className="w-3.5 h-3.5 text-[#f54e00]" />}</span>
+                    <span>
+                      <span className="block font-medium">{label}</span>
+                      <span className="block text-[11px] text-[#807d72]">{enabled ? hint : 'Not available on this server.'}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <button
           type="submit"
           disabled={disabled || pending || !input.trim()}

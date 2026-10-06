@@ -7,6 +7,7 @@ import {
   aiAskResponseSchema,
   aiCommandResponseSchema,
   conversationResponseSchema,
+  speakResponseSchema,
   errorEnvelopeSchema,
   meResponseSchema,
   type AiAskResponse,
@@ -18,6 +19,7 @@ import {
   type DiagramListResponse,
   type ErrorCode,
   type MeResponse,
+  type SpeakResponse,
 } from '../contracts';
 
 /** Minimal shape of a runtime schema (the contracts' Zod schemas satisfy it), so this file needs no direct Zod import. */
@@ -194,6 +196,12 @@ export function createApiClient(options: ApiClientOptions) {
         timeoutMs: 28_000,
         noRetryCodes: ['AI_TIMEOUT', 'AI_PROVIDER_ERROR', 'AI_UNAVAILABLE', 'RATE_LIMITED'],
       }).then((r) => r.data as AiAskResponse),
+    /** Read one of my assistant messages aloud (server-synthesized). The server only accepts a message id, never text. */
+    speak: (diagramId: string, messageId: string) =>
+      request('POST', `/v1/diagrams/${diagramId}/ai/speak`, { messageId }, undefined, speakResponseSchema, {
+        timeoutMs: 20_000,
+        noRetryCodes: ['AI_TIMEOUT', 'AI_PROVIDER_ERROR', 'AI_UNAVAILABLE', 'RATE_LIMITED'],
+      }).then((r) => r.data as SpeakResponse),
     me: () => request('GET', '/v1/me', undefined, undefined, meResponseSchema).then((r) => r.data as MeResponse),
     listDiagrams: (workspaceId: string) =>
       request('GET', `/v1/workspaces/${workspaceId}/diagrams`, undefined, undefined, diagramListResponseSchema).then((r) => r.data as DiagramListResponse),

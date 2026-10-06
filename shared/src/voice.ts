@@ -97,3 +97,16 @@ export const voiceServerMessageSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('pong') }),
 ]);
 export type VoiceServerMessage = z.infer<typeof voiceServerMessageSchema>;
+
+/**
+ * POST /v1/diagrams/{id}/ai/speak: read one of the caller's own assistant messages aloud. The browser sends only a message id
+ * (never text), so this cannot be used as a general text-to-speech service. Audio is raw 16-bit little-endian PCM, mono.
+ */
+export const speakRequestSchema = z.strictObject({ messageId: uuidSchema });
+export type SpeakRequest = z.infer<typeof speakRequestSchema>;
+export const speakResponseSchema = z.strictObject({
+  audio: z.string().min(1).max(6_000_000),
+  sampleRate: z.number().int().min(8_000).max(48_000),
+  format: z.literal('pcm_s16le'),
+});
+export type SpeakResponse = z.infer<typeof speakResponseSchema>;

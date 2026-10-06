@@ -5,6 +5,7 @@ import { api, session } from '../document/instance';
 import { useConversationStore } from '../ai/conversationStore';
 import { syncConversation } from '../ai/aiCommands';
 import { voice } from '../voice/voice';
+import { useSpeechSettings } from '../voice/speech';
 
 const lastKey = (userId: string) => `tinker_last_diagram:${userId}`;
 const remember = (userId: string | undefined, diagramId: string | null) => {
@@ -61,7 +62,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     user: null,
     workspace: null,
     diagrams: [],
-    features: { aiCommands: false, aiModel: false, voice: false },
+    features: { aiCommands: false, aiModel: false, voice: false, speech: false },
 
     async bootstrap() {
       set({ phase: 'loading', error: null });
@@ -70,6 +71,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         const workspace = me.workspaces.find((w) => w.personal) ?? me.workspaces[0] ?? null;
         if (!workspace) throw new Error('No workspace is available for this account.');
         set({ user: me.user, workspace, features: me.features });
+        useSpeechSettings.setState({ serverCanSpeak: me.features.speech });
         await get().refreshList();
         const diagrams = get().diagrams;
         const wanted = recall(me.user.id);
@@ -144,7 +146,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       voice.dispose();
       session.close();
       useConversationStore.getState().reset();
-      set({ phase: 'idle', error: null, user: null, workspace: null, diagrams: [], features: { aiCommands: false, aiModel: false, voice: false } });
+      set({ phase: 'idle', error: null, user: null, workspace: null, diagrams: [], features: { aiCommands: false, aiModel: false, voice: false, speech: false } });
     },
   };
 });

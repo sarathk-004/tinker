@@ -165,6 +165,25 @@ describe('voice: the gate', () => {
     c.close();
   });
 
+  it('the model repeating one request under a new id (seen live) is applied once; a different request still applies', async () => {
+    const d = await seed(h, u);
+    const { c, model } = await listen({ h, live, u, d });
+    model.call({ id: 'e1', name: 'edit_diagram', args: { request: 'Put Redis between Orders and PostgreSQL.' } });
+    await c.until((m) => m.type === 'result');
+    model.call({ id: 'e2', name: 'edit_diagram', args: { request: 'Put Redis between orders and PostgreSQL' } });
+    await new Promise((r) => setTimeout(r, 150));
+    expect(c.results()).toHaveLength(1);
+    expect(model.toolResponses.map((r) => r.result)).toContain('Already handled.');
+    expect(await dbState(h, d.id)).toMatchObject({ version: d.version + 1, nodes: 3 });
+
+    c.send({ type: 'context', version: d.version + 1 });
+    await new Promise((r) => setTimeout(r, 60));
+    model.call({ id: 'e3', name: 'edit_diagram', args: { request: 'add a message queue' } }); // genuinely different
+    await c.until(() => c.results().length >= 2);
+    expect(await dbState(h, d.id)).toMatchObject({ version: d.version + 2, nodes: 4 });
+    c.close();
+  });
+
   it('the proposal is bound to the diagram version the client reported; a stale one changes nothing', async () => {
     const d = await seed(h, u);
     const { c, model } = await listen({ h, live, u, d }, { version: d.version - 1 });

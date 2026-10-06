@@ -45,6 +45,9 @@ const envSchema = z
     GEMINI_THINKING_LEVEL: z.enum(['off', 'minimal', 'low', 'medium', 'high']).default('low'),
     /** Gemini Live model used for voice (verified against the real endpoint on 2026-10-06). */
     GEMINI_LIVE_MODEL: z.string().min(1).default('gemini-3.8-live'),
+    /** Spoken replies (text to speech). Verified against the real endpoint on 2026-10-06. */
+    GEMINI_TTS_MODEL: z.string().min(1).default('gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts'),
+    GEMINI_TTS_VOICE: z.string().min(1).default('Kore'),
     /** Voice sessions: server-wide cap, and the longest one session may last (the provider's own limit is about 10 minutes). */
     VOICE_MAX_SESSIONS: z.coerce.number().int().min(1).max(10_000).default(20),
     VOICE_MAX_SESSION_MS: z.coerce.number().int().min(10_000).max(900_000).default(600_000),
@@ -89,6 +92,9 @@ export interface Config {
     model: string;
     thinkingLevel: 'off' | 'minimal' | 'low' | 'medium' | 'high';
     liveModel: string;
+    /** Comma-separated, tried in order (the free tier of the older preview models allows only ~10 requests a day). */
+    ttsModels: string[];
+    ttsVoice: string;
     deadlineMs: number;
     ratePerMinute: number;
     maxConcurrent: number;
@@ -142,6 +148,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       model: e.GEMINI_MODEL,
       thinkingLevel: e.GEMINI_THINKING_LEVEL,
       liveModel: e.GEMINI_LIVE_MODEL,
+      ttsModels: e.GEMINI_TTS_MODEL.split(',').map((m) => m.trim()).filter(Boolean),
+      ttsVoice: e.GEMINI_TTS_VOICE,
       deadlineMs: e.AI_DEADLINE_MS,
       ratePerMinute: e.AI_RATE_LIMIT_PER_MINUTE,
       maxConcurrent: e.AI_MAX_CONCURRENT,

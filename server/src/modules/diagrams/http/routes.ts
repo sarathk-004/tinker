@@ -11,6 +11,7 @@ import {
   idempotencyKeySchema,
   presentationPatchRequestSchema,
   renameDiagramRequestSchema,
+  speakRequestSchema,
   uuidSchema,
   versionSchema,
   type MeResponse,
@@ -22,6 +23,7 @@ import type { RateLimiter } from '../../../infrastructure/http/rate-limiter.ts';
 import type { RunResult, TestHooks } from '../../../infrastructure/idempotency/mutation-requests.ts';
 import { listWorkspaces } from '../../workspaces/access.ts';
 import { askAdvice } from '../../ai/application/advice-service.ts';
+import { speakMessage } from '../../voice/speak-service.ts';
 import { executeAiCommand, loadConversation, type AiRuntime } from '../../ai/application/ai-service.ts';
 import {
   createDiagram,
@@ -95,7 +97,7 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
       return {
         user: { id: auth.userId, email: auth.email, displayName: auth.displayName },
         workspaces: await listWorkspaces(pool, auth.userId),
-        features: { aiCommands: true, aiModel: deps.ai.provider.available, voice: deps.voiceAvailable ?? false },
+        features: { aiCommands: true, aiModel: deps.ai.provider.available, voice: deps.voiceAvailable ?? false, speech: deps.ai.speech.available },
       };
     });
 
@@ -155,6 +157,14 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
       const body = parseOrThrow(aiAskRequestSchema, request.body, 'INVALID_REQUEST', 'Invalid question.');
       const aiDeps = { ...svc, ai: deps.ai, log: (message: string, data: Record<string, unknown>) => request.log.warn(data, message), metric: (message: string, data: Record<string, unknown>) => request.log.info(data, message) };
       return askAdvice(aiDeps, actorOf(request), diagramId, body);
+    });
+
+    // Read an assistant message aloud: view access, no idempotency key (nothing is mutated).
+    app.post(`${API_PREFIX}/diagrams/:diagramId/ai/speak`, async (request) => {
+      const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
+      const body = parseOrThrow(speakRequestSchema, request.body, 'INVALID_REQUEST', 'Invalid request.');
+      const aiDeps = { ...svc, ai: deps.ai, log: (message: string, data: Record<string, unknown>) => request.log.warn(data, message), metric: (message: string, data: Record<string, unknown>) => request.log.info(data, message) };
+      return speakMessage(aiDeps, actorOf(request), diagramId, body);
     });
 
     app.get(`${API_PREFIX}/diagrams/:diagramId/conversation`, async (request) => {

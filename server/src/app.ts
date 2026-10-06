@@ -17,6 +17,7 @@ import { AppError, toErrorResponse } from './infrastructure/http/errors.ts';
 import { registerDevEngineRoutes } from './modules/diagrams/http/dev-routes.ts';
 import { registerApiRoutes } from './modules/diagrams/http/routes.ts';
 import { createGeminiLiveGateway } from './modules/voice/gemini-live.ts';
+import { createGeminiSpeech, disabledSpeech, type SpeechProvider } from './modules/voice/speech-provider.ts';
 import { disabledLiveGateway, type LiveGateway } from './modules/voice/live-gateway.ts';
 import { registerVoiceRoutes } from './modules/voice/routes.ts';
 import type { VoiceSessionLimits } from './modules/voice/voice-session.ts';
@@ -36,6 +37,8 @@ export interface BuildAppOptions {
   aiProvider?: InterpretationProvider;
   /** Override the realtime voice gateway (tests inject a scripted fake). Defaults to Gemini Live when GEMINI_API_KEY is set. */
   liveGateway?: LiveGateway;
+  /** Override text to speech (tests). Defaults to Gemini TTS when GEMINI_API_KEY is set. */
+  speechProvider?: SpeechProvider;
   /** Tests: shorter timers and smaller quotas for voice sessions. */
   voiceLimits?: Partial<VoiceSessionLimits>;
   /** Override the AI rate limiter (tests). */
@@ -132,6 +135,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     provider: options.aiProvider ?? (config.ai.apiKey ? createGeminiProvider({ apiKey: config.ai.apiKey, model: config.ai.model, thinkingLevel: config.ai.thinkingLevel }) : disabledProvider),
     deadlineMs: config.ai.deadlineMs,
     model: config.ai.model,
+    speech: options.speechProvider ?? (config.ai.apiKey ? createGeminiSpeech({ apiKey: config.ai.apiKey, models: config.ai.ttsModels, voice: config.ai.ttsVoice }) : disabledSpeech),
     limiter: options.aiRateLimiter ?? createRateLimiter({ limit: config.ai.ratePerMinute }),
     concurrency: createConcurrencyLimiter({ max: config.ai.maxConcurrent }),
   };

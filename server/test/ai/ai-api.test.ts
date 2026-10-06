@@ -588,7 +588,7 @@ describe('access, validation and degradation (A18)', () => {
     const d = await seed(h, u);
     const me = await call(h, u, 'GET', '/v1/me');
     expect(meResponseSchema.safeParse(me.body).success).toBe(true);
-    expect(me.body.features).toEqual({ aiCommands: true, aiModel: false, voice: false });
+    expect(me.body.features).toEqual({ aiCommands: true, aiModel: false, voice: false, speech: false });
 
     const needsModel = await aiCmd(h, u, d.id, d.version, VAGUE);
     expect(needsModel.status).toBe(503);
@@ -606,7 +606,7 @@ describe('access, validation and degradation (A18)', () => {
   it('with a provider configured the server says so', async () => {
     const h = await startHarness({ aiProvider: createFakeProvider([{ output: {} }]) });
     const u = await h.newUser('on');
-    expect((await call(h, u, 'GET', '/v1/me')).body.features).toEqual({ aiCommands: true, aiModel: true, voice: false });
+    expect((await call(h, u, 'GET', '/v1/me')).body.features).toEqual({ aiCommands: true, aiModel: true, voice: false, speech: false });
     await h.close();
   });
 });

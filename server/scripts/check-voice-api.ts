@@ -100,6 +100,14 @@ try {
   if (ask.status === 'OK') {
     const stored = await api(token, 'GET', `/v1/diagrams/${diagramId}`);
     check(stored.json.version === version, 'the question changed nothing', `version ${stored.json.version}`);
+    // The answer can be read aloud with the Gemini voice (the server accepts only the id of a stored assistant message).
+    const reply = [...ask.response.messages].reverse().find((m: { role: string }) => m.role === 'ASSISTANT');
+    const started = Date.now();
+    const spoken = await api(token, 'POST', `/v1/diagrams/${diagramId}/ai/speak`, { messageId: reply.id }, false);
+    const seconds = spoken.json?.audio ? (Buffer.from(spoken.json.audio, 'base64').length / 2 / spoken.json.sampleRate).toFixed(1) : '0';
+    check(spoken.status === 200 && Number(seconds) > 0.5, 'the answer is read aloud by the Gemini voice', `${seconds} s of audio at ${spoken.json?.sampleRate} Hz in ${Date.now() - started} ms`);
+    const stranger = await api(token, 'POST', `/v1/diagrams/${diagramId}/ai/speak`, { messageId: '00000000-0000-4000-8000-000000000999' }, false);
+    check(stranger.status === 404, 'an unknown message id is refused', `HTTP ${stranger.status}`);
   }
 } catch (error) {
   failures++;
