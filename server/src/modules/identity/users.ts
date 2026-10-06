@@ -15,6 +15,18 @@ export interface InternalUser {
  * ON CONFLICT-guarded and `workspaces.personal_for_user_id` is a unique bootstrap key.
  */
 export async function ensureUser(pool: Pool, claims: TokenClaims): Promise<InternalUser> {
+  // Fast path (one read, no transaction, no write): the user, their personal workspace and membership already exist and the token
+  // carries nothing new. This is the case for almost every request, and it keeps a hosted database to ONE round trip here.
+  const existing = await pool.query<{ id: string; email: string | null; display_name: string | null; bootstrapped: boolean }>(
+    `SELECT u.id, u.email, u.display_name,
+            EXISTS (SELECT 1 FROM workspaces w JOIN workspace_memberships m ON m.workspace_id = w.id AND m.user_id = u.id WHERE w.personal_for_user_id = u.id) AS bootstrapped
+       FROM users u WHERE u.external_auth_id = $1`,
+    [claims.subject],
+  );
+  const known = existing.rows[0];
+  if (known?.bootstrapped && (claims.email === null || claims.email === known.email) && (claims.displayName === null || claims.displayName === known.display_name)) {
+    return { id: known.id, externalAuthId: claims.subject, email: known.email, displayName: known.display_name };
+  }
   return withTransaction(pool, async (tx) => {
     const user = await tx.query<{ id: string; email: string | null; display_name: string | null }>(
       `INSERT INTO users (external_auth_id, email, display_name)

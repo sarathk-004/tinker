@@ -29,6 +29,8 @@ export interface ClaimedJob {
   maxAttempts: number;
   /** Proof of ownership; every later call must present it. */
   leaseToken: string;
+  /** True when this claim replaced a holder whose lease had lapsed (a crashed or stalled worker). */
+  tookOver: boolean;
 }
 
 /**
@@ -99,7 +101,7 @@ export async function claimJob(pool: Pool, options: { leaseSeconds: number }): P
         [row.id, token, options.leaseSeconds, crashed],
       );
       const job = claimed.rows[0]!;
-      return { id: job.id, type: job.type, operationKey: job.operation_key, payload: job.payload, attempt: job.attempt_count, maxAttempts: job.max_attempts, leaseToken: token };
+      return { id: job.id, type: job.type, operationKey: job.operation_key, payload: job.payload, attempt: job.attempt_count, maxAttempts: job.max_attempts, leaseToken: token, tookOver: crashed };
     }
     return null;
   });

@@ -445,19 +445,37 @@ describe('idempotency, leases and atomicity (same machinery as manual edits)', (
 
 describe('limits (decision D10, single instance)', () => {
   it('per-user AI rate limit -> 429 with Retry-After; replays of stored results are not counted', async () => {
-    const h = await startHarness({ aiProvider: createFakeProvider([{ output: plan({ type: 'ADD_NODE', name: 'X' }) }]), aiRateLimiter: createRateLimiter({ limit: 2 }) });
+    const provider = createFakeProvider([{ output: plan({ type: 'ADD_NODE', name: 'X' }) }]);
+    const h = await startHarness({ aiProvider: provider, aiRateLimiter: createRateLimiter({ limit: 2 }) });
     const u = await h.newUser('rate');
     const d = await seed(h, u);
     const k = key();
-    const a = await aiCmd(h, u, d.id, d.version, 'add Redis', { key: k });
-    const b = await aiCmd(h, u, d.id, d.version + 1, 'add Kafka');
+    const a = await aiCmd(h, u, d.id, d.version, VAGUE, { key: k });
+    const b = await aiCmd(h, u, d.id, d.version + 1, VAGUE);
     expect([a.status, b.status]).toEqual([200, 200]);
-    const c = await aiCmd(h, u, d.id, d.version + 2, 'add S3');
+    const c = await aiCmd(h, u, d.id, d.version + 2, VAGUE);
     expect(c.status).toBe(429);
     expect(c.body.error.code).toBe('RATE_LIMITED');
     expect(Number(c.headers['retry-after'])).toBeGreaterThan(0);
-    expect((await aiCmd(h, u, d.id, d.version, 'add Redis', { key: k })).status).toBe(200); // replay: no provider work, not counted
+    expect((await aiCmd(h, u, d.id, d.version, VAGUE, { key: k })).status).toBe(200); // replay: no provider work, not counted
     expect((await stats(h, d.id)).version).toBe(d.version + 2);
+    expect(provider.calls).toHaveLength(2);
+    await h.close();
+  });
+
+  it('plain commands the parser understands cost no AI quota (found while planning the I9 benchmark)', async () => {
+    const provider = createFakeProvider([{ error: new ProviderError('unavailable', 'must not be called') }]);
+    const h = await startHarness({ aiProvider: provider, aiRateLimiter: createRateLimiter({ limit: 2 }) });
+    const u = await h.newUser('plain');
+    const d = await seed(h, u);
+    let version = d.version;
+    for (const name of ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon']) {
+      const res = await aiCmd(h, u, d.id, version, `add ${name}`);
+      expect(res.status).toBe(200);
+      expect(res.body.source).toBe('PARSER');
+      version = res.body.diagram.version;
+    }
+    expect(provider.calls).toHaveLength(0);
     await h.close();
   });
 

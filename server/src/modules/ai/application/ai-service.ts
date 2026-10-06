@@ -90,9 +90,9 @@ export async function executeAiCommand(deps: AiDeps, actor: Actor, diagramId: st
   const text = request.input.text;
 
   const prepare = async (): Promise<Finish> => {
-    deps.ai.limiter.check(actor.userId); // 429 here releases the key: a refused-for-load request is not cached
-    const release = deps.ai.concurrency.acquire(actor.userId);
-    try {
+    // The per-user AI limits are enforced inside interpretRequest, and only when the MODEL is needed: plain commands the parser
+    // understands cost no quota. A 429 there releases the key (a refused-for-load request is not cached).
+    {
       const current = await getDiagramRow(deps.pool, diagramId);
       if (!current) throw new AppError('DIAGRAM_NOT_FOUND', 'Diagram not found.');
       // Cheap early exit: a stale request never spends provider budget.
@@ -102,6 +102,10 @@ export async function executeAiCommand(deps: AiDeps, actor: Actor, diagramId: st
       const history = request.conversationId ? await recentTurns(deps.pool, request.conversationId, HISTORY_TURNS) : [];
       const interpretation = await interpretRequest({ doc, text, history, provider: deps.ai.provider,
         deadlineMs: deps.ai.deadlineMs,
+        beforeProvider: () => {
+          deps.ai.limiter.check(actor.userId);
+          return deps.ai.concurrency.acquire(actor.userId);
+        },
         onAttempt: (a) => deps.metric?.('ai provider attempt', { ...a, model: deps.ai.model, deadlineMs: deps.ai.deadlineMs }),
       });
 
@@ -111,8 +115,6 @@ export async function executeAiCommand(deps: AiDeps, actor: Actor, diagramId: st
       if (!dry.ok && dry.kind === 'CLARIFY') return clarification(interpretation.source, dry.question, dry.options, current.version);
       if (!dry.ok) return refusal(interpretation.source, dry.error.message, { reason: dry.error.reason, stepIndex: dry.stepIndex, ...dry.error.details });
       return commit(interpretation.source, interpretation.steps);
-    } finally {
-      release();
     }
   };
 

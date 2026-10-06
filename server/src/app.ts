@@ -47,6 +47,8 @@ export interface BuildAppOptions {
   hooks?: TestHooks;
   /** Tests disable logging. */
   logger?: boolean;
+  /** Tests: capture log lines instead of writing them to stdout. */
+  logStream?: { write(line: string): void };
 }
 
 const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{8,64}$/;
@@ -55,6 +57,8 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   const { config } = options;
   const app = Fastify({
     bodyLimit: LIMITS.maxRequestBodyBytes,
+    // One structured `request` line per API call (below) replaces Fastify's two default lines, which print the full URL with ids.
+    disableRequestLogging: true,
     genReqId: (req) => {
       const supplied = req.headers['x-request-id'];
       return typeof supplied === 'string' && SAFE_REQUEST_ID.test(supplied) ? supplied : randomUUID();
@@ -65,6 +69,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
         : {
             level: config.logLevel,
             redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["idempotency-key"]'],
+            ...(options.logStream ? { stream: options.logStream } : {}),
           },
   });
 
@@ -85,8 +90,26 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     maxAge: 600,
   });
 
-  app.addHook('onSend', async (request, reply) => {
+  app.addHook('onSend', async (request, reply, payload) => {
     reply.header('x-request-id', request.id);
+    // Remember WHICH error code a failed API answer carried (conflict, rate limit, AI timeout...) for the request log below.
+    if (reply.statusCode >= 400 && typeof payload === 'string' && payload.length < 4_096) {
+      try {
+        const code = (JSON.parse(payload) as { error?: { code?: unknown } }).error?.code;
+        if (typeof code === 'string') request.errorCode = code;
+      } catch {
+        /* not JSON */
+      }
+    }
+    return payload;
+  });
+
+  // One structured line per API request: route pattern (never the URL with ids), status, duration, and the error code.
+  // `npm run log:report` turns these into latency percentiles, conflict and failure counts. No bodies, tokens or user text.
+  app.addHook('onResponse', async (request, reply) => {
+    const route = request.routeOptions?.url;
+    if (!route || !route.startsWith('/v1/')) return;
+    request.log.info({ msg: 'request', route, method: request.method, status: reply.statusCode, ms: Math.round(reply.elapsedTime * 10) / 10, ...(request.errorCode ? { code: request.errorCode } : {}) }, 'request');
   });
 
   app.setErrorHandler((error, request, reply) => {

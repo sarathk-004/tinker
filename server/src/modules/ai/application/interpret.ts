@@ -23,6 +23,11 @@ export interface InterpretInput {
   now?: () => number;
   /** Tests only: shrink the minimum time worth spending on a retry. */
   minRetryBudgetMs?: number;
+  /**
+   * Called only when the MODEL is actually needed (after the parser had no answer): enforce per-user AI limits here, so plain
+   * commands the parser handles cost nothing. Returns a function that releases what it acquired.
+   */
+  beforeProvider?: () => () => void;
   /** Latency metric: one call per provider attempt (never user text, never the key). */
   onAttempt?: (attempt: { attempt: number; ms: number; outcome: 'ok' | ProviderError['kind'] }) => void;
 }
@@ -48,7 +53,9 @@ export async function interpretRequest(input: InterpretInput): Promise<Interpret
     return { kind: 'clarify', source: 'AI', question: 'This diagram is too large for AI commands. Try a precise command such as "connect Orders to Billing" instead.', options: [] };
   }
 
-  return runProvider({
+  const release = input.beforeProvider?.();
+  try {
+    return await runProvider({
     provider: input.provider,
     request: { systemInstruction: SYSTEM_INSTRUCTION, content: prompt.content, responseSchema: MODEL_RESPONSE_JSON_SCHEMA as unknown as Record<string, unknown> },
     deadlineMs: input.deadlineMs,
@@ -60,7 +67,10 @@ export async function interpretRequest(input: InterpretInput): Promise<Interpret
       if (!validated.success) throw new ProviderError('bad_output', 'The AI output did not match the expected format.', validated.error.issues[0]?.message);
       return fromModelOutput(validated.data);
     },
-  });
+    });
+  } finally {
+    release?.();
+  }
 }
 
 /**

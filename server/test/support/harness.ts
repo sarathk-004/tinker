@@ -32,6 +32,8 @@ export interface HarnessOptions {
   rateLimiter?: RateLimiter;
   aiProvider?: InterpretationProvider;
   aiRateLimiter?: RateLimiter;
+  /** Capture structured log lines (turns logging on). */
+  logStream?: { write(line: string): void };
   liveGateway?: LiveGateway;
   speechProvider?: SpeechProvider;
   voiceLimits?: Partial<VoiceSessionLimits>;
@@ -49,7 +51,8 @@ export async function startHarness(options: HarnessOptions = {}): Promise<Harnes
     config,
     pool,
     verifier: signer.verify,
-    logger: false,
+    logger: options.logStream ? true : false,
+    ...(options.logStream ? { logStream: options.logStream } : {}),
     ...(options.hooks ? { hooks: options.hooks } : {}),
     ...(options.rateLimiter ? { rateLimiter: options.rateLimiter } : {}),
     ...(options.aiProvider ? { aiProvider: options.aiProvider } : {}),

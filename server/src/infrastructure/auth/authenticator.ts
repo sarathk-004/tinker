@@ -19,6 +19,8 @@ export type TokenAuthenticator = (token: string) => Promise<AuthContext>;
 declare module 'fastify' {
   interface FastifyRequest {
     auth?: AuthContext;
+    /** Error code of a failed answer, recorded for the request log. */
+    errorCode?: string;
   }
 }
 

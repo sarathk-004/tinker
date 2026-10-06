@@ -1,0 +1,27 @@
+# Keep the build context small and free of local state and secrets.
+.git
+.github
+node_modules
+**/node_modules
+dist
+graphify-out
+Tinker_Development_Kit
+.env
+**/.env
+**/.env.*
+!**/.env.example
+server/.data
+*.log
+coverage
+src
+public
+index.html
+vite.config.ts
+vitest.config.ts
+tailwind.config.js
+postcss.config.js
+tsconfig.node.json
+tsconfig.tsbuildinfo
+api-demo.html
+engine-demo.html
+docker-compose*.yml

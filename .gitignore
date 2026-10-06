@@ -35,3 +35,6 @@ graphify-out/
 
 # Local dev Postgres data (server/scripts/dev-db.ts)
 .data/
+
+# Logical database backups contain user data
+backups/

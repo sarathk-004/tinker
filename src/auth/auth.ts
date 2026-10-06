@@ -71,7 +71,8 @@ function supabase(): SupabaseClient | null {
   if (!conn) return null;
   const id = `${conn.url}|${conn.key}`;
   if (!client || clientFor !== id) {
-    client = createClient(conn.url, conn.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+    // PKCE keeps tokens out of the address bar; detectSessionInUrl picks the session up when Google or an email link returns here.
+    client = createClient(conn.url, conn.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
     clientFor = id;
   }
   return client;
@@ -86,9 +87,11 @@ interface AuthState {
   busy: boolean;
   error: string | null;
   info: string | null;
+  /** The user arrived from a password-reset email: they must choose a new password before anything else. */
+  recovery: boolean;
 }
 
-export const useAuthStore = create<AuthState>(() => ({ status: 'loading', email: null, mode: null, busy: false, error: null, info: null }));
+export const useAuthStore = create<AuthState>(() => ({ status: 'loading', email: null, mode: null, busy: false, error: null, info: null, recovery: false }));
 const set = useAuthStore.setState;
 
 /** Display only (not verified): the email claim of a dev token, for the header. */
@@ -117,10 +120,14 @@ export async function initAuth(): Promise<void> {
   started = true;
   const sb = supabase();
   if (sb) {
-    sb.auth.onAuthStateChange((_event, session) => {
+    sb.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') set({ recovery: true });
       if (session) set({ status: 'signedIn', email: session.user.email ?? null, mode: 'supabase', error: null });
-      else if (!devTokenValid(store.session.get(DEV_TOKEN_KEY))) set({ status: 'signedOut', email: null, mode: null });
+      else if (!devTokenValid(store.session.get(DEV_TOKEN_KEY))) set({ status: 'signedOut', email: null, mode: null, recovery: false });
     });
+    const returned = oauthErrorFromUrl();
+    if (returned) set({ error: returned });
+    cleanAuthParamsFromUrl();
     const { data } = await sb.auth.getSession();
     if (data.session) return void set({ status: 'signedIn', email: data.session.user.email ?? null, mode: 'supabase' });
   }
@@ -163,10 +170,72 @@ export async function signUp(email: string, password: string): Promise<void> {
   await guard(async () => {
     const sb = supabase();
     if (!sb) throw new Error('Supabase is not configured yet.');
-    const { data, error } = await sb.auth.signUp({ email: email.trim(), password });
+    const { data, error } = await sb.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: appOrigin() } });
     if (error) throw new Error(error.message);
     if (!data.session) set({ info: 'Account created. Check your email to confirm it, then sign in.' });
   });
+}
+
+/** The page address people return to after Google or an email link. Must be allowed in Supabase (Authentication > URL configuration). */
+export const appOrigin = (): string => (typeof window === 'undefined' ? '' : window.location.origin);
+
+/** Continue with Google: leaves for Google, then returns here already signed in (PKCE). Needs the Google provider enabled in Supabase. */
+export async function signInWithGoogle(): Promise<void> {
+  await guard(async () => {
+    const sb = supabase();
+    if (!sb) throw new Error('Supabase is not configured yet.');
+    const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: appOrigin() } });
+    if (error) throw new Error(error.message);
+  });
+}
+
+/** Email a password-reset link. The answer never says whether the address has an account (no account probing). */
+export async function requestPasswordReset(email: string): Promise<void> {
+  await guard(async () => {
+    const sb = supabase();
+    if (!sb) throw new Error('Supabase is not configured yet.');
+    if (!email.trim()) throw new Error('Enter your email address first.');
+    const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: appOrigin() });
+    if (error && !/not found|no user/i.test(error.message)) throw new Error(error.message);
+    set({ info: 'If that address has an account, a reset link is on its way. Check your email.' });
+  });
+}
+
+/** After following the reset link: choose the new password, then continue into the app. */
+export async function setNewPassword(password: string): Promise<void> {
+  await guard(async () => {
+    const sb = supabase();
+    if (!sb) throw new Error('Supabase is not configured yet.');
+    if (password.length < 8) throw new Error('Use at least 8 characters.');
+    const { error } = await sb.auth.updateUser({ password });
+    if (error) throw new Error(error.message);
+    set({ recovery: false, info: 'Password updated.' });
+  });
+}
+
+/** Google or Supabase can send the user back with an error in the address (denied consent, provider not enabled...). */
+export function oauthErrorFromUrl(href: string = typeof window === 'undefined' ? '' : window.location.href): string | null {
+  try {
+    const url = new URL(href);
+    const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
+    const description = url.searchParams.get('error_description') ?? hash.get('error_description');
+    const code = url.searchParams.get('error') ?? hash.get('error');
+    if (!description && !code) return null;
+    if (code === 'access_denied') return 'Google sign-in was cancelled.';
+    return `Sign-in did not complete: ${(description ?? code ?? '').replace(/\+/g, ' ').slice(0, 160)}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Remove one-time sign-in parameters (code, errors, tokens) from the visible address once they have been used. */
+export function cleanAuthParamsFromUrl(): void {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  const had = ['code', 'error', 'error_code', 'error_description'].some((k) => url.searchParams.has(k)) || /access_token|error=/.test(url.hash);
+  if (!had) return;
+  ['code', 'error', 'error_code', 'error_description'].forEach((k) => url.searchParams.delete(k));
+  window.history.replaceState({}, '', `${url.pathname}${url.search}`);
 }
 
 export async function devLogin(email: string): Promise<void> {
@@ -185,11 +254,11 @@ export async function devLogin(email: string): Promise<void> {
   });
 }
 
-export async function signOut(): Promise<void> {
+export async function signOut(options: { expired?: boolean } = {}): Promise<void> {
   store.session.remove(DEV_TOKEN_KEY);
   const sb = supabase();
   if (sb) await sb.auth.signOut().catch(() => undefined);
-  set({ status: 'signedOut', email: null, mode: null, error: null, info: null });
+  set({ status: 'signedOut', email: null, mode: null, error: null, recovery: false, info: options.expired ? 'Your session expired. Please sign in again; your saved diagrams are safe.' : null });
 }
 
 /** What the API client uses: the current Supabase access token (auto-refreshed by supabase-js) or the dev token. */
@@ -210,6 +279,6 @@ export const authSource: AuthSource = {
     return error ? null : (data.session?.access_token ?? null);
   },
   onUnauthorized() {
-    void signOut();
+    void signOut({ expired: true });
   },
 };

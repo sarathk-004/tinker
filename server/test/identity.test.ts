@@ -106,6 +106,29 @@ describe('identity provisioning', () => {
     expect(second.email).toBe('two@example.test');
   });
 
+  it('a returning user costs ONE read: no transaction and no write (the hosted-latency fast path)', async () => {
+    const claims = { subject: `fast:${Math.random()}`, email: 'fast@example.test', displayName: 'Fast User' };
+    const first = await ensureUser(h.pool, claims); // bootstraps
+    const before = (await h.pool.query(`SELECT updated_at, xmin::text AS xmin FROM users WHERE id = $1`, [first.id])).rows[0];
+    let connects = 0;
+    let queries = 0;
+    const spy = new Proxy(h.pool, {
+      get(target, prop, receiver) {
+        if (prop === 'connect') return (...args: unknown[]) => (connects++, (target.connect as (...a: unknown[]) => unknown)(...args));
+        if (prop === 'query') return (...args: unknown[]) => (queries++, (target.query as (...a: unknown[]) => unknown)(...args));
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    const again = await ensureUser(spy, claims);
+    expect(again).toEqual(first);
+    expect({ connects, queries }).toEqual({ connects: 0, queries: 1 });
+    const after = (await h.pool.query(`SELECT updated_at, xmin::text AS xmin FROM users WHERE id = $1`, [first.id])).rows[0];
+    expect(after).toEqual(before); // the row was not even touched
+    // a token with a new email still takes the full path and updates; one with no email keeps what we have
+    expect((await ensureUser(h.pool, { ...claims, email: 'new@example.test' })).email).toBe('new@example.test');
+    expect((await ensureUser(h.pool, { ...claims, email: null, displayName: null })).email).toBe('new@example.test');
+  });
+
   it('never trusts a user id from the request body or headers', async () => {
     const mallory = await h.newUser('mallory');
     const victim = await h.newUser('victim');

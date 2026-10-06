@@ -21,6 +21,7 @@ const Splash: React.FC<{ text: string }> = ({ text }) => (
 
 export const App: React.FC = () => {
   const status = useAuthStore((s) => s.status);
+  const recovery = useAuthStore((s) => s.recovery);
   const { phase, error } = useWorkspaceStore();
 
   useEffect(() => {
@@ -68,7 +69,7 @@ export const App: React.FC = () => {
   }, []);
 
   if (status === 'loading') return <Splash text="Starting…" />;
-  if (status === 'signedOut') return <LoginScreen />;
+  if (status === 'signedOut' || recovery) return <LoginScreen />;
   if (phase === 'idle' || phase === 'loading') return <Splash text="Loading your diagrams…" />;
   if (phase === 'error') {
     return (

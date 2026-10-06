@@ -22,3 +22,17 @@ jobs:
         run: npm run check:boundaries
       - name: Build frontend
         run: npm run build
+      - name: Scan the built frontend for secrets (A30)
+        run: npm run check:artifacts
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the API and worker image
+        run: docker build -t tinker-server .
+      - name: The image refuses to start in production without configuration
+        run: |
+          set -e
+          if docker run --rm -e NODE_ENV=production tinker-server 2>err.txt; then echo 'production start without configuration must fail'; exit 1; fi
+          grep -q 'CORS_ORIGINS' err.txt
+          grep -q 'DATABASE_URL' err.txt
