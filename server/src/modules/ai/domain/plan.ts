@@ -92,6 +92,7 @@ const nameOf = (doc: DiagramDoc, id: string) => doc.graph.nodes.find((n) => n.id
 export function executePlan(start: DiagramDoc, steps: readonly PlanStep[], aliases: AliasMap, newId: () => string): PlanOutcome {
   let doc = start;
   const created = new Map<string, string>(); // alias of a node created in this plan -> its real id
+  let implicitCount = 0;
   const commands: DiagramCommand[] = [];
   const summaries: CommandSummary[] = [];
 
@@ -113,12 +114,13 @@ export function executePlan(start: DiagramDoc, steps: readonly PlanStep[], alias
 
     switch (step.type) {
       case 'ADD_NODE': {
-        if (!step.name) return clarify('What should the new component be called?');
-        const inferred = inferNodeKind(step.name);
+        const name = step.name ?? step.technology ?? undefined;
+        if (!name) return clarify('What should the new component be called?');
+        const inferred = inferNodeKind(name);
         const technology = step.technology === null ? undefined : (step.technology ?? inferred.technology);
-        command = { type: 'ADD_NODE', node: { name: step.name, kind: step.kind ?? inferred.kind, ...(technology ? { technology } : {}), metadata: {} } };
+        command = { type: 'ADD_NODE', node: { name, kind: step.kind ?? inferred.kind, ...(technology ? { technology } : {}), metadata: {} } };
         producesNode = true;
-        describe = () => `Added ${step.name}`;
+        describe = () => `Added ${name}`;
         break;
       }
       case 'REMOVE_NODE': {
@@ -184,8 +186,9 @@ export function executePlan(start: DiagramDoc, steps: readonly PlanStep[], alias
         if (isOutcome(s)) return s;
         const t = node(step.target, 'target');
         if (isOutcome(t)) return t;
-        if (!step.name) return clarify('What should the new component be called?');
-        const inferred = inferNodeKind(step.name);
+        const name = step.name ?? step.technology ?? undefined;
+        if (!name) return clarify('What should the new component be called?');
+        const inferred = inferNodeKind(name);
         const technology = step.technology === null ? undefined : (step.technology ?? inferred.technology);
         const edgeId = step.edge ? aliases.aliasToEdge.get(step.edge) : undefined;
         if (step.edge && !edgeId) return clarify("I couldn't match that connection. Which one do you mean?");
@@ -195,10 +198,10 @@ export function executePlan(start: DiagramDoc, steps: readonly PlanStep[], alias
           sourceNodeId: s.id,
           targetNodeId: t.id,
           ...(edgeId ? { edgeId } : {}),
-          node: { name: step.name, kind: step.kind ?? inferred.kind, ...(technology ? { technology } : {}), metadata: {} },
+          node: { name, kind: step.kind ?? inferred.kind, ...(technology ? { technology } : {}), metadata: {} },
         };
         producesNode = true;
-        describe = () => `Inserted ${step.name} between ${from} and ${to}`;
+        describe = () => `Inserted ${name} between ${from} and ${to}`;
         break;
       }
     }
@@ -216,7 +219,10 @@ export function executePlan(start: DiagramDoc, steps: readonly PlanStep[], alias
     };
     const result = applyCommand(doc, valid.data, recording);
     if (!result.ok) return { ok: false, kind: 'REFUSED', error: result.error, stepIndex: index };
-    if (producesNode && step.as && firstId) created.set(step.as, firstId);
+    if (producesNode && firstId) {
+      // Models often refer to a node they just created as new1, new2... without declaring "as": number them implicitly.
+      created.set(step.as ?? `new${++implicitCount}`, firstId);
+    }
 
     doc = result.value;
     commands.push(valid.data);

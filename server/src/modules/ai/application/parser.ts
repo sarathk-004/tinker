@@ -25,7 +25,7 @@ const norm = (s: string) =>
 
 const stripSuffix = (s: string) => s.replace(/\s+(?:node|service|component|box|block|layer)$/i, '').trim();
 
-type Resolved = { ok: true; alias: string; name: string } | { ok: false; result: Extract<ParseResult, { kind: 'clarify' }> };
+type Resolved = { ok: true; alias: string; name: string } | { ok: false; result: Extract<ParseResult, { kind: 'clarify' | 'none' }> };
 
 function closeNames(doc: DiagramDoc, raw: string): string[] {
   const q = norm(raw);
@@ -43,6 +43,15 @@ function closeNames(doc: DiagramDoc, raw: string): string[] {
     .slice(0, 4);
 }
 
+/**
+ * A reference that reads like a DESCRIPTION ("an event queue from orders", "a new billing service") is not a name the
+ * parser can resolve or reasonably ask about: leave the whole request to the model instead of mis-parsing it.
+ */
+function looksLikeDescription(raw: string): boolean {
+  const q = norm(raw);
+  return q.split(' ').length > 4 || /^new\b/.test(q) || /\b(?:from|that|which|using|via|for|into|on top of)\b/.test(q);
+}
+
 function resolveRef(doc: DiagramDoc, aliases: AliasMap, rawIn: string): Resolved {
   const raw = stripSuffix(rawIn.trim().replace(/[.!?]+$/, ''));
   const byId = UUID.test(raw) ? doc.graph.nodes.find((n) => n.id.toLowerCase() === raw.toLowerCase()) : undefined;
@@ -52,6 +61,9 @@ function resolveRef(doc: DiagramDoc, aliases: AliasMap, rawIn: string): Resolved
   const q = norm(raw);
   const exact = doc.graph.nodes.filter((n) => norm(n.name) === q);
   if (exact.length === 1) return found(exact[0]!.id, exact[0]!.name);
+  // Only an exact name may match a description-like phrase; partial matching would grab "orders" out of
+  // "a cache that sits in front of orders" and silently act on the wrong thing.
+  if (exact.length === 0 && looksLikeDescription(raw)) return { ok: false, result: { kind: 'none' } };
   const candidates =
     exact.length > 1
       ? exact
@@ -64,12 +76,13 @@ function resolveRef(doc: DiagramDoc, aliases: AliasMap, rawIn: string): Resolved
     const names = candidates.map((n) => n.name);
     return { ok: false, result: { kind: 'clarify', question: `"${raw}" could mean ${names.slice(0, 4).join(', ')}. Which one do you mean?`, options: names.slice(0, 4) } };
   }
+  if (looksLikeDescription(raw)) return { ok: false, result: { kind: 'none' } };
   const suggestions = closeNames(doc, raw);
   const listing = doc.graph.nodes.length === 0 ? 'The diagram is empty.' : `Components here: ${doc.graph.nodes.slice(0, 6).map((n) => n.name).join(', ')}.`;
   return { ok: false, result: { kind: 'clarify', question: `I couldn't find a component called "${raw}". ${listing}`, options: suggestions } };
 }
 
-function both(doc: DiagramDoc, aliases: AliasMap, a: string, b: string): { a: Extract<Resolved, { ok: true }>; b: Extract<Resolved, { ok: true }> } | Extract<ParseResult, { kind: 'clarify' }> {
+function both(doc: DiagramDoc, aliases: AliasMap, a: string, b: string): { a: Extract<Resolved, { ok: true }>; b: Extract<Resolved, { ok: true }> } | Extract<ParseResult, { kind: 'clarify' | 'none' }> {
   const ra = resolveRef(doc, aliases, a);
   if (!ra.ok) return ra.result;
   const rb = resolveRef(doc, aliases, b);

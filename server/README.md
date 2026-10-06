@@ -24,7 +24,7 @@ The project URL is in `server/.env.supabase.local` (gitignored). The schema is a
 
 ## Typed commands and Gemini (I5)
 Plain typed commands ("put Redis between Orders and PostgreSQL") are understood by a deterministic parser and need no key. Free-form requests go to Gemini through the server only.
-1. Put `GEMINI_API_KEY=...` in `server/.env` (or `server/.env.supabase.local`). Never in a `VITE_*` variable, never in chat. Optional: `GEMINI_MODEL`, `AI_DEADLINE_MS` (15000), `AI_RATE_LIMIT_PER_MINUTE` (10), `AI_MAX_CONCURRENT` (2).
+1. Put `GEMINI_API_KEY=...` in `server/.env` (or `server/.env.supabase.local`). Never in a `VITE_*` variable, never in chat. Optional: `GEMINI_MODEL` (default `gemini-3.5-flash-lite`), `GEMINI_THINKING_LEVEL` (default `low`), `AI_DEADLINE_MS` (15000), `AI_RATE_LIMIT_PER_MINUTE` (10), `AI_MAX_CONCURRENT` (2).
 2. `npm run check:gemini` makes a few real calls (no database, no diagrams) and prints PASS/FAIL lines. Share those lines if something fails; they contain no key.
 3. Restart the API. `/v1/me` then reports `features.aiModel: true`.
 Without a key the API still serves typed parser commands and everything manual.

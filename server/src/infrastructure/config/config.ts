@@ -39,7 +39,10 @@ const envSchema = z
     RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(120),
     /** Server-side only. Without it AI commands answer 503 AI_UNAVAILABLE and manual editing is unaffected. */
     GEMINI_API_KEY: z.string().min(8).optional(),
-    GEMINI_MODEL: z.string().min(1).default('gemini-3.8-flash'),
+    /** Default measured on 2026-10-06 with this app's real prompt: gemini-3.5-flash-lite answers in ~1.5-2 s; gemini-3.8-flash was overloaded and hung. */
+    GEMINI_MODEL: z.string().min(1).default('gemini-3.5-flash-lite'),
+    /** `off` omits the setting. `minimal` is rejected by some models (it was by gemini-3.8-flash). */
+    GEMINI_THINKING_LEVEL: z.enum(['off', 'minimal', 'low', 'medium', 'high']).default('low'),
     /** Total wall-clock budget for interpreting one AI request, including every provider retry (decision D07). */
     AI_DEADLINE_MS: z.coerce.number().int().min(500).max(60_000).default(15_000),
     AI_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(10_000).default(10),
@@ -79,6 +82,7 @@ export interface Config {
     /** Secret. Never log or return it. */
     apiKey: string | undefined;
     model: string;
+    thinkingLevel: 'off' | 'minimal' | 'low' | 'medium' | 'high';
     deadlineMs: number;
     ratePerMinute: number;
     maxConcurrent: number;
@@ -129,6 +133,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     ai: {
       apiKey: e.GEMINI_API_KEY,
       model: e.GEMINI_MODEL,
+      thinkingLevel: e.GEMINI_THINKING_LEVEL,
       deadlineMs: e.AI_DEADLINE_MS,
       ratePerMinute: e.AI_RATE_LIMIT_PER_MINUTE,
       maxConcurrent: e.AI_MAX_CONCURRENT,

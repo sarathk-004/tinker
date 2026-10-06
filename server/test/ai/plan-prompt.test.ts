@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PROMPT_LIMITS, SYSTEM_INSTRUCTION, buildPrompt, renderDiagram } from '../../src/modules/ai/application/prompt.ts';
-import { MODEL_RESPONSE_JSON_SCHEMA, modelOutputSchema } from '../../src/modules/ai/domain/model-output.ts';
+import { MODEL_RESPONSE_JSON_SCHEMA, dropOverlongOptionalFields, modelOutputSchema } from '../../src/modules/ai/domain/model-output.ts';
 import { buildAliases, executePlan, inferNodeKind, type PlanStep } from '../../src/modules/ai/domain/plan.ts';
 import { mkDoc, ordersToPostgres, uid } from './helpers.ts';
 
@@ -19,6 +19,15 @@ describe('plan executor', () => {
     expect(res.doc.graph.nodes[2]).toMatchObject({ kind: 'CACHE', technology: 'Redis' });
     expect(res.summaries).toEqual([{ type: 'INSERT_BETWEEN', summary: 'Inserted Redis between Orders and PostgreSQL' }]);
     expect(doc.graph.nodes).toHaveLength(2); // input untouched
+  });
+
+  it('a node created without "as" can still be referred to as new1, new2 in order', () => {
+    const res = run(ordersToPostgres(), [
+      { type: 'INSERT_BETWEEN', technology: 'Redis', source: 'n1', target: 'n2' },
+      { type: 'UPDATE_NODE', ref: 'new1', technology: 'Valkey' },
+    ]);
+    if (!res.ok) throw new Error(JSON.stringify(res));
+    expect(res.doc.graph.nodes.find((n) => n.name === 'Redis')?.technology).toBe('Valkey');
   });
 
   it('later steps can use an alias for a node created earlier in the same plan', () => {
@@ -148,5 +157,12 @@ describe('prompt', () => {
     expect(renderDiagram(doc)).toBe(renderDiagram(structuredClone(doc)));
     expect(renderDiagram(doc)).toContain('n3: "C"');
     expect(renderDiagram(doc)).toContain('e2: n2 -> n3');
+  });
+});
+
+describe('dropOverlongOptionalFields', () => {
+  it('drops empty optional text too (a model sometimes sends "")', () => {
+    const cleaned = dropOverlongOptionalFields({ outcome: 'COMMANDS', commands: [{ type: 'ADD_NODE', name: 'Redis', technology: '', relationship: '  ' }] });
+    expect(modelOutputSchema.safeParse(cleaned).success).toBe(true);
   });
 });

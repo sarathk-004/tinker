@@ -12,6 +12,8 @@ import { ProviderError, type InterpretationProvider, type ProviderRequest, type 
 export interface GeminiOptions {
   apiKey: string;
   model: string;
+  /** Reasoning effort. Lower is faster; `off` omits it. Default `low`. */
+  thinkingLevel?: 'off' | 'minimal' | 'low' | 'medium' | 'high';
   baseUrl?: string;
   fetchImpl?: typeof fetch;
 }
@@ -69,6 +71,7 @@ function parseJsonText(text: string): unknown {
 
 export function createGeminiProvider(options: GeminiOptions): InterpretationProvider {
   const fetchImpl = options.fetchImpl ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
+  const thinking = options.thinkingLevel ?? 'low';
   const base = (options.baseUrl ?? 'https://generativelanguage.googleapis.com').replace(/\/$/, '');
 
   return {
@@ -86,7 +89,7 @@ export function createGeminiProvider(options: GeminiOptions): InterpretationProv
             model: options.model,
             input: request.content,
             system_instruction: request.systemInstruction,
-            generation_config: { max_output_tokens: MAX_OUTPUT_TOKENS },
+            generation_config: { max_output_tokens: MAX_OUTPUT_TOKENS, ...(thinking !== 'off' ? { thinking_level: thinking } : {}) },
             response_format: { type: 'text', mime_type: 'application/json', schema: request.responseSchema },
             store: false,
           }),

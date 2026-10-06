@@ -11,6 +11,13 @@ describe('loadConfig', () => {
     expect(config.databaseUrl).toBeUndefined();
   });
 
+  it('AI defaults: the measured fast model, low reasoning effort, 15 s deadline, 10/min, 2 concurrent', () => {
+    const { ai } = loadConfig({});
+    expect(ai).toMatchObject({ model: 'gemini-3.5-flash-lite', thinkingLevel: 'low', deadlineMs: 15_000, ratePerMinute: 10, maxConcurrent: 2, apiKey: undefined });
+    expect(loadConfig({ GEMINI_MODEL: 'gemini-3.8-flash', GEMINI_THINKING_LEVEL: 'off' }).ai).toMatchObject({ model: 'gemini-3.8-flash', thinkingLevel: 'off' });
+    expect(() => loadConfig({ GEMINI_THINKING_LEVEL: 'extreme' })).toThrow(ConfigError);
+  });
+
   it('requires CORS_ORIGINS in production', () => {
     expect(() => loadConfig({ NODE_ENV: 'production', ...PROD_BASE })).toThrow(ConfigError);
     expect(loadConfig({ NODE_ENV: 'production', ...PROD_BASE, CORS_ORIGINS: 'https://app.example.com' }).corsOrigins).toEqual(['https://app.example.com']);

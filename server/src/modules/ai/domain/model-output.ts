@@ -47,3 +47,28 @@ export const MODEL_RESPONSE_JSON_SCHEMA = {
   },
   required: ['outcome'],
 } as const;
+
+const OPTIONAL_TEXT_LIMITS = { technology: 120, relationship: 120 } as const;
+
+/**
+ * Models sometimes put a paragraph in an optional descriptive field. Those fields are decoration, so an over-long value is
+ * DROPPED rather than failing the whole plan (a retry costs seconds). Everything that matters (types, aliases, names, kinds)
+ * stays strictly validated afterwards. Returns the input unchanged when it is not the expected shape.
+ */
+export function dropOverlongOptionalFields(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const out = raw as { commands?: unknown };
+  if (!Array.isArray(out.commands)) return raw;
+  return {
+    ...(raw as Record<string, unknown>),
+    commands: out.commands.map((step) => {
+      if (!step || typeof step !== 'object' || Array.isArray(step)) return step;
+      const copy = { ...(step as Record<string, unknown>) };
+      for (const [field, max] of Object.entries(OPTIONAL_TEXT_LIMITS)) {
+        const value = copy[field];
+        if (typeof value === 'string' && (value.trim().length === 0 || value.trim().length > max)) delete copy[field];
+      }
+      return copy;
+    }),
+  };
+}

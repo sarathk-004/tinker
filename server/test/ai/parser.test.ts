@@ -88,6 +88,12 @@ describe('parser: unknown and ambiguous references are questions, never guesses'
     expect(clarify(parseCommand(d, 'connect orders to cache')).options).toEqual(['Cache', 'Cache']);
   });
 
+  it('a short unknown NAME is still a question (only descriptions are left to the model)', () => {
+    const d = mkDoc(['Orders', 'PostgreSQL']);
+    expect(clarify(parseCommand(d, 'connect Payments to Orders')).question).toContain('"Payments"');
+    expect(clarify(parseCommand(d, 'connect the Payments service to Orders')).question).toContain('Payments');
+  });
+
   it('an empty diagram says so', () => {
     expect(clarify(parseCommand(mkDoc([]), 'remove Orders')).question).toContain('empty');
   });
@@ -137,6 +143,9 @@ describe('parser: the other commands', () => {
 describe('parser: leaves anything else to the model', () => {
   const doc = ordersToPostgres();
   it.each([
+    'wire an event queue from orders to a new billing service',
+    'connect the orders service to the new billing database',
+    'link a cache that sits in front of orders to the database',
     'What happens if Orders goes down?',
     'Build me a typical three tier web app',
     'add a cache and connect it to Orders',

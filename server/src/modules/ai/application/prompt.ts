@@ -16,15 +16,25 @@ HOW TO REFER TO THINGS
 - A step that creates a component may set "as" (new1, new2, ...) so later steps in the same answer can refer to it.
 
 STEPS (at most ${MAX_PLAN_STEPS}), field by field
-- ADD_NODE: name, optional kind, optional technology, optional as.
+- ADD_NODE: name (REQUIRED), optional kind, optional technology, optional as.
 - REMOVE_NODE: ref.
 - RENAME_NODE: ref, name.
 - UPDATE_NODE: ref, and kind and/or technology.
 - CONNECT: source, target, optional relationship (a short protocol or label such as HTTP).
 - DISCONNECT: edge (preferred), or source and target.
-- INSERT_BETWEEN: source, target, name (the new component), optional kind, technology, edge (when there are several connections between source and target).
+- INSERT_BETWEEN: source, target, name (the new component, REQUIRED), optional kind, technology, edge (when there are several connections between source and target).
 - kind is one of: ${NODE_KINDS.join(', ')}.
-- Use the fewest steps. To place a component on an existing connection use INSERT_BETWEEN; if there is no connection, use ADD_NODE then two CONNECT steps.
+- Include EVERY step the request needs: when you add components, also add the CONNECT steps that wire them to the diagram (use "as" aliases for the new ones). Otherwise use the fewest steps and never repeat a step. A request to place one component between two others is ONE INSERT_BETWEEN step.
+- To place a component on an existing connection use INSERT_BETWEEN; if there is no connection, use ADD_NODE then two CONNECT steps.
+- Keep values short: name at most 60 characters, technology a short product name of at most 40 characters (for example "Redis" or "PostgreSQL 16"), relationship at most 30 characters. Never put sentences, questions, alternatives or explanations in any field.
+
+EXAMPLES (aliases are illustrative)
+- "put a cache between the api and the database" with n2 = API, n3 = Database, e2 = n2 -> n3:
+  {"outcome":"COMMANDS","commands":[{"type":"INSERT_BETWEEN","source":"n2","target":"n3","edge":"e2","name":"Redis","kind":"CACHE","technology":"Redis"}]}
+- "add a billing service fed by an event queue from orders" with n2 = Orders:
+  {"outcome":"COMMANDS","commands":[{"type":"ADD_NODE","as":"new1","name":"Event Queue","kind":"QUEUE"},{"type":"ADD_NODE","as":"new2","name":"Billing","kind":"SERVICE"},{"type":"CONNECT","source":"n2","target":"new1","relationship":"events"},{"type":"CONNECT","source":"new1","target":"new2"}]}
+- "make it better":
+  {"outcome":"CLARIFY","question":"What would you like to improve?","options":["Add a cache","Add a queue","Add authentication"]}
 
 WHEN NOT TO ACT
 - If the request is ambiguous, names something that is not in the diagram, or needs a choice, answer outcome CLARIFY with a short question and up to 4 options.

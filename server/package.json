@@ -14,7 +14,8 @@
     "db:migrate": "node-pg-migrate -m migrations up",
     "db:migrate:down": "node-pg-migrate -m migrations down",
     "db:migrate:create": "node-pg-migrate -m migrations create",
-    "check:gemini": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.supabase.local scripts/check-gemini.ts"
+    "check:gemini": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.supabase.local scripts/check-gemini.ts",
+    "diagnose:gemini": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.supabase.local scripts/diagnose-gemini.ts"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.8",

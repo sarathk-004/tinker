@@ -38,6 +38,24 @@ describe('Gemini adapter: request', () => {
   });
 });
 
+describe('Gemini adapter: reasoning effort', () => {
+  const bodyFor = async (thinkingLevel?: 'off' | 'minimal' | 'low' | 'medium' | 'high') => {
+    let sent: Record<string, unknown> = {};
+    const fetchImpl = (async (_u: string | URL, init?: RequestInit) => {
+      sent = JSON.parse(String(init?.body));
+      return ok(completed('{"outcome":"UNSUPPORTED"}'));
+    }) as unknown as typeof fetch;
+    await createGeminiProvider({ apiKey: SECRET, model: 'm', fetchImpl, ...(thinkingLevel ? { thinkingLevel } : {}) }).interpret(request, { signal: signal() });
+    return sent.generation_config as Record<string, unknown>;
+  };
+
+  it('asks for low reasoning effort by default (lower latency), configurable, and omitted when off', async () => {
+    expect(await bodyFor()).toMatchObject({ thinking_level: 'low' });
+    expect(await bodyFor('medium')).toMatchObject({ thinking_level: 'medium' });
+    expect(await bodyFor('off')).not.toHaveProperty('thinking_level');
+  });
+});
+
 describe('Gemini adapter: response', () => {
   const answer = (body: unknown) => createGeminiProvider({ apiKey: SECRET, model: 'm', fetchImpl: (async () => ok(body)) as unknown as typeof fetch });
 
@@ -118,6 +136,7 @@ describe('Gemini adapter: errors', () => {
 describe('interpretRequest: parser first, then the provider under one deadline', () => {
   const doc = ordersToPostgres();
   const base = { doc, history: [], deadlineMs: 400 };
+  const plan2 = (name: string, extra: Record<string, unknown>) => ({ outcome: 'COMMANDS', commands: [{ type: 'ADD_NODE', name, ...extra }] });
   const plan = (name = 'Redis') => ({ outcome: 'COMMANDS', commands: [{ type: 'ADD_NODE', name }] });
 
   it('plain commands never call the provider', async () => {
@@ -139,6 +158,18 @@ describe('interpretRequest: parser first, then the provider under one deadline',
     expect(q).toEqual({ kind: 'clarify', source: 'AI', question: 'Improve what?', options: ['Speed'] });
     const u = await interpretRequest({ ...base, text: 'what is a monad', provider: createFakeProvider([{ output: { outcome: 'UNSUPPORTED', message: 'I only edit diagrams.' } }]) });
     expect(u).toMatchObject({ kind: 'clarify', question: 'I only edit diagrams.' });
+  });
+
+  it('an over-long OPTIONAL field (a model writing a paragraph in "technology") is dropped, not a failure', async () => {
+    const provider = createFakeProvider([{ output: plan2('Redis', { technology: 'x'.repeat(300), relationship: 'y'.repeat(300) }) }]);
+    const r = await interpretRequest({ ...base, text: 'make it faster', provider });
+    expect(provider.calls).toHaveLength(1); // no retry needed
+    expect(r).toEqual({ kind: 'plan', source: 'AI', steps: [{ type: 'ADD_NODE', name: 'Redis' }] });
+  });
+
+  it('...but an over-long NAME (or any required field) still fails validation', async () => {
+    const provider = createFakeProvider([{ output: plan2('x'.repeat(300), {}) }]);
+    await expect(interpretRequest({ ...base, deadlineMs: 5_000, text: 'make it faster', provider })).rejects.toMatchObject({ kind: 'bad_output' });
   });
 
   it('malformed output is retried ONCE, then fails as bad_output; nothing is executed', async () => {
@@ -181,6 +212,31 @@ describe('interpretRequest: parser first, then the provider under one deadline',
     const provider = createFakeProvider([{ error: new ProviderError('unavailable', 'blip'), }]);
     await expect(interpretRequest({ ...base, deadlineMs: 1_000, text: 'do stuff', provider })).rejects.toMatchObject({ kind: 'unavailable' });
     expect(provider.calls).toHaveLength(1); // 1 s < the minimum retry budget
+  });
+
+  it('a hung first attempt is cut at half the budget and retried inside the total deadline', async () => {
+    const provider = createFakeProvider([{ output: plan(), delayMs: 5_000 }, { output: plan() }]);
+    const started = Date.now();
+    const r = await interpretRequest({ ...base, deadlineMs: 600, minRetryBudgetMs: 100, text: 'do stuff', provider });
+    expect(r).toMatchObject({ kind: 'plan', source: 'AI' });
+    expect(provider.calls).toHaveLength(2);
+    expect(Date.now() - started).toBeLessThan(600);
+  });
+
+  it('a hung retry still ends at the total deadline, with exactly two calls', async () => {
+    const provider = createFakeProvider([{ output: plan(), delayMs: 5_000, ignoreAbort: true }, { output: plan(), delayMs: 5_000, ignoreAbort: true }]);
+    const started = Date.now();
+    await expect(interpretRequest({ ...base, deadlineMs: 400, minRetryBudgetMs: 100, text: 'do stuff', provider })).rejects.toMatchObject({ kind: 'timeout' });
+    expect(Date.now() - started).toBeLessThan(700);
+    expect(provider.calls).toHaveLength(2);
+  });
+
+  it('exact repeats of a non-ADD step are dropped, repeated ADD_NODE steps are kept', async () => {
+    const insert = { type: 'INSERT_BETWEEN', source: 'n1', target: 'n2', name: 'Redis' };
+    const add = { type: 'ADD_NODE', name: 'Cache' };
+    const provider = createFakeProvider([{ output: { outcome: 'COMMANDS', commands: [insert, insert, insert, add, add] } }]);
+    const r = await interpretRequest({ ...base, deadlineMs: 5_000, text: 'do stuff', provider });
+    expect(r.kind === 'plan' && r.steps.map((s) => s.type)).toEqual(['INSERT_BETWEEN', 'ADD_NODE', 'ADD_NODE']);
   });
 
   it('a disabled provider answers "disabled" only when the model is actually needed', async () => {
