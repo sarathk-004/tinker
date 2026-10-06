@@ -74,10 +74,21 @@ describe('logical backup and restore', () => {
   });
 
   it('the export never writes to the source (read-only snapshot)', async () => {
-    const before = (await h.pool.query(`SELECT count(*)::int AS n, max(updated_at) AS latest FROM diagrams`)).rows[0];
-    await exportBackup(dbUrl, mkdtempSync(join(tmpdir(), 'tinker-backup-')));
-    const after = (await h.pool.query(`SELECT count(*)::int AS n, max(updated_at) AS latest FROM diagrams`)).rows[0];
-    expect(after).toEqual(before);
+    // An isolated copy, so other test files running in parallel cannot change the numbers being compared.
+    const seedDir = mkdtempSync(join(tmpdir(), 'tinker-backup-'));
+    await exportBackup(dbUrl, seedDir);
+    const source = await emptyDatabase();
+    await restoreBackup(source, seedDir);
+    const probe = async () => {
+      const client = new pg.Client(source);
+      await client.connect();
+      const { rows } = await client.query(`SELECT count(*)::int AS n, max(updated_at) AS latest, (SELECT count(*) FROM diagram_revisions)::int AS revisions, (SELECT sum(n_tup_upd + n_tup_ins + n_tup_del) FROM pg_stat_user_tables WHERE relname = 'diagrams')::int AS writes FROM diagrams`);
+      await client.end();
+      return rows[0];
+    };
+    const before = await probe();
+    await exportBackup(source, mkdtempSync(join(tmpdir(), 'tinker-backup-')));
+    expect(await probe()).toEqual(before);
   });
 
   it('verification catches a restore that lost data', async () => {

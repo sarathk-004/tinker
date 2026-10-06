@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Release artifact scan (acceptance A30): the BUILT frontend must carry no provider, server or database secrets.
 //   node scripts/check-artifacts.mjs [dist-dir]
 // Two layers:

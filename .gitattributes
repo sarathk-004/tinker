@@ -1,0 +1,6 @@
+# One line-ending policy for everyone (Windows checkouts would otherwise get CRLF, which breaks shell scripts and shebang files).
+* text=auto eol=lf
+*.sh text eol=lf
+*.mjs text eol=lf
+*.png binary
+*.jpg binary
