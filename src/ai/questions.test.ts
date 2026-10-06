@@ -10,6 +10,13 @@ describe('looksLikeQuestion', () => {
     expect(looksLikeQuestion('can you add Redis between Orders and PostgreSQL?')).toBe(false);
     expect(looksLikeQuestion('Please add a cache?')).toBe(false);
     expect(looksLikeQuestion('')).toBe(false);
+    // no question mark needed when it reads as a question
+    expect(looksLikeQuestion('is PostgreSQL a single point of failure')).toBe(true);
+    expect(looksLikeQuestion('what happens if Orders goes down')).toBe(true);
+    expect(looksLikeQuestion('Explain the data flow')).toBe(true);
+    expect(looksLikeQuestion('add a cache')).toBe(false);
+    expect(looksLikeQuestion('connect Orders to Redis')).toBe(false);
+    expect(looksLikeQuestion('rename island to Isle')).toBe(false); // starts with "is" only as part of a word
   });
 });
 
