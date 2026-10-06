@@ -14,7 +14,8 @@ import WebSocket from 'ws';
 const port = Number(process.env.CHECK_PORT ?? 8799);
 const base = `http://127.0.0.1:${port}`;
 const allowed = 'https://app.tinker.example';
-const databaseUrl = process.env.DATABASE_URL ?? 'postgres://tinker:tinker@localhost:54329/tinker';
+// The local development database, unless CHECK_TARGET=env (check:production:supabase) asks for the database in the .env file.
+const databaseUrl = process.env.CHECK_TARGET === 'env' && process.env.DATABASE_URL ? process.env.DATABASE_URL : 'postgres://tinker:tinker@localhost:54329/tinker';
 const supabaseUrl = process.env.SUPABASE_URL ?? 'https://rnwbgjrzbliqvqradjcm.supabase.co';
 
 let failures = 0;

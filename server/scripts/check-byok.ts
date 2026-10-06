@@ -1,7 +1,7 @@
 /**
  * Live check of bring-your-own-key with the REAL model (no secrets printed). It starts its own API on PORT in `user` mode with NO
  * operator key at all (so nothing can possibly run on the operator's key), then plays a person who adds their own key.
- *   npm run check:byok -w @tinker/server            (reads the key to try from GEMINI_API_KEY in server/.env, only to send it to the local API)
+ *   npm run check:byok -w @tinker/server            (reads the key to try from GEMINI_API_KEY in .env, only to send it to the local API)
  * Proves: without a key the model features are off but plain commands work; a bogus key is refused by Google; a real key is accepted,
  * stored ENCRYPTED (the database holds no readable key), and the person's free-form request runs on it; removing it switches AI off; and
  * the key appears nowhere in the API's logs.
@@ -14,12 +14,13 @@ import { client, devLogin } from './support/http.ts';
 
 const realKey = process.env.GEMINI_API_KEY;
 if (!realKey) {
-  console.error('GEMINI_API_KEY is not set (server/.env): it is only used as the key the simulated person pastes.');
+  console.error('GEMINI_API_KEY is not set (.env): it is only used as the key the simulated person pastes.');
   process.exit(2);
 }
 const port = Number(process.env.CHECK_PORT ?? 8798);
 const base = `http://127.0.0.1:${port}`;
-const databaseUrl = process.env.DATABASE_URL ?? 'postgres://tinker:tinker@localhost:54329/tinker';
+// Always the LOCAL development database, whatever the .env points at (this check writes a throw-away user and key).
+const databaseUrl = 'postgres://tinker:tinker@localhost:54329/tinker';
 let failures = 0;
 const check = (ok: boolean, label: string, detail = '') => {
   if (!ok) failures++;

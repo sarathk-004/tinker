@@ -4,7 +4,7 @@ Updated: 2026-10-06
 Active milestone: I9 implemented on branch `implementation-9` (plus the follow-ups of 2026-10-06: Supabase certificate verified, Google sign-in replaced by email verification, bring-your-own-key AI) (stack: main <- ... <- 8 <- 9). Branches 1-8 are pushed; implementation-9 is committed locally and NOT pushed. Release verdict (docs/release-readiness.md): the software is release-ready, the deployment is not: blockers B1-B9 need accounts, a paid plan or the user's approval. After I9 the user wants: later checks, UI changes, a few fixes, setup.
 
 ## See it locally
-Terminals: `npm run dev:db -w @tinker/server`, then `npm run dev:api:supabase` (your Supabase project) or `npm run dev:api` (local dev login), then `npm run dev`; open http://localhost:5173/ and type in the command bar. Plain commands work with no key. For free-form requests put `GEMINI_API_KEY=...` in `server/.env` (or `server/.env.supabase.local`), restart the API, and run `npm run check:gemini` first (LC22).
+Terminals: `npm run dev:db -w @tinker/server`, then `npm run dev:api:supabase` (your Supabase project) or `npm run dev:api` (local dev login), then `npm run dev`; open http://localhost:5173/ and type in the command bar. Plain commands work with no key. For free-form requests put `GEMINI_API_KEY=...` in `.env` (or `.env`), restart the API, and run `npm run check:gemini` first (LC22).
 
 ## I9 completion record (verified 2026-10-06)
 Full evidence table and blockers: `docs/release-readiness.md`. Costs: `docs/costs-and-limits.md`. How to run and ship: `docs/runbook.md`.

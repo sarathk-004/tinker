@@ -138,7 +138,9 @@ export class ConfigError extends Error {
 const DEV_DEFAULT_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173'];
 
 /** Validates the environment. Error messages name variables but never echo values (they may be secrets). */
-export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
+export function loadConfig(input: Record<string, string | undefined> = process.env): Config {
+  // One .env file serves both halves: the API accepts the browser's public project address when SUPABASE_URL is not set separately.
+  const env = { ...input, ...(input['SUPABASE_URL'] || !input['VITE_SUPABASE_URL'] ? {} : { SUPABASE_URL: input['VITE_SUPABASE_URL'] }) };
   const parsed = envSchema.safeParse(env);
   if (!parsed.success) {
     throw new ConfigError(parsed.error.issues.map((i) => `${i.path.join('.') || 'env'}: ${i.message}`));

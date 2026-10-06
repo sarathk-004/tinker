@@ -6,7 +6,7 @@
  */
 const key = process.env.GEMINI_API_KEY;
 if (!key) {
-  console.error('GEMINI_API_KEY is not set (server/.env).');
+  console.error('GEMINI_API_KEY is not set (.env).');
   process.exit(2);
 }
 const base = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';

@@ -10,7 +10,6 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "npm run dev -w @tinker/server",
-    "dev:api:supabase": "npm run dev:api:supabase -w @tinker/server",
     "check:supabase": "npm run check:supabase -w @tinker/server",
     "build": "tsc -b && vite build && node scripts/write-headers.mjs",
     "preview": "vite preview",
@@ -21,7 +20,8 @@
     "check:artifacts": "node scripts/check-artifacts.mjs",
     "check": "npm run typecheck && npm run test && npm run check:boundaries",
     "test:web": "vitest run",
-    "check:gemini": "npm run check:gemini -w @tinker/server"
+    "check:gemini": "npm run check:gemini -w @tinker/server",
+    "dev:api:local": "npm run dev:api:local -w @tinker/server"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.4",

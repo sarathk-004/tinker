@@ -14,9 +14,9 @@ Retrieval index: `graphify-out/` built from `6e0130d` on 2026-10-05 (333 nodes).
 | Typecheck all workspaces | `npm run typecheck` | PASS (I1) |
 | Tests (Vitest: shared, server) | `npm test` | 295 tests PASS (I5: shared 17, server 220, frontend 58 via `npm run test:web`; server tests start an isolated real Postgres) |
 | Boundary check | `npm run check:boundaries` (`--strict` fails on legacy VITE_* key refs) | PASS (I1) |
-| API dev server | `npm run dev:api` (server/.env from server/.env.example; needs `dev:db` first) | /health, /health/ready 200 verified (I3) |
+| API dev server | `npm run dev:api` (reads the single root `.env`; `npm run dev:api:local` uses the local database and needs `dev:db` first) | /health, /health/ready 200 verified (I3) |
 | Local database | `npm run dev:db -w @tinker/server` (embedded Postgres 18.4 on :54329, data in `server/.data/`) | running; migrations up/down/up verified |
-| DB migrate | `npm run db:migrate -w @tinker/server` (reads `server/.env` DATABASE_URL) | PASS on Postgres 18.4 |
+| DB migrate | `npm run db:migrate -w @tinker/server` (reads `.env` DATABASE_URL) | PASS on Postgres 18.4 |
 | CI | `.github/workflows/ci.yml` | not yet run on GitHub |
 | Lint / format | none | no eslint config |
 

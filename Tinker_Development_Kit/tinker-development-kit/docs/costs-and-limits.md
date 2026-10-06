@@ -5,7 +5,7 @@ before committing to a plan. Nothing here is a quote. "Estimate" marks anything 
 
 ## What this project's accounts are on today
 - Supabase organization "Tinker": **Free** plan (read from the project through the Supabase connector). Region: ap-southeast-1.
-- Gemini: the key in `server/.env` is on a free tier (the older preview speech models returned "quota exceeded ... 10 requests" on 2026-10-06).
+- Gemini: the key in `.env` is on a free tier (the older preview speech models returned "quota exceeded ... 10 requests" on 2026-10-06).
 - Railway, Cloudflare: no account is connected to this repository; nothing is deployed.
 
 ## Supabase (https://supabase.com/pricing, https://supabase.com/docs/guides/platform/backups)

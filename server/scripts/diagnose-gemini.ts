@@ -12,7 +12,7 @@ import type { DiagramDoc } from '../src/modules/diagrams/domain/index.ts';
 const config = loadConfig({ ...process.env, NODE_ENV: 'development' });
 const key = config.ai.apiKey;
 if (!key) {
-  console.error('GEMINI_API_KEY is not set in server/.env');
+  console.error('GEMINI_API_KEY is not set in .env');
   process.exit(2);
 }
 const base = 'https://generativelanguage.googleapis.com';

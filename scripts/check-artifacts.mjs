@@ -39,8 +39,9 @@ function* files(dir) {
 /** Values that must never reach the browser, read from env files that exist on this machine. Returns [label, value] pairs. */
 export function localSecretValues(rootDir = root) {
   const out = [];
-  const SERVER_KEYS = /^(GEMINI_API_KEY|DATABASE_URL|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_ACCESS_TOKEN|DATABASE_SSL_CA_FILE)$/;
-  for (const file of ['server/.env', 'server/.env.supabase.local', '.env.supabase.local']) {
+  const SERVER_KEYS = /^(GEMINI_API_KEY|DATABASE_URL|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_ACCESS_TOKEN|KEY_ENCRYPTION_SECRET|KEY_ENCRYPTION_SECRET_PREVIOUS)$/;
+  // The single root .env (server settings live there too), plus the old per-folder files while any still exist.
+  for (const file of ['.env', 'server/.env', 'server/.env.supabase.local', '.env.supabase.local']) {
     const path = join(rootDir, file);
     if (!existsSync(path)) continue;
     for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {

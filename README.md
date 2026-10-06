@@ -39,8 +39,8 @@ VITE_SUPABASE_URL=https://<project-ref>.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxxxxx   # public by design; never the secret/service_role key
 ```
 
-Server settings live in `server/.env` (see `server/.env.example` and `server/README.md`): database, Supabase, and later the Gemini key.
-The Gemini key is server-side only (`GEMINI_API_KEY` in `server/.env`); the app never calls Gemini from the browser. Typed commands work now (plain ones without any key); voice returns in a later update.
+Server settings live in the SAME root `.env` (see `.env.example` and `server/README.md`): database, Supabase, the Gemini key.
+The Gemini key is server-side only (`GEMINI_API_KEY` in `.env`); the app never calls Gemini from the browser. Typed commands work now (plain ones without any key); voice returns in a later update.
 
 ### 3. Start the app
 

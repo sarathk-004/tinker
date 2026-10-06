@@ -1,7 +1,7 @@
 /**
  * Live check of the voice path with a real key and NO microphone: a Gemini text-to-speech model speaks a sentence, the audio goes
  * through OUR Gemini Live gateway exactly as the browser's would, and we expect the model to propose the right tool call.
- *   npm run check:voice          (reads GEMINI_API_KEY from server/.env; the key is never printed)
+ *   npm run check:voice          (reads GEMINI_API_KEY from .env; the key is never printed)
  * It proves: the endpoint and setup are accepted, 16 kHz PCM is understood, transcription events arrive, and the model calls
  * edit_diagram / ask_about_diagram with a sensible request. It changes nothing (no database).
  */
@@ -13,7 +13,7 @@ import { synthesizeSpeech, withTrailingSilence } from './support/speech.ts';
 const config = loadConfig({ ...process.env, NODE_ENV: 'development' });
 const key = config.ai.apiKey;
 if (!key) {
-  console.error('GEMINI_API_KEY is not set (put it in server/.env).');
+  console.error('GEMINI_API_KEY is not set (put it in .env).');
   process.exit(2);
 }
 const scrub = (text: string) => text.split(key!).join('[key]');

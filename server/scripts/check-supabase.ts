@@ -1,5 +1,5 @@
 /**
- * Smoke-check the Supabase wiring without changing anything. Reads server/.env.supabase.local (or the environment).
+ * Smoke-check the Supabase wiring without changing anything. Reads .env (or the environment).
  *   npm run check:supabase -w @tinker/server
  * Optional inputs (never printed): SUPABASE_ACCESS_TOKEN (a real user JWT) to verify a live token,
  * DATABASE_URL to test the database connection and row level security.
@@ -72,7 +72,7 @@ if (config.databaseUrl) {
     await pool.end();
   }
 } else {
-  console.log('SKIP  database (set DATABASE_URL in server/.env.supabase.local)');
+  console.log('SKIP  database (set DATABASE_URL in .env)');
 }
 
 process.exit(results.some(([, ok]) => !ok) ? 1 : 0);

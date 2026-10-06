@@ -6,7 +6,7 @@
  *   npm run backup:export -w @tinker/server -- <dir>           export only (consistent snapshot, one NDJSON file per table + manifest)
  *   npm run backup:restore -w @tinker/server -- <dir>          restore a backup into the (empty) database at RESTORE_URL
  *
- * SOURCE is DATABASE_URL (server/.env, or server/.env.supabase.local via `npm run backup:drill:supabase`). The drill never writes to
+ * SOURCE is DATABASE_URL (.env, or .env via `npm run backup:drill:supabase`). The drill never writes to
  * the source: the export runs in a READ ONLY, REPEATABLE READ transaction. Backups contain user data: they go to `backups/` (git-ignored).
  * Reports: rows and bytes, time to export, time to restore (= the measured RTO for this data size), and the age of the data (RPO).
  */
@@ -75,7 +75,7 @@ if (command === 'export') {
 } else if (command === 'drill' || command === undefined) {
   const url = process.env.DATABASE_URL;
   if (!url) {
-    console.error('DATABASE_URL is not set (server/.env).');
+    console.error('DATABASE_URL is not set (.env).');
     process.exit(2);
   }
   process.exit(await drill(url));

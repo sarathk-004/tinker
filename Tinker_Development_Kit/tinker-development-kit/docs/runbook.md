@@ -1,7 +1,7 @@
 # Runbook: run it, check it, ship it, recover it
 
 Written in I9 against the real repository (2026-10-06). Every command below was run; where something could not be run here it says so.
-No secret appears in this file: values are placeholders, real ones live in `server/.env` (git-ignored) or the host's secret store.
+No secret appears in this file: values are placeholders, real ones live in `.env` (git-ignored) or the host's secret store.
 
 ## 1. Run it on your machine (fresh setup)
 
@@ -17,8 +17,8 @@ npm run worker -w @tinker/server         # optional terminal 4: background clean
 ```
 
 - Everything works without any key. Plain commands ("add Orders", "put Redis between A and B"), manual editing, history, undo and advice
-  (computed from the graph) need no model. For free-form AI, voice and spoken replies put `GEMINI_API_KEY=...` in `server/.env`.
-- Use your own Supabase project instead of the local login: `server/.env.supabase.local` (see `server/.env.example`) and
+  (computed from the graph) need no model. For free-form AI, voice and spoken replies put `GEMINI_API_KEY=...` in `.env`.
+- Use your own Supabase project instead of the local login: `.env` (see `.env.example`) and
   `npm run dev:api:supabase`; the browser needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in the root `.env`.
 - A production-shaped preview with containers: `docker compose -f docker-compose.preview.yml up --build`, then `npm run build && npm run preview`.
 
@@ -32,9 +32,9 @@ npm run worker -w @tinker/server         # optional terminal 4: background clean
 | `npm run check:production -w @tinker/server` | the API refuses bad production configuration and behaves as a deployed instance (no dev routes, strict CORS, forged tokens refused, voice origin) | local database |
 | `npm run bench:api -w @tinker/server` | latency percentiles for a stated workload, with misses reported | API running with dev login |
 | `npm run backup:drill -w @tinker/server` | backup, restore into a fresh database, verification, measured time (A32) | `DATABASE_URL` |
-| `npm run check:supabase -w @tinker/server` | live JWKS, forged tokens, TLS, row level security, migration recorded | `.env.supabase.local` |
+| `npm run check:supabase -w @tinker/server` | live JWKS, forged tokens, TLS, row level security, migration recorded | `.env` |
 | `npm run check:byok -w @tinker/server` | bring-your-own-key with the real model: nothing runs without a key, a bogus key is refused, a real key is stored encrypted and runs the person's request, removal switches it off, the key is in no log | `GEMINI_API_KEY` (only as the key the simulated person pastes) |
-| `npm run check:production:supabase -w @tinker/server` | the same production-mode checks against your Supabase database with the certificate VERIFIED | `.env.supabase.local`, `server/certs/supabase-ca.crt` |
+| `npm run check:production:supabase -w @tinker/server` | the same production-mode checks against your Supabase database with the certificate VERIFIED | `.env`, `server/certs/supabase-ca.crt` |
 | `npm run check:gemini` / `check:voice` / `check:voice:api` | the real model, voice and spoken replies | `GEMINI_API_KEY` |
 
 ## 3. Configuration inventory

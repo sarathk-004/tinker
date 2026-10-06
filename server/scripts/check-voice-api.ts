@@ -13,7 +13,7 @@ const base = process.env.API_URL ?? 'http://127.0.0.1:8787';
 const origin = 'http://localhost:5173';
 const config = loadConfig({ ...process.env, NODE_ENV: 'development' });
 if (!config.ai.apiKey) {
-  console.error('GEMINI_API_KEY is not set (server/.env).');
+  console.error('GEMINI_API_KEY is not set (.env).');
   process.exit(2);
 }
 const key = config.ai.apiKey;

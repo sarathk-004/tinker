@@ -1,6 +1,6 @@
 /**
  * Live smoke test of the Gemini integration. Needs a real key; changes nothing (no database, no diagrams).
- *   npm run check:gemini -w @tinker/server      (reads GEMINI_API_KEY from server/.env or the environment)
+ *   npm run check:gemini -w @tinker/server      (reads GEMINI_API_KEY from .env or the environment)
  *   CHECK_RUNS=3 npm run check:gemini           (repeat each request to see how consistent the model is)
  * It checks what fake-provider tests cannot: that the real endpoint accepts our request, that the response is found and
  * parses, that the output passes the same validation the server applies, AND that the resulting diagram is what was asked for.
@@ -15,7 +15,7 @@ import type { DiagramDoc } from '../src/modules/diagrams/domain/index.ts';
 
 const config = loadConfig({ ...process.env, NODE_ENV: 'development' });
 if (!config.ai.apiKey) {
-  console.error('GEMINI_API_KEY is not set (put it in server/.env, never in a VITE_* variable).');
+  console.error('GEMINI_API_KEY is not set (put it in .env, never in a VITE_* variable).');
   process.exit(2);
 }
 const provider = createGeminiProvider({ apiKey: config.ai.apiKey, model: config.ai.model, thinkingLevel: config.ai.thinkingLevel });

@@ -68,7 +68,7 @@ Date for all records below: 2026-10-05 (I0). "User" = explicit answer in chat; "
 - Workspace/member management routes (create workspace, invite, roles) are NOT built; tests grant roles directly in SQL. Diagram listing is capped at 200 without pagination.
 
 ## I3 Supabase wiring (2026-10-05)
-- Project: `rnwbgjrzbliqvqradjcm` (region ap-southeast-1, Postgres 17). URL is not a secret and is in `server/.env.supabase.local` (gitignored via `*.local`). The browser-side publishable key is public by design; the boundary check now allows `VITE_*PUBLISHABLE*` names but still rejects other `VITE_*KEY/SECRET/TOKEN/PASSWORD`.
+- Project: `rnwbgjrzbliqvqradjcm` (region ap-southeast-1, Postgres 17). URL is not a secret and is in `.env` (gitignored via `*.local`). The browser-side publishable key is public by design; the boundary check now allows `VITE_*PUBLISHABLE*` names but still rejects other `VITE_*KEY/SECRET/TOKEN/PASSWORD`.
 - Schema applied to the Supabase project through the Supabase connector (`apply_migration` named `initial_schema`), then recorded in node-pg-migrate's `pgmigrations` table so `npm run db:migrate` against Supabase is a no-op. Future migrations: apply with `npm run db:migrate` once `DATABASE_URL` is set (preferred) so both tools agree.
 - Database TLS is explicit: `DATABASE_SSL=off|verify|no-verify` (+ `DATABASE_SSL_CA_FILE`). `sslmode` in the URL is stripped so the policy cannot be overridden by a pasted Supabase URL. `no-verify` is rejected in production. Use the Supabase session pooler (port 5432) for the API; transaction-mode pooling (6543) is untested.
 - The API must connect as a role that owns the tables or bypasses RLS (Supabase `postgres` does both); `check:supabase` verifies this because otherwise RLS-with-no-policies would make every read silently empty.
@@ -149,3 +149,8 @@ Date for all records below: 2026-10-05 (I0). "User" = explicit answer in chat; "
 - Bring-your-own-key: `AI_KEY_MODE` (`server` | `user` | `user_or_server`; production default `user`). Keys are stored only as AES-256-GCM ciphertext (nonce per key, id-bound AAD, key fingerprint for rotation) under `KEY_ENCRYPTION_SECRET`, checked with the provider before saving, limited to 5 submissions a minute, never returned, logged or kept in the browser, deleted on removal. Each request resolves the asking person's providers (typed AI, advice, speech, voice). Without a key the model features are off but plain commands, editing, history and computed advice keep working. Considered and rejected: keeping the key only in the browser (every request would carry it and an injected script could read it; AGENTS.md also forbids provider secrets in browser storage).
 - Database TLS is verified with the Supabase root certificate shipped in `server/certs/` (public, not a secret) and copied into the container image.
 
+
+## One .env file (I9)
+- Decision: a single git-ignored root `.env` serves the web app (`VITE_*` lines only) and the API/scripts. `.env.example` documents every setting. The old browser-side Gemini lines are gone.
+- Default mode is your Supabase project; `npm run dev:api:local`, `dev:worker:local` and `db:migrate:local` switch to the local database and developer login without editing the file.
+- Why: two env files confused which one was live. Backup of the pre-merge files (contains secrets, git-ignored): `backups/env-before-merge-*`.
