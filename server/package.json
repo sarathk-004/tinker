@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
+    "worker": "tsx --env-file-if-exists=.env src/worker.ts",
+    "dev:worker": "tsx watch --env-file-if-exists=.env src/worker.ts",
+    "worker:supabase": "tsx --env-file=.env.supabase.local src/worker.ts",
     "start": "tsx --env-file-if-exists=.env src/main.ts",
     "typecheck": "tsc -p tsconfig.json",
     "dev:db": "tsx scripts/dev-db.ts",

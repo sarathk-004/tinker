@@ -15,8 +15,10 @@ import {
   Loader2,
   CheckCircle2,
   Play,
+  History,
 } from 'lucide-react';
 import { TinkerLogo } from './TinkerLogo';
+import { VersionsPanel } from './VersionsPanel';
 
 interface Suggestion {
   id: string;
@@ -52,7 +54,7 @@ export const SidebarPanel: React.FC = () => {
   };
 
   const [isOpen, setIsOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<'advisor' | 'conversation'>('advisor');
+  const [activeTab, setActiveTab] = useState<'advisor' | 'conversation' | 'versions'>('advisor');
   
   // Resizable sidebar width (persisted in localStorage)
   const [width, setWidth] = useState<number>(() => {
@@ -328,6 +330,19 @@ export const SidebarPanel: React.FC = () => {
                     </span>
                   )}
                 </button>
+
+                {/* Versions Tab */}
+                <button
+                  onClick={() => setActiveTab('versions')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                    activeTab === 'versions'
+                      ? 'bg-white text-[#26251e] border border-[#e6e5e0] shadow-2xs'
+                      : 'text-[#5a5852] hover:text-[#26251e]'
+                  }`}
+                >
+                  <History className="w-3.5 h-3.5 text-[#807d72]" />
+                  <span>Versions</span>
+                </button>
               </div>
 
               {/* Close Button */}
@@ -454,6 +469,9 @@ export const SidebarPanel: React.FC = () => {
                 )}
               </div>
             )}
+
+            {/* Tab 3: saved versions, restore */}
+            {activeTab === 'versions' && <VersionsPanel />}
 
             {/* Tab 2: Conversation & Architectural History */}
             {activeTab === 'conversation' && (

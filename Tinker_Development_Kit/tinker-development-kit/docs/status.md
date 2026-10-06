@@ -1,10 +1,24 @@
 # Development status
 
 Updated: 2026-10-06
-Active milestone: I7 implemented on branch `implementation-7` (stack: main <- implementation-1 <- ... <- 6 <- 7). Branches 1-6 are pushed; implementation-7 is committed locally and NOT pushed. Next: I8 (history, restore, maintenance). Reminder for I9: add "Continue with Google" sign-in (LC19). Still needs YOU: try the microphone in your own Chrome (LC30); the built-in browser blocks it.
+Active milestone: I8 implemented on branch `implementation-8` (stack: main <- implementation-1 <- ... <- 7 <- 8). Branches 1-7 are pushed; implementation-8 is committed locally and NOT pushed. Next: I9 (release readiness). TELL THE USER AT THE START OF I9: Google sign-in (LC19) is planned there. Before I9: the new `jobs` table must be applied to the Supabase project (LC34), and the microphone check in a real Chrome is still open (LC30).
 
 ## See it locally
 Terminals: `npm run dev:db -w @tinker/server`, then `npm run dev:api:supabase` (your Supabase project) or `npm run dev:api` (local dev login), then `npm run dev`; open http://localhost:5173/ and type in the command bar. Plain commands work with no key. For free-form requests put `GEMINI_API_KEY=...` in `server/.env` (or `server/.env.supabase.local`), restart the API, and run `npm run check:gemini` first (LC22).
+
+## I8 completion record (verified 2026-10-06)
+| Task | Where | Evidence |
+|---|---|---|
+| Authorized revision listing; restore as a new version, never decrementing | `modules/history/*`, `shared/src/history.ts`, routes `GET /v1/diagrams/{id}/revisions[/{version}]`, `POST /v1/diagrams/{id}/restore` | 13 API tests: baseline revision on creation, newest-first paging, drags create none, restore => version+1 with a RESTORE revision and execution record, redo = restore the version we came from, can go back to empty, retry replays once, key reuse 409, stale version 409, unknown version 422 `REVISION_NOT_FOUND`, same content 422 `ALREADY_CURRENT`, two concurrent restores => exactly one wins; viewers read but cannot restore (403), strangers 404, deleted diagram 404 |
+| Restore through the shared transaction and idempotency path | `history-service.ts` (`runIdempotent`, same lock, version check, atomic commit) | injected failure after the revision insert rolls everything back and the same key then succeeds |
+| Postgres job claiming, short claim transaction, recoverable lease | `migrations/1761000000000_jobs.sql`, `modules/jobs/queue.ts` | 12 tests: operation-key dedupe, `FOR UPDATE SKIP LOCKED` (12 concurrent claimers, 5 jobs, no duplicates), lease + heartbeat |
+| Fence stale workers, retry bounds, sanitized errors | `queue.ts`, `worker.ts` | a worker whose lease was taken over cannot complete, fail or heartbeat (fenced, result discarded); retry after 10 s then 60 s, third failure = dead letter; a job that crashes its workers every time is dead-lettered (bounded); stored errors are one line without URLs, tokens or stack traces; error kinds LEASE_EXPIRED / SCHEMA / EXTERNAL / INTERNAL |
+| Revision pruning, expired execution cleanup, deletion purge | `modules/jobs/handlers.ts` | pruning needs BOTH outside the latest 100 AND older than 30 days; recent history beyond 100 and short or ancient short histories are kept; expired request bodies are dropped but the key stays a tombstone (the old key answers 410 and never re-executes), in-flight requests untouched, diagnostics after 90 days, tombstones after 90; purge removes only diagrams deleted more than 30 days ago with everything attached, one diagram per transaction, live and recently deleted diagrams untouched; every handler is safe to run twice |
+| Defer export/deep-analysis workers | `jobs` table allows only the three implemented types | adding a type is a new migration |
+| Crash after claim, duplicate worker, idempotent behaviour | `test/jobs/jobs.test.ts` | covered above |
+Gate: restore creates a new canonical version (live: Undo took 3 nodes to 2 and Redo back to 3 in the real app, each as a new saved version); dead workers do not strand jobs (a crashed claim is retaken after its lease lapses, once); cleanup respects the retention and replay policy and current diagram state. The real worker process (`npm run worker`) was started against the dev database: it scheduled and completed the three maintenance jobs.
+UI: Undo / Redo buttons in the header and Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y (not while typing in a text field); a "Versions" tab in the sidebar listing saved versions with one-click Restore. Undo/redo are restores (durable, work across refresh and devices); drags create no versions so Undo steps over structural changes only.
+Commands: `npm run typecheck` PASS; `npm test` PASS (shared 17, server 328, frontend 106); `npm run check:boundaries` PASS.
 
 ## I7 completion record (verified 2026-10-06)
 | Task | Where | Evidence |
@@ -62,8 +76,8 @@ Live (built-in browser, real API + Postgres, no Gemini key): typed "add Orders",
 ## Earlier milestones (details in git history, decisions.md and later-checks.md)
 I1 contracts/API foundation; I2 pure engine; I3 persistence, identity, authorization, idempotency, RLS, Supabase verified; I4 durable editor (sign-in, serialized idempotent writes, conflict drafts, browser Gemini code removed).
 
-## Next action (I8)
-History, restore and maintenance: list revisions, restore as a new version (RESTORE revision, expectedVersion, idempotency), revision pruning (D11), soft-delete recovery. This is also where undo/redo (LC14) belongs. Read implementation-plan.md I8 first.
+## Next action (I9)
+Release readiness. FIRST tell the user it is I9 (Google sign-in, LC19). Then: read implementation-plan.md I9, the open later-checks (LC1 transaction pooler, LC2 key rotation drill, LC3 CI first run, LC24, LC26, LC30-LC34), apply the I8 migration to Supabase, deployment and production configuration (separate API and worker processes), CI, security review, final acceptance run.
 
 ## Handoff template
 - Active task / milestone:

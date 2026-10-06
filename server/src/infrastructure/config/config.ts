@@ -45,6 +45,9 @@ const envSchema = z
     GEMINI_THINKING_LEVEL: z.enum(['off', 'minimal', 'low', 'medium', 'high']).default('low'),
     /** Gemini Live model used for voice (verified against the real endpoint on 2026-10-06). */
     GEMINI_LIVE_MODEL: z.string().min(1).default('gemini-3.8-live'),
+    /** Background worker (decision D12): how often to look for work, and how long a claim lasts without a heartbeat. */
+    WORKER_POLL_MS: z.coerce.number().int().min(200).max(300_000).default(5_000),
+    WORKER_LEASE_SECONDS: z.coerce.number().int().min(5).max(3_600).default(60),
     /** Spoken replies (text to speech). Verified against the real endpoint on 2026-10-06. */
     GEMINI_TTS_MODEL: z.string().min(1).default('gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts'),
     GEMINI_TTS_VOICE: z.string().min(1).default('Kore'),
@@ -100,6 +103,7 @@ export interface Config {
     maxConcurrent: number;
   };
   voice: { maxSessions: number; maxSessionMs: number };
+  worker: { pollMs: number; leaseSeconds: number };
 }
 
 export class ConfigError extends Error {
@@ -155,5 +159,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       maxConcurrent: e.AI_MAX_CONCURRENT,
     },
     voice: { maxSessions: e.VOICE_MAX_SESSIONS, maxSessionMs: e.VOICE_MAX_SESSION_MS },
+    worker: { pollMs: e.WORKER_POLL_MS, leaseSeconds: e.WORKER_LEASE_SECONDS },
   };
 }

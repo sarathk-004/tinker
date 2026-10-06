@@ -8,6 +8,7 @@ import {
   aiCommandResponseSchema,
   conversationResponseSchema,
   speakResponseSchema,
+  revisionListResponseSchema,
   errorEnvelopeSchema,
   meResponseSchema,
   type AiAskResponse,
@@ -19,6 +20,7 @@ import {
   type DiagramListResponse,
   type ErrorCode,
   type MeResponse,
+  type RevisionListResponse,
   type SpeakResponse,
 } from '../contracts';
 
@@ -196,6 +198,14 @@ export function createApiClient(options: ApiClientOptions) {
         timeoutMs: 28_000,
         noRetryCodes: ['AI_TIMEOUT', 'AI_PROVIDER_ERROR', 'AI_UNAVAILABLE', 'RATE_LIMITED'],
       }).then((r) => r.data as AiAskResponse),
+    /** Version history, newest first (view access is enough). */
+    revisions: (diagramId: string, query: { before?: number; limit?: number } = {}) => {
+      const params = new URLSearchParams();
+      if (query.before) params.set('before', String(query.before));
+      if (query.limit) params.set('limit', String(query.limit));
+      const qs = params.toString();
+      return request('GET', `/v1/diagrams/${diagramId}/revisions${qs ? `?${qs}` : ''}`, undefined, undefined, revisionListResponseSchema).then((r) => r.data as RevisionListResponse);
+    },
     /** Read one of my assistant messages aloud (server-synthesized). The server only accepts a message id, never text. */
     speak: (diagramId: string, messageId: string) =>
       request('POST', `/v1/diagrams/${diagramId}/ai/speak`, { messageId }, undefined, speakResponseSchema, {

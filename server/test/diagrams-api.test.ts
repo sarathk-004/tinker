@@ -8,7 +8,7 @@ const addNode = (name: string, kind = 'SERVICE') => ({ type: 'ADD_NODE', node: {
 async function counts(h: Harness, diagramId: string) {
   const { rows } = await h.pool.query(
     `SELECT (SELECT version FROM diagrams WHERE id = $1)::int AS version,
-            (SELECT count(*) FROM diagram_revisions WHERE diagram_id = $1)::int AS revisions,
+            (SELECT count(*) FROM diagram_revisions WHERE diagram_id = $1 AND NOT (reason = 'CHECKPOINT' AND version = 1))::int AS revisions, -- the creation baseline (I8) is not an edit
             (SELECT count(*) FROM command_executions WHERE diagram_id = $1)::int AS executions,
             (SELECT count(*) FROM mutation_requests WHERE diagram_id = $1 AND resource LIKE '/v1/diagrams/%')::int AS requests`,
     [diagramId],

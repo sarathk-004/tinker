@@ -11,6 +11,8 @@ import {
   idempotencyKeySchema,
   presentationPatchRequestSchema,
   renameDiagramRequestSchema,
+  restoreRequestSchema,
+  revisionListQuerySchema,
   speakRequestSchema,
   uuidSchema,
   versionSchema,
@@ -23,6 +25,7 @@ import type { RateLimiter } from '../../../infrastructure/http/rate-limiter.ts';
 import type { RunResult, TestHooks } from '../../../infrastructure/idempotency/mutation-requests.ts';
 import { listWorkspaces } from '../../workspaces/access.ts';
 import { askAdvice } from '../../ai/application/advice-service.ts';
+import { getRevisionDetail, listRevisions, restoreRevision } from '../../history/application/history-service.ts';
 import { speakMessage } from '../../voice/speak-service.ts';
 import { executeAiCommand, loadConversation, type AiRuntime } from '../../ai/application/ai-service.ts';
 import {
@@ -157,6 +160,25 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
       const body = parseOrThrow(aiAskRequestSchema, request.body, 'INVALID_REQUEST', 'Invalid question.');
       const aiDeps = { ...svc, ai: deps.ai, log: (message: string, data: Record<string, unknown>) => request.log.warn(data, message), metric: (message: string, data: Record<string, unknown>) => request.log.info(data, message) };
       return askAdvice(aiDeps, actorOf(request), diagramId, body);
+    });
+
+    // History (D11): listing needs view access; restoring is an ordinary idempotent, version-checked write.
+    app.get(`${API_PREFIX}/diagrams/:diagramId/revisions`, async (request) => {
+      const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
+      const query = parseOrThrow(revisionListQuerySchema, request.query, 'INVALID_REQUEST', 'Invalid history query.');
+      return listRevisions(svc, actorOf(request), diagramId, query);
+    });
+
+    app.get(`${API_PREFIX}/diagrams/:diagramId/revisions/:version`, async (request) => {
+      const { diagramId, version } = parseOrThrow(z.object({ diagramId: uuidSchema, version: z.coerce.number().int().min(1) }), request.params, 'INVALID_REQUEST', 'Invalid revision.');
+      return getRevisionDetail(svc, actorOf(request), diagramId, version);
+    });
+
+    app.post(`${API_PREFIX}/diagrams/:diagramId/restore`, async (request, reply) => {
+      const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
+      const key = idempotencyKeyOf(request);
+      const body = parseOrThrow(restoreRequestSchema, request.body, 'INVALID_REQUEST', 'Invalid restore request.');
+      return send(reply, request, await restoreRevision(svc, actorOf(request), diagramId, key, body));
     });
 
     // Read an assistant message aloud: view access, no idempotency key (nothing is mutated).

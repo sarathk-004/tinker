@@ -1,6 +1,7 @@
 import React from 'react';
 import { useDiagramStore } from '../diagram/store';
-import { RotateCcw, ArrowRightLeft, ArrowUpDown } from 'lucide-react';
+import { RotateCcw, ArrowRightLeft, ArrowUpDown, Undo2, Redo2 } from 'lucide-react';
+import { useHistoryStore } from '../history/history';
 import { TinkerLogo } from './TinkerLogo';
 import { DiagramBar } from './DiagramBar';
 
@@ -9,6 +10,9 @@ export const Header: React.FC = () => {
   const edges = useDiagramStore((s) => s.edges);
   const layoutDir = useDiagramStore((s) => s.layoutDir);
   const hasDiagram = useDiagramStore((s) => s.doc.diagram !== null);
+  const canUndo = useHistoryStore((s) => s.canUndo);
+  const canRedo = useHistoryStore((s) => s.canRedo);
+  const busy = useHistoryStore((s) => s.busy);
 
   const toggleLayout = () => void useDiagramStore.getState().applyLayout(layoutDir === 'LR' ? 'TB' : 'LR');
   const resetCanvas = () => {
@@ -32,6 +36,27 @@ export const Header: React.FC = () => {
           <span className="text-[#26251e] font-medium">{nodes.length}</span> nodes
           <span className="text-[#a09c92]">·</span>
           <span className="text-[#26251e] font-medium">{edges.length}</span> edges
+        </div>
+
+        <div className="flex items-center rounded-md border border-[#e6e5e0] bg-white overflow-hidden">
+          <button
+            onClick={() => void useHistoryStore.getState().undo()}
+            disabled={!hasDiagram || !canUndo || busy}
+            title="Undo (Ctrl+Z): go back to the previous saved version. It is saved as a new version, so nothing is lost."
+            aria-label="Undo"
+            className="p-1.5 text-[#26251e] hover:bg-[#fafaf7] disabled:opacity-35 disabled:hover:bg-white"
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => void useHistoryStore.getState().redo()}
+            disabled={!hasDiagram || !canRedo || busy}
+            title="Redo (Ctrl+Shift+Z)"
+            aria-label="Redo"
+            className="p-1.5 text-[#26251e] hover:bg-[#fafaf7] border-l border-[#e6e5e0] disabled:opacity-35 disabled:hover:bg-white"
+          >
+            <Redo2 className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         <button

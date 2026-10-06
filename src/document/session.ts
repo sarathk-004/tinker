@@ -112,13 +112,15 @@ type Item =
   | { type: 'presentation'; key: string; positions: Record<string, Position>; viewport?: Viewport; sent?: MutationSpec; sentPositions?: Record<string, Position>; waiters: Waiter[] }
   | { type: 'rename'; key: string; name: string; sent?: MutationSpec; waiters: Waiter[] }
   /** A typed command: interpreted by the server, committed (or answered with a question) as ONE queued write. */
-  | { type: 'ai'; key: string; text: string; conversationId?: string; sent?: MutationSpec; waiters: Waiter[] };
+  | { type: 'ai'; key: string; text: string; conversationId?: string; sent?: MutationSpec; waiters: Waiter[] }
+  /** Make the diagram look like an older revision, as a NEW version (undo, redo and "restore this version"). */
+  | { type: 'restore'; key: string; version: number; sent?: MutationSpec; waiters: Waiter[] };
 
 interface Draft {
   diagramId: string;
   baseVersion: number;
   savedAt: number;
-  items: Array<{ type: 'command'; command: DiagramCommand; label: string } | { type: 'presentation'; positions: Record<string, Position>; viewport?: Viewport } | { type: 'rename'; name: string } | { type: 'ai'; text: string; conversationId?: string }>;
+  items: Array<{ type: 'command'; command: DiagramCommand; label: string } | { type: 'presentation'; positions: Record<string, Position>; viewport?: Viewport } | { type: 'rename'; name: string } | { type: 'ai'; text: string; conversationId?: string } | { type: 'restore'; version: number }>;
 }
 
 const draftKey = (diagramId: string) => `tinker_draft_${diagramId}`;
@@ -253,6 +255,8 @@ export function createDocumentSession(deps: SessionDeps) {
           body: { expectedVersion, ...(item.conversationId ? { conversationId: item.conversationId } : {}), input: { type: 'TEXT', text: item.text } },
           idempotencyKey: item.key,
         };
+      case 'restore':
+        return { method: 'POST', path: `${base}/restore`, body: { expectedVersion, version: item.version }, idempotencyKey: item.key };
       case 'presentation': {
         // Positions for nodes that no longer exist (removed by an earlier queued command) must not be sent.
         const ids = new Set(graph.nodes.map((n) => n.id));
@@ -370,7 +374,7 @@ export function createDocumentSession(deps: SessionDeps) {
         queue.shift();
         const reason = (error.details as { reason?: string } | undefined)?.reason;
         failWaiters(new RefusedError(error.message, reason));
-        if (item.type !== 'ai') setNotice('error', error.message);
+        if (item.type !== 'ai' && item.type !== 'restore') setNotice('error', error.message); // typed commands and restores report where they were asked
         setStatus('idle');
         return 'continue';
       }
@@ -409,6 +413,7 @@ export function createDocumentSession(deps: SessionDeps) {
     if (item.type === 'command') return { type: 'command', command: item.command, label: item.label };
     if (item.type === 'rename') return { type: 'rename', name: item.name };
     if (item.type === 'ai') return { type: 'ai', text: item.text, ...(item.conversationId ? { conversationId: item.conversationId } : {}) };
+    if (item.type === 'restore') return { type: 'restore', version: item.version };
     return { type: 'presentation', positions: item.positions, ...(item.viewport ? { viewport: item.viewport } : {}) };
   }
 
@@ -437,7 +442,7 @@ export function createDocumentSession(deps: SessionDeps) {
       expectedVersion: d?.expectedVersion ?? null,
       currentVersion: d?.currentVersion ?? null,
       draftCount: drafts.length,
-      descriptions: drafts.map((i) => (i.type === 'command' ? i.label : i.type === 'rename' ? `Rename diagram to "${i.name}"` : i.type === 'ai' ? `Ask: "${i.text.slice(0, 60)}"` : 'Moved nodes')),
+      descriptions: drafts.map((i) => (i.type === 'command' ? i.label : i.type === 'rename' ? `Rename diagram to "${i.name}"` : i.type === 'ai' ? `Ask: "${i.text.slice(0, 60)}"` : i.type === 'restore' ? `Restore version ${i.version}` : 'Moved nodes')),
     };
     setNotice('error', 'This diagram changed elsewhere. Your unsaved changes were kept.');
     setStatus('conflict');
@@ -469,6 +474,18 @@ export function createDocumentSession(deps: SessionDeps) {
     return new Promise((resolve, reject) => {
       try {
         enqueue({ type: 'ai', key: newKey(), text, ...(conversationId ? { conversationId } : {}), waiters: [{ resolve: resolve as Waiter['resolve'], reject }] });
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
+  /** Restore an older revision as a new version. Resolves with the new head; rejects like any write (RefusedError when nothing would change or the version is gone). */
+  function restore(version: number): Promise<DiagramDetail> {
+    flushPositionsNow();
+    return new Promise((resolve, reject) => {
+      try {
+        enqueue({ type: 'restore', key: newKey(), version, waiters: [{ resolve: resolve as Waiter['resolve'], reject }] });
       } catch (e) {
         reject(e);
       }
@@ -559,6 +576,7 @@ export function createDocumentSession(deps: SessionDeps) {
         if (item.type === 'command') await command(item.command, item.label);
         else if (item.type === 'rename') await renameDiagram(item.name);
         else if (item.type === 'ai') await ai(item.text, item.conversationId);
+        else if (item.type === 'restore') await restore(item.version);
         else savePositions(item.positions, item.viewport);
         applied += 1;
       } catch (e) {
@@ -597,6 +615,7 @@ export function createDocumentSession(deps: SessionDeps) {
     close,
     command,
     ai,
+    restore,
     renameDiagram,
     savePositions,
     flush,

@@ -39,7 +39,7 @@ export interface Actor {
   requestId: string;
 }
 
-const detail = (row: DiagramRow): DiagramDetail => ({
+export const detail = (row: DiagramRow): DiagramDetail => ({
   diagramId: row.id,
   workspaceId: row.workspaceId,
   name: row.name,
@@ -80,6 +80,8 @@ export async function createDiagram(deps: ServiceDeps, actor: Actor, workspaceId
       await authorizeWorkspace(tx, actor.userId, workspaceId, 'modify');
       const row = await insertDiagram(tx, { workspaceId, name: input.name, createdBy: actor.userId });
       await attachDiagramToRequest(tx, mutationRequestId, row.id);
+      // A baseline to go back to: without it the very first change could never be undone.
+      await insertRevision(tx, { diagramId: row.id, version: row.version, graph: row.graph, presentation: row.presentation, reason: 'CHECKPOINT', createdBy: actor.userId });
       return { status: 201, body: detail(row) };
     },
     deps.hooks,

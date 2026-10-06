@@ -121,13 +121,13 @@ Typed-command completion does not imply voice readiness.
 
 ## I8 — History, restore and maintenance
 Read: D11–D12; Phase 3 sections 4/14.
-- [ ] Implement authorized revision listing and restore as a new version, never decrementing version.
-- [ ] Restore graph and presentation through the shared transaction/idempotency path.
-- [ ] Implement Postgres job claiming with short claim transaction and recoverable lease.
-- [ ] Fence stale workers, enforce retry bounds, and store sanitized errors.
-- [ ] Implement revision pruning, expired execution cleanup and deletion purge.
-- [ ] Defer export/deep-analysis workers until those features have explicit acceptance criteria.
-- [ ] Verify crash after claim, duplicate worker execution and idempotent artifact behavior.
+- [x] Implement authorized revision listing and restore as a new version, never decrementing version.
+- [x] Restore graph and presentation through the shared transaction/idempotency path.
+- [x] Implement Postgres job claiming with short claim transaction and recoverable lease.
+- [x] Fence stale workers, enforce retry bounds, and store sanitized errors.
+- [x] Implement revision pruning, expired execution cleanup and deletion purge.
+- [x] Defer export/deep-analysis workers until those features have explicit acceptance criteria.
+- [x] Verify crash after claim, duplicate worker execution and idempotent artifact behavior.
 Gate: restore creates a new canonical version; dead workers do not strand jobs; cleanup respects retention/replay policy and current diagram state.
 
 ## I9 — Release readiness

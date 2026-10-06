@@ -20,12 +20,27 @@ function fakeServer() {
     failures: [] as Array<ApiError | 'lost-response'>,
     gate: undefined as undefined | Promise<void>,
     loads: 0,
+    /** Saved structural versions (what the real server keeps in diagram_revisions). Version 1 is the empty baseline. */
+    revs: new Map<number, { graph: Graph; presentation: Presentation }>(),
   };
+  s.revs.set(1, { graph: s.graph, presentation: s.presentation });
   const detail = (): DiagramDetail => ({ diagramId: DIAGRAM, workspaceId: uid(9), name: s.name, version: s.version, graph: s.graph, presentation: s.presentation, updatedAt: '2026-01-01T00:00:00.000Z' });
 
   function apply(spec: MutationSpec): CommandResponse | DiagramDetail | AiCommandResponse {
     const body = spec.body as { expectedVersion: number; command?: DiagramCommand; name?: string; nodePositions?: Record<string, { x: number; y: number }>; viewport?: Presentation['viewport'] };
     if (body.expectedVersion !== s.version) throw new ApiError('DIAGRAM_VERSION_CONFLICT', 'conflict', 409, { expectedVersion: body.expectedVersion, currentVersion: s.version });
+    if (spec.path.endsWith('/restore')) {
+      const target = s.revs.get((spec.body as { version: number }).version);
+      if (!target) throw new ApiError('DOMAIN_VALIDATION_FAILED', 'That version is not in the history (it may be older than the history window).', 422, { reason: 'REVISION_NOT_FOUND' });
+      if (JSON.stringify(target.graph) === JSON.stringify(s.graph) && JSON.stringify(target.presentation) === JSON.stringify(s.presentation)) {
+        throw new ApiError('DOMAIN_VALIDATION_FAILED', 'The diagram already looks like that version.', 422, { reason: 'ALREADY_CURRENT' });
+      }
+      s.graph = target.graph;
+      s.presentation = target.presentation;
+      s.version += 1;
+      s.revs.set(s.version, { graph: s.graph, presentation: s.presentation });
+      return detail();
+    }
     if (spec.path.endsWith('/ai/command')) {
       const text = (spec.body as { input: { text: string } }).input.text;
       const msgs = (summary: string, status: string) => [
@@ -42,6 +57,7 @@ function fakeServer() {
       s.graph = { ...s.graph, nodes: [...s.graph.nodes, { id, name, kind: 'SERVICE', metadata: {} }] };
       s.presentation = { ...s.presentation, nodePositions: { ...s.presentation.nodePositions, [id]: { x: 0, y: 0 } } };
       s.version += 1;
+      s.revs.set(s.version, { graph: s.graph, presentation: s.presentation });
       return { status: 'APPLIED', source: 'PARSER', interpretation: { commands: [{ type: 'ADD_NODE', summary: `Added ${name}` }] }, conversationId: uid(700), messages: msgs(`Added ${name}.`, 'APPLIED'), diagram: { id: DIAGRAM, version: s.version, graph: s.graph, presentation: s.presentation } };
     }
     if (spec.path.endsWith('/commands')) {
@@ -57,6 +73,7 @@ function fakeServer() {
         s.presentation = { ...s.presentation, nodePositions: rest };
       }
       s.version += 1;
+      s.revs.set(s.version, { graph: s.graph, presentation: s.presentation });
       return { diagramId: DIAGRAM, version: s.version, appliedCommand: { type: c.type }, graph: s.graph, presentation: s.presentation };
     }
     if (spec.path.endsWith('/presentation')) {
@@ -454,5 +471,69 @@ describe('document session: typed commands travel through the same queue', () =>
     expect(await session.reapplyDraft()).toEqual({ applied: 1, refused: 0 });
     expect(s.graph.nodes.map((n) => n.name)).toEqual(['Mine']);
     expect((s.received[s.received.length - 1]!.body as { expectedVersion: number }).expectedVersion).toBe(2);
+  });
+});
+
+describe('document session: restore (undo, redo and "restore this version")', () => {
+  it('restores an older version as a NEW version through the same queue, and the document follows the server', async () => {
+    const { session, s } = await newSession();
+    await session.command(add('A'), 'Add A');
+    await session.command(add('B'), 'Add B'); // v3
+    const head = await session.restore(2); // back to just A
+    expect(head.version).toBe(4);
+    expect(s.graph.nodes.map((n) => n.name)).toEqual(['A']);
+    expect(session.getState().diagram?.version).toBe(4);
+    expect(session.getState().graph.nodes.map((n) => n.name)).toEqual(['A']);
+    expect((s.received[s.received.length - 1]!.body as { expectedVersion: number; version: number })).toEqual({ expectedVersion: 3, version: 2 });
+  });
+
+  it('is ordered with other writes and uses the version the previous one produced', async () => {
+    const { session, s } = await newSession();
+    await session.command(add('A'), 'Add A');
+    const writes = [session.command(add('B'), 'Add B'), session.restore(2)];
+    await Promise.all(writes);
+    expect(s.graph.nodes.map((n) => n.name)).toEqual(['A']);
+    const bodies = s.received.map((r) => r.body as { expectedVersion: number });
+    expect(bodies.map((b) => b.expectedVersion)).toEqual([1, 2, 3]);
+  });
+
+  it('a missing or already-current version rejects with the reason, shows no error banner, and does not block the session', async () => {
+    const { session } = await newSession();
+    await session.command(add('A'), 'Add A');
+    const gone = await session.restore(99).catch((e) => e);
+    expect(gone).toBeInstanceOf(RefusedError);
+    expect((gone as RefusedError).reason).toBe('REVISION_NOT_FOUND');
+    const same = await session.restore(2).catch((e) => e);
+    expect((same as RefusedError).reason).toBe('ALREADY_CURRENT');
+    expect(session.getState().status).toBe('idle'); // NOT blocked (a missing revision is not a missing diagram)
+    expect(session.getState().notice).toBeNull();
+    await session.command(add('B'), 'Add B'); // editing still works
+    expect(session.getState().graph.nodes).toHaveLength(2);
+  });
+
+  it('a retry after a lost response replays with the SAME key and restores once', async () => {
+    const { session, s } = await newSession();
+    await session.command(add('A'), 'Add A');
+    await session.command(add('B'), 'Add B');
+    s.failures.push('lost-response');
+    const done = session.restore(2);
+    await tick();
+    expect(session.getState().status).toBe('failed');
+    session.retry();
+    await done;
+    expect(s.version).toBe(4); // one restore, not two
+    const restores = s.received.filter((r) => r.path.endsWith('/restore'));
+    expect(restores).toHaveLength(1);
+  });
+
+  it('a conflict keeps the restore in the draft and re-apply submits it again on the latest version', async () => {
+    const { session, s, bump, storage } = await newSession();
+    await session.command(add('A'), 'Add A');
+    bump(); // someone else saved
+    await expect(session.restore(1)).rejects.toBeInstanceOf(ConflictError);
+    expect(session.getState().conflict?.descriptions).toEqual(['Restore version 1']);
+    expect(JSON.parse(storage.data.get(`tinker_draft_${DIAGRAM}`)!).items).toEqual([{ type: 'restore', version: 1 }]);
+    expect(await session.reapplyDraft()).toEqual({ applied: 1, refused: 0 });
+    expect(s.graph.nodes).toHaveLength(0);
   });
 });

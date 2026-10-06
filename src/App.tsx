@@ -10,6 +10,7 @@ import { StatusBanners } from './components/StatusBanners';
 import { initAuth, signOut, useAuthStore } from './auth/auth';
 import { session } from './document/instance';
 import { useWorkspaceStore } from './workspace/workspaceStore';
+import { historyKeyHandler, watchHistory } from './history/history';
 
 const Splash: React.FC<{ text: string }> = ({ text }) => (
   <div className="min-h-screen w-screen flex items-center justify-center bg-[#f7f7f4] text-[#5a5852] text-sm gap-2">
@@ -50,11 +51,15 @@ export const App: React.FC = () => {
         e.returnValue = '';
       }
     };
+    window.addEventListener('keydown', historyKeyHandler);
+    const stopWatchingHistory = watchHistory();
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onFocus);
     window.addEventListener('online', onOnline);
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => {
+      window.removeEventListener('keydown', historyKeyHandler);
+      stopWatchingHistory();
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onFocus);
       window.removeEventListener('online', onOnline);
