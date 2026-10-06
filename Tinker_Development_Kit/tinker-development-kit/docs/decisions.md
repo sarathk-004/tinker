@@ -136,3 +136,11 @@ Date for all records below: 2026-10-05 (I0). "User" = explicit answer in chat; "
 - Deleted diagrams: soft-deleted for 30 days, then purged by the worker with everything attached, one diagram per transaction. There is no recovery API yet (LC35).
 - Jobs (D12): Postgres table, `FOR UPDATE SKIP LOCKED` short claim, lease with heartbeat, a lease token that completion/failure/heartbeat must present (fencing), 3 attempts with 10 s and 60 s delays then DEAD_LETTER, sanitized one-line errors with a kind, deterministic operation keys for enqueue, hourly scheduling by the worker itself. Only the three maintenance types exist; export and deep-analysis jobs wait for acceptance criteria. The worker is a separate process (`npm run worker`); it is not started by the API.
 
+## I9 release readiness (2026-10-06)
+- Plain commands the parser understands no longer count against the per-user AI limit or concurrency cap: those limits apply only when the model is actually needed.
+- The per-request user lookup is one read with no transaction when the user, personal workspace and membership exist and the token adds nothing new; the full upsert transaction runs only on first sight or a changed email or name.
+- One structured `request` log line per API call (route pattern, status, milliseconds, error code) replaces Fastify's two default lines (which print full URLs with ids). Logs never contain bodies, tokens, prompts, ids or user text.
+- Backups: the managed provider's backups are not available on the Free plan, so a provider-independent logical backup (`backup:drill`) is part of the product's recovery story; it runs on a consistent read-only snapshot and verifies by checksum. Hourly runs would bound the loss window to one hour.
+- Sign-in: Supabase PKCE with session detection in the address; Google, password reset and confirmation links all return to the app's own origin, which must be allowed in Supabase. The password-reset answer never reveals whether an address has an account.
+- One line-ending policy (`.gitattributes`, LF) because Windows checkouts broke a script with a `#!` first line.
+

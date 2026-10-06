@@ -132,15 +132,16 @@ Gate: restore creates a new canonical version; dead workers do not strand jobs; 
 
 ## I9 — Release readiness
 Read: runbook and acceptance release cases.
-- [ ] Run relevant checks and end-to-end critical paths on a fresh setup.
-- [ ] Validate configuration, migrations and backward-compatible rollout sequence.
-- [ ] Verify ownership checks, public table exposure, CORS/origins and secret-free frontend artifacts.
-- [ ] Add structured logs and metrics for command latency, conflicts, AI failures and job leases.
-- [ ] Measure p95 targets with an explicit workload/region; report misses rather than assuming goals.
-- [ ] Validate managed backup/PITR capabilities against RPO/RTO; run a recovery drill.
-- [ ] Document costs/limits only after checking current provider plans.
-- [ ] Prepare hosting configuration and review the runnable preview before deployment.
+- [x] Run relevant checks and end-to-end critical paths on a fresh setup.
+- [x] Validate configuration, migrations and backward-compatible rollout sequence.
+- [x] Verify ownership checks, public table exposure, CORS/origins and secret-free frontend artifacts.
+- [x] Add structured logs and metrics for command latency, conflicts, AI failures and job leases.
+- [x] Measure p95 targets with an explicit workload/region; report misses rather than assuming goals.
+- [x] Validate managed backup/PITR capabilities against RPO/RTO; run a recovery drill.
+- [x] Document costs/limits only after checking current provider plans.
+- [ ] Prepare hosting configuration and review the runnable preview before deployment. (Configuration prepared and the production-mode runtime reviewed; the container preview was not built here (B4) and nothing is deployed (B2), so this stays open.)
 Gate: critical behaviors pass with evidence; unresolved release blockers are stated. Deployment completion requires actual deployment verification.
+I9 result: see docs/release-readiness.md (verdict: software ready, deployment blocked by B1-B9).
 
 ## Task completion record
 For each checked task record: task ID, affected files, verification command/result, notable limitations.

@@ -51,3 +51,9 @@ Record missing credentials or unavailable services as blockers.
 Do not check boxes from implementation alone.
 Latency and availability targets require workloads/observations; passing unit tests is insufficient.
 
+## Release evidence (I9, 2026-10-06)
+| ID | Result | Evidence |
+|---|---|---|
+| A30 | pass | `npm run check:artifacts`: no secret shapes, server-only names or real local secret values in `dist` |
+| A31 | pass | `scripts/fresh-setup-check.sh`: empty clone through migrations, API, 26-step smoke path, backup drill, worker |
+| A32 | partly | own backup and restore drilled and timed (7.1 s for 21,675 rows); the provider's backup/PITR could not be drilled: the Supabase project is on the Free plan (blocker B1) |

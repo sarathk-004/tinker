@@ -14,8 +14,8 @@ step() { printf '\n== %s\n' "$1"; }
 ok() { printf 'PASS  %s\n' "$1"; }
 bad() { printf 'FAIL  %s\n' "$1"; FAILED=1; }
 cleanup() {
-  [ -n "${API_PID:-}" ] && taskkill //PID "$API_PID" //T //F >/dev/null 2>&1
-  [ -n "${DB_PID:-}" ] && taskkill //PID "$DB_PID" //T //F >/dev/null 2>&1
+  # Background jobs started here are Git-Bash processes whose ids taskkill cannot see: stop everything that runs from the clone by its path.
+  powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -like '*$(basename "$WORK")*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force -ErrorAction SilentlyContinue }" >/dev/null 2>&1
   sleep 4 # let Windows release the database files
   cd "$SRC" && rm -rf "$WORK" 2>/dev/null || echo "(temporary folder $WORK could not be removed yet; it is safe to delete by hand)"
 }
@@ -54,7 +54,7 @@ DATABASE_URL="$DATABASE_URL" npm run backup:drill -w @tinker/server >"$WORK/dril
 npm run worker -w @tinker/server >"$WORK/worker.log" 2>&1 &
 WORKER_PID=$!
 sleep 12
-taskkill //PID "$WORKER_PID" //T //F >/dev/null 2>&1
+kill "$WORKER_PID" 2>/dev/null
 grep -q '"job completed"' "$WORK/worker.log" && ok "worker scheduled and completed its jobs" || { bad "worker"; tail -5 "$WORK/worker.log"; }
 
 echo

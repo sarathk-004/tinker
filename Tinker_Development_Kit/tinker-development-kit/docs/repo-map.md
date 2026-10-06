@@ -41,6 +41,9 @@ Retrieval index: `graphify-out/` built from `6e0130d` on 2026-10-05 (333 nodes).
 | Prototype AI code (reference only) | `Tinker_Development_Kit/tinker-development-kit/legacy/prototype-ai/` | not compiled; input for I5/I7 |
 | AI: parser, prompt, plan executor, provider gateway, service | `server/src/modules/ai/{domain,application,providers,persistence}`, `server/src/infrastructure/http/concurrency-limiter.ts`, `shared/src/ai.ts` | I5 |
 | Read-only advice (ask) and graph analyzer | `server/src/modules/analysis/graph-analyzer.ts`, `server/src/modules/ai/application/{advice,advice-service,provider-call}.ts`, `src/ai/{aiCommands,questions}.ts` | I6 |
+| Release checks and operations | `scripts/{check-artifacts.mjs,fresh-setup-check.sh}`, `server/scripts/{smoke-api,check-production-mode,bench-api,backup-drill,log-report}.ts`, `server/src/infrastructure/{backup,observability}/*` | I9 |
+| Hosting files | `Dockerfile`, `.dockerignore`, `docker-compose.preview.yml`, `railway.json`, `public/_headers`, `public/_redirects`, `.github/workflows/ci.yml`, `.gitattributes` | I9 |
+| Sign-in (password, Google, reset) | `src/auth/auth.ts`, `src/components/LoginScreen.tsx` | I4, I9 |
 | History, restore, undo/redo | `shared/src/history.ts`, `server/src/modules/history/*`, `src/history/history.ts`, `src/components/VersionsPanel.tsx` | I8 |
 | Background jobs and worker | `server/migrations/1761000000000_jobs.sql`, `server/src/modules/jobs/{queue,handlers,worker}.ts`, `server/src/worker.ts` | I8 |
 | Voice: contract, gateway, session, routes | `shared/src/voice.ts`, `server/src/modules/voice/{live-gateway,gemini-live,fake-live,voice-session,routes,speech-provider,speak-service}.ts` | I7 |

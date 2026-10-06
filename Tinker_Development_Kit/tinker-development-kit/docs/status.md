@@ -1,10 +1,26 @@
 # Development status
 
 Updated: 2026-10-06
-Active milestone: I8 implemented on branch `implementation-8` (stack: main <- implementation-1 <- ... <- 7 <- 8). Branches 1-7 are pushed; implementation-8 is committed locally and NOT pushed. Next: I9 (release readiness). TELL THE USER AT THE START OF I9: Google sign-in (LC19) is planned there. The I8 `jobs` table is applied to Supabase (LC34 done). Still open for the user: the microphone check in a real Chrome (LC30) and leaked-password protection in the Supabase dashboard (LC37).
+Active milestone: I9 implemented on branch `implementation-9` (stack: main <- ... <- 8 <- 9). Branches 1-8 are pushed; implementation-9 is committed locally and NOT pushed. Release verdict (docs/release-readiness.md): the software is release-ready, the deployment is not: blockers B1-B9 need accounts, a paid plan or the user's approval. After I9 the user wants: later checks, UI changes, a few fixes, setup.
 
 ## See it locally
 Terminals: `npm run dev:db -w @tinker/server`, then `npm run dev:api:supabase` (your Supabase project) or `npm run dev:api` (local dev login), then `npm run dev`; open http://localhost:5173/ and type in the command bar. Plain commands work with no key. For free-form requests put `GEMINI_API_KEY=...` in `server/.env` (or `server/.env.supabase.local`), restart the API, and run `npm run check:gemini` first (LC22).
+
+## I9 completion record (verified 2026-10-06)
+Full evidence table and blockers: `docs/release-readiness.md`. Costs: `docs/costs-and-limits.md`. How to run and ship: `docs/runbook.md`.
+| Task | Evidence |
+|---|---|
+| Checks and critical paths on a fresh setup (A31) | `bash scripts/fresh-setup-check.sh`: empty clone, `npm ci`, typecheck, tests (17 + 338 + 121), boundaries, build, artifact scan, new database, 2 migrations, API, 26-step `smoke:api`, backup drill, worker: all passed (first run found and fixed a shebang/line-ending test failure and a flaky backup test) |
+| Configuration, migrations, rollout sequence | `check:production` (14 checks: refuses missing settings, wildcard CORS and dev login in production; no dev routes; strict CORS; forged tokens; voice origin), runbook sections 3-4 (additive migrations before code; API, worker, then web) |
+| Ownership, public table exposure, CORS/origins, secret-free artifacts (A30) | `check:supabase` RLS 11/11, `check:artifacts` (shapes + names + real local secret values, CI step), isolation in `smoke:api` and the API tests |
+| Structured logs and metrics | request line (route pattern, status, ms, error code), worker job and lease lines, AI attempt latency; `log:report` percentiles, conflicts, failures, job leases; tested |
+| p95 targets with an explicit workload (miss reporting) | `bench:api`: 20 users x 5 rounds x 8 ops; sequential p95 <= 37 ms; 20 concurrent p95 <= 272 ms; all targets met LOCALLY; hosted measurement pending (B8). The benchmark first reported wrong numbers (refused requests timed); fixed |
+| Backups/PITR vs RPO/RTO and a recovery drill (A32) | Supabase is on the Free plan: no backups, no PITR (B1). Own drill: 21,675 rows 7.1 s; Supabase data 1.8 s; checksums match |
+| Costs and limits checked against current plans | `costs-and-limits.md` (Supabase, Gemini, Railway, Cloudflare Pages, read 2026-10-06) |
+| Hosting configuration and preview | `Dockerfile`, `.dockerignore`, `railway.json`, `docker-compose.preview.yml`, `public/_headers`, `public/_redirects`, CI container step prepared. NOT verified as a built image (Docker Desktop's engine did not start, B4) and NOT deployed (B2) |
+| LC19 sign-in | Continue with Google, forgot password, new password after the reset link, confirmation landing, error-in-address handling, expired-session message: 11 tests with a fake Supabase client; the real Google round trip needs the user's two setup steps (runbook section 8) |
+Fixes found by running the checks: plain commands no longer use AI quota; a returning user costs one read, not a write transaction (concurrent write p95 300-390 ms -> 222-264 ms); `.gitattributes` line endings.
+Commands: `npm run typecheck` PASS; `npm test` PASS (shared 17, server 338, frontend 121); `npm run check:boundaries` PASS; `npm run build` + `npm run check:artifacts` PASS.
 
 ## I8 completion record (verified 2026-10-06)
 | Task | Where | Evidence |
@@ -76,8 +92,8 @@ Live (built-in browser, real API + Postgres, no Gemini key): typed "add Orders",
 ## Earlier milestones (details in git history, decisions.md and later-checks.md)
 I1 contracts/API foundation; I2 pure engine; I3 persistence, identity, authorization, idempotency, RLS, Supabase verified; I4 durable editor (sign-in, serialized idempotent writes, conflict drafts, browser Gemini code removed).
 
-## Next action (I9)
-Release readiness. FIRST tell the user it is I9 (Google sign-in, LC19). Then: read implementation-plan.md I9, the open later-checks (LC1 transaction pooler, LC2 key rotation drill, LC3 CI first run, LC24, LC26, LC30-LC34), apply the I8 migration to Supabase, deployment and production configuration (separate API and worker processes), CI, security review, final acceptance run.
+## Next action (after I9)
+The user wants, in order: later checks (`docs/later-checks.md`), UI changes, a few fixes, setup. Start by asking which later checks to take first; the ones that need the user are LC30 (microphone), LC37 (leaked-password protection), the Google setup (runbook section 8), LC4 (database CA), LC26 (Gemini budget alert). Release blockers B1-B9 are in `docs/release-readiness.md`.
 
 ## Handoff template
 - Active task / milestone:
