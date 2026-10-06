@@ -1,7 +1,7 @@
 # Development status
 
 Updated: 2026-10-06
-Active milestone: I8 implemented on branch `implementation-8` (stack: main <- implementation-1 <- ... <- 7 <- 8). Branches 1-7 are pushed; implementation-8 is committed locally and NOT pushed. Next: I9 (release readiness). TELL THE USER AT THE START OF I9: Google sign-in (LC19) is planned there. Before I9: the new `jobs` table must be applied to the Supabase project (LC34), and the microphone check in a real Chrome is still open (LC30).
+Active milestone: I8 implemented on branch `implementation-8` (stack: main <- implementation-1 <- ... <- 7 <- 8). Branches 1-7 are pushed; implementation-8 is committed locally and NOT pushed. Next: I9 (release readiness). TELL THE USER AT THE START OF I9: Google sign-in (LC19) is planned there. The I8 `jobs` table is applied to Supabase (LC34 done). Still open for the user: the microphone check in a real Chrome (LC30) and leaked-password protection in the Supabase dashboard (LC37).
 
 ## See it locally
 Terminals: `npm run dev:db -w @tinker/server`, then `npm run dev:api:supabase` (your Supabase project) or `npm run dev:api` (local dev login), then `npm run dev`; open http://localhost:5173/ and type in the command bar. Plain commands work with no key. For free-form requests put `GEMINI_API_KEY=...` in `server/.env` (or `server/.env.supabase.local`), restart the API, and run `npm run check:gemini` first (LC22).
