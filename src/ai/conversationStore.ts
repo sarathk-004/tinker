@@ -14,8 +14,10 @@ export interface ConversationTurn {
   actions?: string[];
   /** Suggestions from a clarification. Clicking one fills the command bar; nothing is sent automatically. */
   options?: string[];
-  kind?: 'applied' | 'clarification' | 'refused' | 'error' | 'sending';
-  source?: 'PARSER' | 'AI';
+  kind?: 'applied' | 'clarification' | 'refused' | 'error' | 'sending' | 'advice';
+  source?: 'PARSER' | 'AI' | 'ANALYZER';
+  /** Components an advice answer is about. "Show on diagram" highlights them (transient, never saved in the diagram). */
+  highlight?: string[];
 }
 
 interface ConversationState {
@@ -44,13 +46,15 @@ export function messageToTurn(m: ChatMessage): ConversationTurn {
   const meta = (m.metadata ?? {}) as Record<string, unknown>;
   const status = asString(meta['status']);
   const options = Array.isArray(meta['options']) ? (meta['options'] as unknown[]).filter((o): o is string => typeof o === 'string') : undefined;
-  const source = meta['source'] === 'PARSER' || meta['source'] === 'AI' ? (meta['source'] as 'PARSER' | 'AI') : undefined;
+  const source = meta['source'] === 'PARSER' || meta['source'] === 'AI' || meta['source'] === 'ANALYZER' ? (meta['source'] as 'PARSER' | 'AI' | 'ANALYZER') : undefined;
+  const highlight = Array.isArray(meta['highlight']) ? (meta['highlight'] as unknown[]).filter((o): o is string => typeof o === 'string') : undefined;
   return {
     id: m.id,
     timestamp: Date.parse(m.createdAt),
     role: m.role === 'USER' ? 'user' : 'assistant',
     text: m.content,
-    ...(status === 'APPLIED' ? { kind: 'applied' as const } : status === 'CLARIFICATION' ? { kind: 'clarification' as const } : status === 'REFUSED' ? { kind: 'refused' as const } : {}),
+    ...(status === 'APPLIED' ? { kind: 'applied' as const } : status === 'CLARIFICATION' ? { kind: 'clarification' as const } : status === 'REFUSED' ? { kind: 'refused' as const } : status === 'ADVICE' ? { kind: 'advice' as const } : {}),
+    ...(highlight && highlight.length > 0 ? { highlight } : {}),
     ...(options && options.length > 0 ? { options } : {}),
     ...(source ? { source } : {}),
   };

@@ -58,7 +58,7 @@ function classify(deps: AiDeps): ClassifyFailure {
   };
 }
 
-async function persistTurn(
+export async function persistTurn(
   tx: PoolClient,
   input: { conversationId: string | undefined; diagramId: string; userId: string; userText: string; assistantText: string; metadata: Record<string, unknown> },
 ): Promise<{ conversationId: string; messages: ChatMessage[] }> {

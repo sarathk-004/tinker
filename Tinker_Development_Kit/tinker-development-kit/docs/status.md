@@ -1,10 +1,23 @@
 # Development status
 
-Updated: 2026-10-05
-Active milestone: I5 implemented on branch `implementation-5` (stack: main <- implementation-1 <- 2 <- 3 <- 4 <- 5). Branches 1-4 are pushed; implementation-5 is committed locally and NOT pushed. Next: I6 (read-only architecture advice).
+Updated: 2026-10-06
+Active milestone: I6 implemented on branch `implementation-6` (stack: main <- implementation-1 <- ... <- 5 <- 6). Branches 1-5 are pushed; implementation-6 is committed locally and NOT pushed. Next: I7 (voice). Reminder for I9: add "Continue with Google" sign-in (LC19).
 
 ## See it locally
 Terminals: `npm run dev:db -w @tinker/server`, then `npm run dev:api:supabase` (your Supabase project) or `npm run dev:api` (local dev login), then `npm run dev`; open http://localhost:5173/ and type in the command bar. Plain commands work with no key. For free-form requests put `GEMINI_API_KEY=...` in `server/.env` (or `server/.env.supabase.local`), restart the API, and run `npm run check:gemini` first (LC22).
+
+## I6 completion record (verified 2026-10-06)
+| Task | Where | Evidence |
+|---|---|---|
+| Authorized `POST /v1/diagrams/{id}/ai/ask` with bounded conversation context | `modules/ai/application/advice-service.ts`, `http/routes.ts`, `shared/src/ai.ts` | `view` access is enough (viewers may ask); stranger 404, no token 401, bad body 400, another user's conversation id 404; same 8-turn history bound as commands; uses the I5 rate limit, concurrency cap and 15 s deadline |
+| Downstream, upstream and cycles computed without the model | `modules/analysis/graph-analyzer.ts` | 12 tests incl. loops, self-loops, 3000-node chain (no recursion), whole-word name matching with regex characters |
+| Computed topology + diagram version given to the explainer | `application/advice.ts` | the prompt carries per-component reach as aliases (no UUIDs), loops, entry/end points; delimiters defanged; large diagrams only get reach lines for mentioned components |
+| Validated highlight ids | `advice.ts` (`resolveHighlights`) | the model's aliases must name real components (an invented n42 is dropped); response `analysis` holds focus, downstream, upstream, affected ids and cycles |
+| Advice never writes graph/presentation/revision state | `ask-api.test.ts` | version, graph, presentation, revision and execution counts are identical before and after (also for a VIEWER); only the conversation turn is stored |
+| No model, or the model fails or returns junk: still an answer | `fallbackAnswer` | source `ANALYZER` with the same facts in words; works with no key at all |
+Gate: "What happens if Orders goes down?" explains the computed dependencies; the diagram version and graph remain unchanged (tested over HTTP; live in the browser with the real Gemini key: answered about 2 s, Orders/Redis/PostgreSQL highlighted, 3 nodes and 2 edges unchanged).
+UI: the command bar sends anything ending in "?" (except polite requests such as "can you add Redis?") or anything typed in Ask mode to advice; the Conversation tab shows "Tinker advice" with "Show on diagram" / "Clear" (highlight is view state, never saved).
+Commands: `npm run typecheck` PASS; `npm test` PASS (shared 17, server 252, frontend 60); `npm run check:boundaries` PASS.
 
 ## I5 completion record (verified 2026-10-05)
 | Task | Where | Evidence |
@@ -33,8 +46,8 @@ Live (built-in browser, real API + Postgres, no Gemini key): typed "add Orders",
 ## Earlier milestones (details in git history, decisions.md and later-checks.md)
 I1 contracts/API foundation; I2 pure engine; I3 persistence, identity, authorization, idempotency, RLS, Supabase verified; I4 durable editor (sign-in, serialized idempotent writes, conflict drafts, browser Gemini code removed).
 
-## Next action (I6)
-Read-only advice: `POST /v1/diagrams/{id}/ai/ask` and bounded conversation context; compute downstream dependencies and cycles deterministically (the engine already has `downstreamNodeIds`; add cycle detection), give the computed topology and the diagram version to the explanation provider, return validated highlight ids for transient display, and prove advice never writes graph, presentation, revision or execution state. Gate: "What happens if Orders goes down?" explains the computed dependencies while the version and graph stay unchanged. Reuses the provider gateway, limits and conversation persistence from I5.
+## Next action (I7)
+Voice: realtime voice session that converges on the same command path (typed commands already do). Read the Phase 3 voice notes first; the wire contract is unspecified there (decision needed). Before I7, decide whether `ask` should also be reachable by voice.
 
 ## Handoff template
 - Active task / milestone:

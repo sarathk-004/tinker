@@ -38,6 +38,7 @@ whose trigger has arrived is a blocker, not a note. Never mark an item done with
 ## Done (kept for the record)
 | ID | Check | Evidence |
 |---|---|---|
+| LC29 | Advice quality with a real model | I6 was exercised live once (one question, correct answer and highlights); no systematic quality run | Ask 10 varied questions on a larger diagram (loops, isolated components, "is X a single point of failure"); note wrong or invented statements | Before release | open |
 | LD1 | Real Supabase login and persistence | User signed in with a real Supabase user via api-demo; changes appeared in the Supabase tables (2026-10-05, user-run) |
 | LD2 | Key rotation, revocation and provider-outage **logic**, simulated locally | `server/test/key-rotation.test.ts` (14 tests, fake clock + fake key server + real local HTTP); each guarded behaviour confirmed to fail when deliberately broken. Real Supabase rotation is LC2 |
 | LD3 | Schema and RLS on a real Supabase project; TLS database connection | `npm run check:supabase` (all PASS) and connector-run advisor results (2026-10-05) |

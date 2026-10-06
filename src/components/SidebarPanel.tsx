@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { showOnDiagram } from '../ai/aiCommands';
 import { useConversationStore } from '../ai/conversationStore';
 import { useDiagramStore } from '../diagram/store';
 import type { NewNodeSpec } from '../diagram/adapters';
@@ -504,7 +505,7 @@ export const SidebarPanel: React.FC = () => {
                             ) : (
                               <>
                                 <Zap className="w-3 h-3 text-[#f54e00]" />
-                                <span>{turn.source === 'AI' ? 'Tinker AI' : 'Tinker'}</span>
+                                <span>{turn.source === 'AI' ? 'Tinker AI' : turn.kind === 'advice' ? 'Tinker advice' : 'Tinker'}</span>
                               </>
                             )}
                           </span>
@@ -514,6 +515,23 @@ export const SidebarPanel: React.FC = () => {
                         <div className="text-[11.5px] text-[#26251e] whitespace-pre-wrap leading-relaxed">
                           {turn.text}
                         </div>
+
+                        {turn.kind === 'advice' && turn.highlight && turn.highlight.length > 0 && (
+                          <div className="mt-2 flex gap-1">
+                            <button
+                              onClick={() => showOnDiagram(turn.highlight ?? [])}
+                              className="px-2 py-0.5 rounded-md bg-[#fafaf7] hover:bg-white border border-[#e6e5e0] hover:border-[#26251e] text-[11px] text-[#26251e] transition-colors"
+                            >
+                              Show on diagram
+                            </button>
+                            <button
+                              onClick={() => useDiagramStore.getState().clearHighlight()}
+                              className="px-2 py-0.5 rounded-md bg-[#fafaf7] hover:bg-white border border-[#e6e5e0] hover:border-[#26251e] text-[11px] text-[#5a5852] transition-colors"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        )}
 
                         {turn.options && turn.options.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">

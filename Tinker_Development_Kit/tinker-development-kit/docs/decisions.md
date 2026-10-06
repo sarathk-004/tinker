@@ -103,3 +103,10 @@ Date for all records below: 2026-10-05 (I0). "User" = explicit answer in chat; "
 - `gemini-3.8-flash` was overloaded/slow with the user's key (503s, hangs), so the default is `gemini-3.5-flash-lite` with thinking level `low`: typical answer 1.5-2.5 s, occasional 7-13 s.
 - The first provider attempt is capped at half the 15 s deadline so a hung call is retried once inside the same deadline. Exact repeated non-ADD steps are dropped; empty/over-long optional text is dropped; nodes created without `as` are addressable as new1, new2.
 - Remaining model noise (about 1 in 6 free-form requests): an incomplete plan (missing connect) or a step the engine refuses. Failures never half-apply (plans are atomic) and show a clarification or error. Revisit with `GEMINI_THINKING_LEVEL=medium` or a bigger model if it bothers users (LC23).
+
+## I6 read-only advice (2026-10-06)
+- Advice needs `view` access (a viewer can ask), has no idempotency key (nothing is mutated, a network retry is safe) and stores only the question/answer turn in the caller's own conversation. It shares the AI rate limit and concurrency cap with commands.
+- The graph analyzer (no model) computes the facts; the model only explains them. Direction: an edge A -> B means A sends to B; downstream = what X sends to, upstream = what sends to X. "Affected" for highlighting = the mentioned components plus both directions (the blast radius).
+- Mentions are found by whole-word component name, case-insensitive, longest name first. When a question names nothing, the model still sees every component's reach (diagrams up to 40 components) and may pick highlights, which must be real aliases.
+- Any provider failure, timeout or invalid model output falls back to a computed answer (source `ANALYZER`) instead of an error, so advice works with no key.
+- The UI routes anything ending in "?" to advice, except polite requests ("can you add Redis?"), and has an Ask/Edit switch. Highlights are view state and are never saved.

@@ -71,3 +71,39 @@ export const conversationResponseSchema = z.strictObject({
   messages: z.array(chatMessageSchema),
 });
 export type ConversationResponse = z.infer<typeof conversationResponseSchema>;
+
+/** POST /v1/diagrams/{id}/ai/ask (LLD section 10): read-only advice. Never changes the diagram. */
+export const aiAskRequestSchema = z.strictObject({
+  conversationId: uuidSchema.optional(),
+  question: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((t) => utf8Bytes(t) <= LIMITS.maxCommandTextBytes, { message: `question exceeds ${LIMITS.maxCommandTextBytes} bytes` }),
+});
+export type AiAskRequest = z.infer<typeof aiAskRequestSchema>;
+
+/**
+ * `ANALYZER` = the answer was written by the deterministic graph analyzer because the model was unavailable;
+ * the facts are the same either way. Every id below refers to a component in the diagram at `diagram.version`.
+ */
+export const aiAskResponseSchema = z.strictObject({
+  answer: z.string(),
+  source: z.enum(['AI', 'ANALYZER']),
+  analysis: z.strictObject({
+    /** Components the question is about (found by name in the question). */
+    focusNodeIds: z.array(uuidSchema),
+    /** Components that receive from the focus, directly or through others. */
+    downstreamNodeIds: z.array(uuidSchema),
+    /** Components that send to the focus, directly or through others. */
+    upstreamNodeIds: z.array(uuidSchema),
+    /** What the UI should highlight (transient, never stored in the diagram). */
+    affectedNodeIds: z.array(uuidSchema),
+    /** Groups of components that form a loop. */
+    cycles: z.array(z.array(uuidSchema)),
+  }),
+  conversationId: uuidSchema,
+  messages: z.array(chatMessageSchema),
+  diagram: z.strictObject({ id: uuidSchema, version: versionSchema }),
+});
+export type AiAskResponse = z.infer<typeof aiAskResponseSchema>;

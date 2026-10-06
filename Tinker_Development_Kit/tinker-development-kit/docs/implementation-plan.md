@@ -100,11 +100,11 @@ Live provider smoke test requires a configured server credential; fake-provider 
 
 ## I6 — Read-only architecture advice
 Read: Phase 3 sections 10/11; deterministic graph analyzer.
-- [ ] Implement authorized ai/ask and bounded conversation context.
-- [ ] Compute downstream dependencies and cycles without relying on the model.
-- [ ] Provide computed topology and diagram version to the explanation provider.
-- [ ] Return validated highlight IDs for transient UI display.
-- [ ] Verify advice never writes graph/presentation/revision state.
+- [x] Implement authorized ai/ask and bounded conversation context.
+- [x] Compute downstream dependencies and cycles without relying on the model.
+- [x] Provide computed topology and diagram version to the explanation provider.
+- [x] Return validated highlight IDs for transient UI display.
+- [x] Verify advice never writes graph/presentation/revision state.
 Gate: “What happens if Orders goes down?” explains the computed dependencies; diagram version and graph remain unchanged.
 
 ## I7 — Voice integration

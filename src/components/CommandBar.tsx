@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Command, Loader2, Mic, Sparkles } from 'lucide-react';
-import { submitAiCommand } from '../ai/aiCommands';
+import { ArrowRight, Command, Loader2, MessageCircleQuestion, Mic, Sparkles } from 'lucide-react';
+import { submitAiAsk, submitAiCommand } from '../ai/aiCommands';
+import { looksLikeQuestion } from '../ai/questions';
 import { useConversationStore } from '../ai/conversationStore';
 import { useDiagramStore } from '../diagram/store';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 
-const EXAMPLES = ['Put Redis between Orders and PostgreSQL', 'Add an API Gateway', 'Connect Orders to Billing'];
+const EXAMPLES = ['Put Redis between Orders and PostgreSQL', 'Add an API Gateway', 'What happens if Orders goes down?'];
 
 /**
  * Typed commands. Text goes to the server, which applies it as one atomic edit (or asks a question); nothing here edits
@@ -19,6 +20,7 @@ export const CommandBar: React.FC = () => {
   const hasDiagram = useDiagramStore((s) => s.doc.diagram !== null);
   const blocked = useDiagramStore((s) => s.doc.status === 'conflict' || s.doc.status === 'blocked');
   const [input, setInput] = useState('');
+  const [askMode, setAskMode] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Suggestion chips in the conversation fill the bar; the user decides whether to send.
@@ -36,7 +38,8 @@ export const CommandBar: React.FC = () => {
     e.preventDefault();
     if (disabled || pending || !input.trim()) return;
     const text = input;
-    const ok = await submitAiCommand(text);
+    // Questions (ending in "?") or the Ask switch go to read-only advice; everything else is an edit command.
+    const ok = askMode || looksLikeQuestion(text) ? await submitAiAsk(text) : await submitAiCommand(text);
     if (ok) setInput((current) => (current === text ? '' : current)); // keep what the user typed meanwhile
   };
 
@@ -60,7 +63,17 @@ export const CommandBar: React.FC = () => {
         aria-disabled={disabled}
         className={`w-full flex items-center gap-2 p-1.5 pl-3.5 rounded-md bg-white border border-[#e6e5e0] transition-all focus-within:border-[#26251e] ${disabled ? 'opacity-80' : 'hover:border-[#cfcdc4]'}`}
       >
-        <Command className="w-4 h-4 text-[#807d72]" />
+        <button
+          type="button"
+          onClick={() => setAskMode((m) => !m)}
+          disabled={disabled}
+          aria-pressed={askMode}
+          title={askMode ? 'Ask mode: questions only, the diagram is never changed. Click to switch back to commands.' : 'Edit mode. Click to switch to Ask mode (questions only). Anything ending in ? is treated as a question.'}
+          className={`flex items-center gap-1 px-1.5 py-1 rounded-md border text-[11px] font-mono transition-colors ${askMode ? 'bg-[#26251e] border-[#26251e] text-white' : 'bg-[#fafaf7] border-[#e6e5e0] text-[#5a5852] hover:border-[#cfcdc4]'}`}
+        >
+          {askMode ? <MessageCircleQuestion className="w-3.5 h-3.5" /> : <Command className="w-3.5 h-3.5" />}
+          {askMode ? 'Ask' : 'Edit'}
+        </button>
         <input
           ref={inputRef}
           type="text"
@@ -72,7 +85,9 @@ export const CommandBar: React.FC = () => {
             !aiAvailable
               ? 'Typed commands are not available right now. Manual editing works as usual.'
               : modelAvailable
-              ? 'Type a command, e.g. "Put Redis between Orders and PostgreSQL"…'
+              ? askMode
+                ? 'Ask about the diagram, e.g. "What happens if Orders goes down?"…'
+                : 'Type a command, or ask a question ending in ?, e.g. "Put Redis between Orders and PostgreSQL"…'
               : 'Type a simple command, e.g. "Put Redis between Orders and PostgreSQL" (free-form AI needs a key on the server)…'
           }
           aria-label="Command"
@@ -85,7 +100,7 @@ export const CommandBar: React.FC = () => {
           type="submit"
           disabled={disabled || pending || !input.trim()}
           className="flex items-center justify-center w-8 h-8 rounded-md bg-[#f54e00] hover:bg-[#d04200] disabled:bg-[#e6e5e0] disabled:text-[#a09c92] disabled:cursor-not-allowed text-white transition-all"
-          aria-label="Send command"
+          aria-label={askMode ? 'Ask' : 'Send command'}
         >
           {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
         </button>

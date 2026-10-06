@@ -4,10 +4,12 @@ import {
   diagramDetailSchema,
   diagramListResponseSchema,
   ERROR_RETRY_POLICY,
+  aiAskResponseSchema,
   aiCommandResponseSchema,
   conversationResponseSchema,
   errorEnvelopeSchema,
   meResponseSchema,
+  type AiAskResponse,
   type AiCommandResponse,
   type CommandResponse,
   type ConversationResponse,
@@ -186,6 +188,12 @@ export function createApiClient(options: ApiClientOptions) {
   return {
     conversation: (diagramId: string) =>
       request('GET', `/v1/diagrams/${diagramId}/conversation`, undefined, undefined, conversationResponseSchema).then((r) => r.data as ConversationResponse),
+    /** Read-only advice: nothing is mutated, so no idempotency key and a network retry is safe. */
+    ask: (diagramId: string, question: string, conversationId?: string) =>
+      request('POST', `/v1/diagrams/${diagramId}/ai/ask`, { question, ...(conversationId ? { conversationId } : {}) }, undefined, aiAskResponseSchema, {
+        timeoutMs: 28_000,
+        noRetryCodes: ['AI_TIMEOUT', 'AI_PROVIDER_ERROR', 'AI_UNAVAILABLE', 'RATE_LIMITED'],
+      }).then((r) => r.data as AiAskResponse),
     me: () => request('GET', '/v1/me', undefined, undefined, meResponseSchema).then((r) => r.data as MeResponse),
     listDiagrams: (workspaceId: string) =>
       request('GET', `/v1/workspaces/${workspaceId}/diagrams`, undefined, undefined, diagramListResponseSchema).then((r) => r.data as DiagramListResponse),

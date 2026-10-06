@@ -1,6 +1,7 @@
 import { ApiError } from '../api/client';
 import { api, session } from '../document/instance';
 import { ConflictError, RefusedError, SessionClosedError } from '../document/session';
+import { useDiagramStore } from '../diagram/store';
 import { messageToTurn, useConversationStore, type ConversationTurn } from './conversationStore';
 
 /** What the user sees when a typed command did not go through. Server messages are already user-facing. */
@@ -66,5 +67,45 @@ export async function syncConversation(diagramId: string): Promise<void> {
     if (useConversationStore.getState().diagramId === diagramId) useConversationStore.getState().load(diagramId, conversation);
   } catch {
     /* history is a convenience: the editor works without it */
+  }
+}
+
+
+/** Highlight components on the canvas. Only ids that still exist are used; this is view state and never reaches the server. */
+export function showOnDiagram(ids: readonly string[]): void {
+  const diagram = useDiagramStore.getState();
+  const present = new Set(diagram.doc.graph.nodes.map((n) => n.id));
+  const live = ids.filter((id) => present.has(id));
+  if (live.length === 0) diagram.clearHighlight();
+  else diagram.highlight(live);
+}
+
+/**
+ * Ask a question about the diagram. Read-only: it does not go through the document session (no version, no idempotency key,
+ * no queue) and can never change the diagram. The answer's components are highlighted on the canvas.
+ */
+export async function submitAiAsk(text: string): Promise<boolean> {
+  const trimmed = text.trim();
+  const convo = useConversationStore.getState();
+  const diagramId = session.getState().diagram?.id;
+  if (!trimmed || convo.pending || !diagramId) return false;
+
+  const sending = localTurn('user', trimmed, 'sending');
+  convo.setPending(true);
+  convo.append([sending]);
+  useDiagramStore.getState().clearHighlight();
+  try {
+    const res = await api.ask(diagramId, trimmed, convo.conversationId ?? undefined);
+    if (useConversationStore.getState().diagramId !== diagramId) return true;
+    useConversationStore.getState().replaceLocal(sending.id, res.messages.map(messageToTurn), res.conversationId);
+    if (session.getState().diagram?.id === diagramId) showOnDiagram(res.analysis.affectedNodeIds);
+    return true;
+  } catch (error) {
+    if (useConversationStore.getState().diagramId === diagramId) {
+      useConversationStore.getState().append([localTurn('assistant', describeAiError(error), 'error')]);
+    }
+    return false;
+  } finally {
+    useConversationStore.getState().setPending(false);
   }
 }

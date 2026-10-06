@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
   API_PREFIX,
+  aiAskRequestSchema,
   aiCommandRequestSchema,
   commandRequestSchema,
   createDiagramRequestSchema,
@@ -20,6 +21,7 @@ import { AppError, parseOrThrow } from '../../../infrastructure/http/errors.ts';
 import type { RateLimiter } from '../../../infrastructure/http/rate-limiter.ts';
 import type { RunResult, TestHooks } from '../../../infrastructure/idempotency/mutation-requests.ts';
 import { listWorkspaces } from '../../workspaces/access.ts';
+import { askAdvice } from '../../ai/application/advice-service.ts';
 import { executeAiCommand, loadConversation, type AiRuntime } from '../../ai/application/ai-service.ts';
 import {
   createDiagram,
@@ -143,6 +145,14 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
       const body = parseOrThrow(aiCommandRequestSchema, request.body, 'INVALID_REQUEST', 'Invalid AI command request.');
       const aiDeps = { ...svc, ai: deps.ai, log: (message: string, data: Record<string, unknown>) => request.log.warn(data, message), metric: (message: string, data: Record<string, unknown>) => request.log.info(data, message) };
       return send(reply, request, await executeAiCommand(aiDeps, actorOf(request), diagramId, key, body));
+    });
+
+    // Read-only advice: no idempotency key (nothing is mutated), view access is enough.
+    app.post(`${API_PREFIX}/diagrams/:diagramId/ai/ask`, async (request) => {
+      const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
+      const body = parseOrThrow(aiAskRequestSchema, request.body, 'INVALID_REQUEST', 'Invalid question.');
+      const aiDeps = { ...svc, ai: deps.ai, log: (message: string, data: Record<string, unknown>) => request.log.warn(data, message), metric: (message: string, data: Record<string, unknown>) => request.log.info(data, message) };
+      return askAdvice(aiDeps, actorOf(request), diagramId, body);
     });
 
     app.get(`${API_PREFIX}/diagrams/:diagramId/conversation`, async (request) => {
