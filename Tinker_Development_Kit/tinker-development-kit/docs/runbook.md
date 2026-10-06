@@ -50,7 +50,7 @@ Server (all optional unless marked; defaults in `server/src/infrastructure/confi
 | `DATABASE_SSL` | off | `verify` (+ `DATABASE_SSL_CA_FILE`) in production; `no-verify` is refused in production (LC4) |
 | `AUTH_MODE` | supabase | `dev` only with `NODE_ENV=development` |
 | `REQUIRE_VERIFIED_EMAIL` | true | refuse tokens whose email address was never confirmed (on top of Supabase's "Confirm email") |
-| `AI_KEY_MODE` | server in development, **user in production** | whose model key the AI runs on: `server`, `user` (each person brings their own) or `user_or_server` |
+| `AI_KEY_MODE` | **server** everywhere (the key stays on our side only) | whose model key the AI runs on: `server`, `user` (each person brings their own) or `user_or_server` |
 | `KEY_ENCRYPTION_SECRET` | - | **required unless `AI_KEY_MODE=server`**: 32 random bytes in base64, seals people's stored API keys. Host secret store only |
 | `KEY_ENCRYPTION_SECRET_PREVIOUS` | - | retired secret(s) while rotating (comma separated) |
 | `JWT_AUDIENCE` | authenticated | |
@@ -120,7 +120,7 @@ Keep **anonymous sign-ins and unused providers disabled**.
 
 ## 9. People bring their own AI key (and nothing runs on yours)
 
-`AI_KEY_MODE` decides whose Gemini key the AI uses: `server` (your `GEMINI_API_KEY` for everyone: development), `user` (**the production default**: each person adds their own key; with none, only plain commands, editing, history and computed advice work), or `user_or_server`.
+`AI_KEY_MODE` decides whose Gemini key the AI uses: `server` (your `GEMINI_API_KEY` for everyone: development), `user` (not used: each person adds their own key; with none, only plain commands, editing, history and computed advice work), or `user_or_server`.
 - A person adds the key under "Add AI key" (header). The browser sends it once over HTTPS; the server **checks it with Google** (a free request that lists one model), **seals it with AES-256-GCM** under `KEY_ENCRYPTION_SECRET` (bound to the person's id, so a copied row does not open for anyone else), and stores only ciphertext plus its last four characters. It is decrypted in memory for the single request that needs it, never returned by any route, never logged (a test scans the logs), never kept in the browser. Removing it deletes the row. Typed commands, advice, spoken replies and voice each use the key of the person asking.
 - Submitting keys is limited to 5 a minute per person, so the endpoint cannot be used to test guessed keys.
 - **Secret handling:** generate `KEY_ENCRYPTION_SECRET` once (`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`) and keep it ONLY in the host's secret store. If the database leaks without the secret, the keys stay sealed; if the secret leaks without the database, there is nothing to open. Back the secret up separately from the database: without it every stored key is unreadable (people would simply add theirs again). **Rotate**: set the new value as `KEY_ENCRYPTION_SECRET`, put the old one in `KEY_ENCRYPTION_SECRET_PREVIOUS`, run `npm run rotate:ai-keys -w @tinker/server` (prints counts only), and remove the old secret when it reports 0 unreadable.

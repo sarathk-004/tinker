@@ -82,7 +82,7 @@ const envSchema = z
         need('DATABASE_SSL', 'no-verify is not allowed in production (use verify with DATABASE_SSL_CA_FILE)');
       }
     }
-    const keyMode = env.AI_KEY_MODE ?? (env.NODE_ENV === 'production' ? 'user' : 'server');
+    const keyMode = env.AI_KEY_MODE ?? 'server';
     if (keyMode !== 'server') {
       if (!env.KEY_ENCRYPTION_SECRET) need('KEY_ENCRYPTION_SECRET', `is required when AI_KEY_MODE is ${keyMode} (people's API keys are stored encrypted)`);
       else if (!/^[A-Za-z0-9+/]{43}=$/.test(env.KEY_ENCRYPTION_SECRET.trim())) need('KEY_ENCRYPTION_SECRET', 'must be 32 random bytes encoded as base64 (44 characters)');
@@ -186,7 +186,7 @@ export function loadConfig(input: Record<string, string | undefined> = process.e
     voice: { maxSessions: e.VOICE_MAX_SESSIONS, maxSessionMs: e.VOICE_MAX_SESSION_MS },
     worker: { pollMs: e.WORKER_POLL_MS, leaseSeconds: e.WORKER_LEASE_SECONDS },
     aiKeys: {
-      mode: e.AI_KEY_MODE ?? (e.NODE_ENV === 'production' ? 'user' : 'server'),
+      mode: e.AI_KEY_MODE ?? 'server',
       secret: e.KEY_ENCRYPTION_SECRET?.trim(),
       previousSecrets: (e.KEY_ENCRYPTION_SECRET_PREVIOUS ?? '').split(',').map((v) => v.trim()).filter(Boolean),
     },

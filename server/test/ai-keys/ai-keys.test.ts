@@ -293,15 +293,16 @@ describe('key modes', () => {
     }
   });
 
-  it('production defaults to user mode and refuses to start without the secret that seals the keys', async () => {
+  it('every environment defaults to server mode (the key stays on our side); user mode still demands the sealing secret', async () => {
     const { loadConfig, ConfigError } = await import('../../src/infrastructure/config/config.ts');
     const prod = { NODE_ENV: 'production', CORS_ORIGINS: 'https://a.example.com', DATABASE_URL: 'postgres://u:p@h/db', SUPABASE_URL: 'https://x.supabase.co' };
-    expect(() => loadConfig(prod)).toThrowError(ConfigError);
-    expect(() => loadConfig(prod)).toThrowError(/KEY_ENCRYPTION_SECRET/);
-    expect(loadConfig({ ...prod, KEY_ENCRYPTION_SECRET: secret() }).aiKeys.mode).toBe('user');
-    expect(loadConfig({ ...prod, AI_KEY_MODE: 'server' }).aiKeys.mode).toBe('server'); // an explicit choice by the operator
-    expect(() => loadConfig({ ...prod, KEY_ENCRYPTION_SECRET: 'not-a-secret' })).toThrowError(/32 random bytes/);
-    expect(() => loadConfig({ ...prod, KEY_ENCRYPTION_SECRET: secret(), KEY_ENCRYPTION_SECRET_PREVIOUS: 'nope' })).toThrowError(/KEY_ENCRYPTION_SECRET_PREVIOUS/);
+    expect(loadConfig(prod).aiKeys.mode).toBe('server');
+    const userMode = { ...prod, AI_KEY_MODE: 'user' };
+    expect(() => loadConfig(userMode)).toThrowError(ConfigError);
+    expect(() => loadConfig(userMode)).toThrowError(/KEY_ENCRYPTION_SECRET/);
+    expect(loadConfig({ ...userMode, KEY_ENCRYPTION_SECRET: secret() }).aiKeys.mode).toBe('user');
+    expect(() => loadConfig({ ...userMode, KEY_ENCRYPTION_SECRET: 'not-a-secret' })).toThrowError(/32 random bytes/);
+    expect(() => loadConfig({ ...userMode, KEY_ENCRYPTION_SECRET: secret(), KEY_ENCRYPTION_SECRET_PREVIOUS: 'nope' })).toThrowError(/KEY_ENCRYPTION_SECRET_PREVIOUS/);
     expect(loadConfig({ NODE_ENV: 'development' }).aiKeys.mode).toBe('server');
     expect(() => loadConfig({ NODE_ENV: 'development', AI_KEY_MODE: 'user' })).toThrowError(/KEY_ENCRYPTION_SECRET/);
   });

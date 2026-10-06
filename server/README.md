@@ -23,7 +23,7 @@ Two ways, same code:
   ```
 `npm run db:migrate -w @tinker/server` applies migrations to the database in `.env` (your Supabase project); use `db:migrate:local` for the local one.
 Configuration is validated at startup (`src/infrastructure/config/config.ts`); an invalid environment exits with a message that names variables but never prints values.
-Production needs `DATABASE_URL`, `SUPABASE_URL`, `CORS_ORIGINS` (exact origins, no wildcard) and `KEY_ENCRYPTION_SECRET` (unless `AI_KEY_MODE=server`), and rejects `AUTH_MODE=dev`.
+Production needs `DATABASE_URL`, `SUPABASE_URL`, `CORS_ORIGINS` (exact origins, no wildcard) and and, only if you ever turn on `AI_KEY_MODE=user`, `KEY_ENCRYPTION_SECRET`, and rejects `AUTH_MODE=dev`.
 
 ## Checking the Supabase wiring
 `npm run check:supabase -w @tinker/server` checks the key set, forged-token rejection, TLS connection (verified with the certificate) and RLS. Optional: `SUPABASE_ACCESS_TOKEN=<a real user JWT>` in `.env` verifies a live token.

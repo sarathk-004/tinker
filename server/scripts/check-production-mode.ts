@@ -37,7 +37,8 @@ const env = {
   ...(process.env.DATABASE_SSL_CA_FILE ? { DATABASE_SSL_CA_FILE: process.env.DATABASE_SSL_CA_FILE } : {}),
   SUPABASE_URL: supabaseUrl,
   CORS_ORIGINS: allowed,
-  // Production defaults to "people bring their own AI key", which needs the secret that seals stored keys.
+  // The secret check below runs the optional "people bring their own key" mode, which is the only mode that needs the sealing secret.
+  AI_KEY_MODE: 'user',
   KEY_ENCRYPTION_SECRET: randomBytes(32).toString('base64'),
 };
 // 1. Misconfiguration must be refused loudly, never half-started.
