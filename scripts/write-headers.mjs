@@ -65,6 +65,19 @@ export function withPolicy(headersFile, policy) {
   return `/*\n${line}\n\n${headersFile}`;
 }
 
+/**
+ * The same policy as a <meta> tag inside index.html, so it applies on hosts that cannot read a _headers file (Vercel reads
+ * vercel.json at deploy time, before this build knows its origins). A meta policy cannot carry `frame-ancestors` (browsers ignore it
+ * there); framing is refused by the X-Frame-Options header instead (vercel.json / _headers).
+ */
+export function withMetaPolicy(html, policy) {
+  const withoutFraming = policy.split('; ').filter((d) => !d.startsWith('frame-ancestors')).join('; ');
+  const tag = `<meta http-equiv="Content-Security-Policy" content="${withoutFraming.replace(/"/g, '&quot;')}" />`;
+  const cleaned = html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>\s*/g, '');
+  return cleaned.replace(/<head>/i, (m) => `${m}
+    ${tag}`);
+}
+
 const invoked = process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
 if (invoked) {
   const file = join(root, 'dist', '_headers');
@@ -74,6 +87,8 @@ if (invoked) {
   }
   const policy = buildPolicy(readPublicSettings());
   writeFileSync(file, withPolicy(readFileSync(file, 'utf8').replace(/^ {2}Content-Security-Policy:.*\r?\n/m, ''), policy));
-  console.log('Content-Security-Policy written to dist/_headers');
+  const index = join(root, 'dist', 'index.html');
+  writeFileSync(index, withMetaPolicy(readFileSync(index, 'utf8'), policy));
+  console.log('Content-Security-Policy written to dist/_headers and as a <meta> tag in dist/index.html');
   console.log(`  ${policy.split('; ').join('\n  ')}`);
 }

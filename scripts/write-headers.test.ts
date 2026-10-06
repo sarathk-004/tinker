@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error plain ES module script without types
-import { buildPolicy, withPolicy } from './write-headers.mjs';
+import { buildPolicy, withMetaPolicy, withPolicy } from './write-headers.mjs';
 
 describe('Content-Security-Policy for the built site', () => {
   it('lets the page connect only to itself, the API (and its WebSocket) and Supabase, and loads scripts only from itself', () => {
@@ -33,5 +33,18 @@ describe('Content-Security-Policy for the built site', () => {
     expect(out.startsWith("/*\n  Content-Security-Policy: default-src 'self'\n  X-Frame-Options: DENY")).toBe(true);
     expect(out).toContain('/assets/*\n  Cache-Control: immutable');
     expect(withPolicy('/assets/*\n  Cache-Control: x\n', 'p')).toBe('/*\n  Content-Security-Policy: p\n\n/assets/*\n  Cache-Control: x\n');
+  });
+
+  it('also puts the policy in index.html as a meta tag (hosts like Vercel), without frame-ancestors, and replaces an older tag', () => {
+    const policy: string = buildPolicy({ VITE_API_URL: 'https://api.tinker.example' });
+    const html = '<!doctype html><html><head>\n<title>x</title></head><body></body></html>';
+    const once: string = withMetaPolicy(html, policy);
+    expect(once).toMatch(/<head>\n    <meta http-equiv="Content-Security-Policy" content="default-src 'self'/);
+    expect(once).toContain('https://api.tinker.example');
+    expect(once).not.toContain('frame-ancestors');
+    const twice: string = withMetaPolicy(once, buildPolicy({ VITE_API_URL: 'https://other.example' }));
+    expect(twice.match(/Content-Security-Policy/g)).toHaveLength(1);
+    expect(twice).toContain('https://other.example');
+    expect(twice).not.toContain('https://api.tinker.example');
   });
 });
