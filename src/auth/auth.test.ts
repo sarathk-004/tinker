@@ -44,10 +44,7 @@ vi.mock('@supabase/supabase-js', () => ({
 
 const ORIGIN = 'https://tinker.example.app';
 const memory = () => {
-  const data = new Map<string, string>([
-    ['tinker_supabase_url', 'https://abc.supabase.co'],
-    ['tinker_supabase_pk', 'sb_publishable_test'],
-  ]);
+  const data = new Map<string, string>();
   return { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v), removeItem: (k: string) => void data.delete(k) };
 };
 
@@ -57,6 +54,7 @@ const replaceState = vi.fn();
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.resetModules();
+  vi.doMock('../config', () => ({ config: { apiUrl: 'http://api.test', supabaseUrl: 'https://abc.supabase.co', supabasePublishableKey: 'sb_publishable_test', turnstileSiteKey: '', devLoginAvailable: false } }));
   fake.f.calls.length = 0;
   fake.f.created.length = 0;
   fake.f.authListener = undefined;
@@ -235,5 +233,17 @@ describe('returning from Google or an email link', () => {
     await auth.initAuth();
     await auth.signOut();
     expect(auth.useAuthStore.getState()).toMatchObject({ status: 'signedOut', info: null });
+  });
+});
+
+describe('no project details are ever asked of people', () => {
+  it('the connection comes only from the build settings; stale values typed in by older versions are ignored', async () => {
+    expect(auth.supabaseConnection()).toEqual({ url: 'https://abc.supabase.co', key: 'sb_publishable_test' });
+    expect((auth as Record<string, unknown>)['saveSupabaseConnection']).toBeUndefined();
+    vi.resetModules();
+    vi.doMock('../config', () => ({ config: { apiUrl: 'http://api.test', supabaseUrl: '', supabasePublishableKey: '', turnstileSiteKey: '', devLoginAvailable: false } }));
+    vi.stubGlobal('localStorage', { getItem: (k: string) => (k === 'tinker_supabase_url' ? 'https://old.supabase.co' : k === 'tinker_supabase_pk' ? 'sb_publishable_old' : null), setItem() {}, removeItem() {} });
+    const unconfigured = await import('./auth');
+    expect(unconfigured.supabaseConnection()).toBeNull();
   });
 });

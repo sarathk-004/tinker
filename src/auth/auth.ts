@@ -10,8 +10,6 @@ import { config } from '../config';
 import { describeMissing, passwordIsAcceptable } from './passwordPolicy';
 
 const DEV_TOKEN_KEY = 'tinker_dev_token';
-const SB_URL_KEY = 'tinker_supabase_url';
-const SB_KEY_KEY = 'tinker_supabase_pk';
 
 const store = {
   get: (k: string) => {
@@ -58,10 +56,13 @@ export interface SupabaseConnection {
   key: string;
 }
 
-/** Env first (VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY); otherwise what the user entered on the sign-in screen. */
+/**
+ * The Supabase project this build signs in against. It comes ONLY from the build's settings (VITE_SUPABASE_URL and
+ * VITE_SUPABASE_PUBLISHABLE_KEY): people signing in are never asked for project details. Null means the build was not configured.
+ */
 export function supabaseConnection(): SupabaseConnection | null {
-  const url = config.supabaseUrl || store.get(SB_URL_KEY) || '';
-  const key = config.supabasePublishableKey || store.get(SB_KEY_KEY) || '';
+  const url = config.supabaseUrl;
+  const key = config.supabasePublishableKey;
   return url && key ? { url, key } : null;
 }
 
@@ -140,14 +141,6 @@ export async function initAuth(): Promise<void> {
   if (devTokenValid(dev)) return void set({ status: 'signedIn', email: emailFromToken(dev), mode: 'dev' });
   store.session.remove(DEV_TOKEN_KEY);
   set({ status: 'signedOut' });
-}
-
-export function saveSupabaseConnection(conn: SupabaseConnection): void {
-  store.set(SB_URL_KEY, conn.url.trim().replace(/\/$/, ''));
-  store.set(SB_KEY_KEY, conn.key.trim());
-  client = null;
-  started = false;
-  void initAuth();
 }
 
 async function guard<T>(fn: () => Promise<T>): Promise<T | undefined> {
