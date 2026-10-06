@@ -17,6 +17,8 @@ export interface AiRuntime {
   provider: InterpretationProvider;
   /** Total interpretation budget, including provider retries (D07). */
   deadlineMs: number;
+  /** Model name, for latency metrics only. */
+  model?: string;
   /** Per-user AI requests per minute (D10, single instance). */
   limiter: RateLimiter;
   /** Per-user simultaneous AI requests (D10, single instance). */
@@ -27,6 +29,8 @@ export interface AiDeps extends ServiceDeps {
   ai: AiRuntime;
   /** Server-side diagnostics for provider failures (never user text, never the key). */
   log?: (message: string, data: Record<string, unknown>) => void;
+  /** Latency metrics at info level: one structured line per provider attempt. */
+  metric?: (message: string, data: Record<string, unknown>) => void;
 }
 
 const HISTORY_TURNS = 8;
@@ -93,7 +97,10 @@ export async function executeAiCommand(deps: AiDeps, actor: Actor, diagramId: st
 
       const doc = { graph: current.graph, presentation: current.presentation };
       const history = request.conversationId ? await recentTurns(deps.pool, request.conversationId, HISTORY_TURNS) : [];
-      const interpretation = await interpretRequest({ doc, text, history, provider: deps.ai.provider, deadlineMs: deps.ai.deadlineMs });
+      const interpretation = await interpretRequest({ doc, text, history, provider: deps.ai.provider,
+        deadlineMs: deps.ai.deadlineMs,
+        onAttempt: (a) => deps.metric?.('ai provider attempt', { ...a, model: deps.ai.model, deadlineMs: deps.ai.deadlineMs }),
+      });
 
       if (interpretation.kind === 'clarify') return clarification(interpretation.source, interpretation.question, interpretation.options, current.version);
 

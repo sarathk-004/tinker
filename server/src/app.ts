@@ -127,6 +127,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     ai: {
       provider: options.aiProvider ?? (config.ai.apiKey ? createGeminiProvider({ apiKey: config.ai.apiKey, model: config.ai.model, thinkingLevel: config.ai.thinkingLevel }) : disabledProvider),
       deadlineMs: config.ai.deadlineMs,
+      model: config.ai.model,
       limiter: options.aiRateLimiter ?? createRateLimiter({ limit: config.ai.ratePerMinute }),
       concurrency: createConcurrencyLimiter({ max: config.ai.maxConcurrent }),
     },

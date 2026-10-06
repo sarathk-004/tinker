@@ -141,7 +141,7 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
       const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
       const key = idempotencyKeyOf(request);
       const body = parseOrThrow(aiCommandRequestSchema, request.body, 'INVALID_REQUEST', 'Invalid AI command request.');
-      const aiDeps = { ...svc, ai: deps.ai, log: (message: string, data: Record<string, unknown>) => request.log.warn(data, message) };
+      const aiDeps = { ...svc, ai: deps.ai, log: (message: string, data: Record<string, unknown>) => request.log.warn(data, message), metric: (message: string, data: Record<string, unknown>) => request.log.info(data, message) };
       return send(reply, request, await executeAiCommand(aiDeps, actorOf(request), diagramId, key, body));
     });
 

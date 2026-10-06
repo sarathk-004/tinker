@@ -239,6 +239,14 @@ describe('interpretRequest: parser first, then the provider under one deadline',
     expect(r.kind === 'plan' && r.steps.map((s) => s.type)).toEqual(['INSERT_BETWEEN', 'ADD_NODE', 'ADD_NODE']);
   });
 
+  it('reports one latency metric per provider attempt: outcome and milliseconds only', async () => {
+    const provider = createFakeProvider([{ error: new ProviderError('unavailable', 'blip') }, { output: plan() }]);
+    const seen: Array<{ attempt: number; ms: number; outcome: string }> = [];
+    await interpretRequest({ ...base, deadlineMs: 5_000, minRetryBudgetMs: 100, text: 'do stuff', provider, onAttempt: (a) => seen.push(a) });
+    expect(seen.map((a) => [a.attempt, a.outcome])).toEqual([[0, 'unavailable'], [1, 'ok']]);
+    expect(seen.every((a) => a.ms >= 0 && Object.keys(a).sort().join() === 'attempt,ms,outcome')).toBe(true);
+  });
+
   it('a disabled provider answers "disabled" only when the model is actually needed', async () => {
     const simple = await interpretRequest({ ...base, text: 'add Redis', provider: disabledProvider });
     expect(simple).toMatchObject({ kind: 'plan', source: 'PARSER' });

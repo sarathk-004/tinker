@@ -22,6 +22,8 @@ export interface InterpretInput {
   now?: () => number;
   /** Tests only: shrink the minimum time worth spending on a retry. */
   minRetryBudgetMs?: number;
+  /** Latency metric: one call per provider attempt (never user text, never the key). */
+  onAttempt?: (attempt: { attempt: number; ms: number; outcome: 'ok' | ProviderError['kind'] }) => void;
 }
 
 /** Minimum time worth spending on a retry: below this a second attempt cannot realistically finish. */
@@ -70,6 +72,8 @@ export async function interpretRequest(input: InterpretInput): Promise<Interpret
       });
       stopped.catch(() => undefined); // consumed by the race below when needed
 
+      const attemptStarted = now();
+      const report = (outcome: 'ok' | ProviderError['kind']) => input.onAttempt?.({ attempt, ms: now() - attemptStarted, outcome });
       try {
         const call = input.provider.interpret(
           { systemInstruction: SYSTEM_INSTRUCTION, content: prompt.content, responseSchema: MODEL_RESPONSE_JSON_SCHEMA as unknown as Record<string, unknown> },
@@ -79,10 +83,12 @@ export async function interpretRequest(input: InterpretInput): Promise<Interpret
         const result = await Promise.race([call, stopped]);
         const validated = modelOutputSchema.safeParse(dropOverlongOptionalFields(result.output));
         if (!validated.success) throw new ProviderError('bad_output', 'The AI output did not match the expected format.', validated.error.issues[0]?.message);
+        report('ok');
         return fromModelOutput(validated.data);
       } catch (error) {
         const totalExpired = total.signal.aborted;
         const failure = error instanceof ProviderError ? error : new ProviderError('unavailable', 'The AI provider failed.');
+        report(totalExpired ? 'timeout' : failure.kind);
         const remaining = input.deadlineMs - (now() - started);
         // A first attempt that merely hit its own cap is worth retrying; the total deadline never is.
         const retryable = failure.transient || (failure.kind === 'timeout' && !totalExpired);
