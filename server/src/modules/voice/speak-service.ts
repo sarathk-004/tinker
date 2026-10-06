@@ -13,7 +13,8 @@ import { speakableText } from './speech-provider.ts';
  */
 export async function speakMessage(deps: AiDeps, actor: { userId: string }, diagramId: string, request: SpeakRequest): Promise<SpeakResponse> {
   await authorizeDiagram(deps.pool, actor.userId, diagramId, 'view');
-  if (!deps.ai.speech.available) throw new AppError('AI_UNAVAILABLE', 'Spoken replies are not available right now.');
+  const { speech } = await deps.ai.access.providersFor(actor.userId);
+  if (!speech.available) throw new AppError('AI_UNAVAILABLE', 'Spoken replies are not available for this account right now.');
   const stored = await assistantMessageText(deps.pool, request.messageId, diagramId, actor.userId);
   if (stored === null) throw new AppError('NOT_FOUND', 'Message not found.');
   const text = speakableText(stored);
@@ -25,9 +26,9 @@ export async function speakMessage(deps: AiDeps, actor: { userId: string }, diag
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), deps.ai.deadlineMs);
   try {
-    const speech = await deps.ai.speech.synthesize(text, { signal: controller.signal });
-    deps.metric?.('speech synthesized', { ms: Date.now() - started, chars: text.length, model: deps.ai.speech.name });
-    return { audio: speech.audio, sampleRate: speech.sampleRate, format: 'pcm_s16le' };
+    const spoken = await speech.synthesize(text, { signal: controller.signal });
+    deps.metric?.('speech synthesized', { ms: Date.now() - started, chars: text.length, model: speech.name });
+    return { audio: spoken.audio, sampleRate: spoken.sampleRate, format: 'pcm_s16le' };
   } catch (error) {
     if (!(error instanceof ProviderError)) throw error;
     deps.log?.('speech failure', { kind: error.kind, detail: error.detail });

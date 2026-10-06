@@ -16,6 +16,8 @@ import { registerDevAuthRoutes } from './modules/identity/dev-auth-routes.ts';
 import { AppError, toErrorResponse } from './infrastructure/http/errors.ts';
 import { registerDevEngineRoutes } from './modules/diagrams/http/dev-routes.ts';
 import { registerApiRoutes } from './modules/diagrams/http/routes.ts';
+import { createAiAccess, serverOnlyAccess, type AiAccess, type AiProviders, type KeyCheck } from './modules/ai-keys/ai-access.ts';
+import { createSecretBox } from './infrastructure/crypto/secret-box.ts';
 import { createGeminiLiveGateway } from './modules/voice/gemini-live.ts';
 import { createGeminiSpeech, disabledSpeech, type SpeechProvider } from './modules/voice/speech-provider.ts';
 import { disabledLiveGateway, type LiveGateway } from './modules/voice/live-gateway.ts';
@@ -35,6 +37,11 @@ export interface BuildAppOptions {
   rateLimiter?: RateLimiter;
   /** Override the AI provider (tests inject a deterministic fake). Defaults to Gemini when GEMINI_API_KEY is set, else disabled. */
   aiProvider?: InterpretationProvider;
+  /** Override personal-key handling entirely (tests). */
+  aiAccess?: AiAccess;
+  /** Tests: how a submitted personal key is checked with the provider, and how a person's providers are built from it. */
+  checkAiKey?: (apiKey: string) => Promise<KeyCheck>;
+  buildUserProviders?: (apiKey: string) => Omit<AiProviders, 'source'>;
   /** Override the realtime voice gateway (tests inject a scripted fake). Defaults to Gemini Live when GEMINI_API_KEY is set. */
   liveGateway?: LiveGateway;
   /** Override text to speech (tests). Defaults to Gemini TTS when GEMINI_API_KEY is set. */
@@ -154,22 +161,40 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   const authenticate =
     options.authenticate ??
     (options.pool && options.verifier ? createJwtAuthenticator(options.pool, options.verifier) : rejectAllAuthenticator);
+  // The operator's own providers (used in `server` and `user_or_server` modes) ...
+  const serverProvider = options.aiProvider ?? (config.ai.apiKey ? createGeminiProvider({ apiKey: config.ai.apiKey, model: config.ai.model, thinkingLevel: config.ai.thinkingLevel }) : disabledProvider);
+  const serverSpeech = options.speechProvider ?? (config.ai.apiKey ? createGeminiSpeech({ apiKey: config.ai.apiKey, models: config.ai.ttsModels, voice: config.ai.ttsVoice }) : disabledSpeech);
+  const serverLive = options.liveGateway ?? (config.ai.apiKey ? createGeminiLiveGateway({ apiKey: config.ai.apiKey, model: config.ai.liveModel }) : disabledLiveGateway);
+  const server = { provider: serverProvider, live: serverLive, speech: serverSpeech, configured: serverProvider.available || serverLive.available || serverSpeech.available };
+  // ... and, per person, their own key (stored encrypted) when the deployment asks people to bring one.
+  const access =
+    options.aiAccess ??
+    (options.pool
+      ? createAiAccess({
+          pool: options.pool,
+          mode: config.aiKeys.mode,
+          secretBox: config.aiKeys.secret ? createSecretBox({ current: config.aiKeys.secret, previous: config.aiKeys.previousSecrets }) : undefined,
+          server,
+          models: { chat: config.ai.model, thinkingLevel: config.ai.thinkingLevel, live: config.ai.liveModel, tts: config.ai.ttsModels, ttsVoice: config.ai.ttsVoice },
+          ...(options.checkAiKey ? { checkKey: options.checkAiKey } : {}),
+          ...(options.buildUserProviders ? { build: options.buildUserProviders } : {}),
+          log: (message, data) => app.log.warn(data, message),
+        })
+      : serverOnlyAccess(server));
   const ai = {
-    provider: options.aiProvider ?? (config.ai.apiKey ? createGeminiProvider({ apiKey: config.ai.apiKey, model: config.ai.model, thinkingLevel: config.ai.thinkingLevel }) : disabledProvider),
+    access,
     deadlineMs: config.ai.deadlineMs,
     model: config.ai.model,
-    speech: options.speechProvider ?? (config.ai.apiKey ? createGeminiSpeech({ apiKey: config.ai.apiKey, models: config.ai.ttsModels, voice: config.ai.ttsVoice }) : disabledSpeech),
     limiter: options.aiRateLimiter ?? createRateLimiter({ limit: config.ai.ratePerMinute }),
     concurrency: createConcurrencyLimiter({ max: config.ai.maxConcurrent }),
   };
-  const live = options.liveGateway ?? (config.ai.apiKey ? createGeminiLiveGateway({ apiKey: config.ai.apiKey, model: config.ai.liveModel }) : disabledLiveGateway);
   const rateLimiter = options.rateLimiter ?? createRateLimiter({ limit: config.rateLimitPerMinute });
   await registerApiRoutes(app, {
     ...(options.pool ? { pool: options.pool } : {}),
     authenticate,
     rateLimiter,
     ai,
-    voiceAvailable: live.available,
+    keyWriteLimiter: createRateLimiter({ limit: 5 }),
     ...(options.hooks ? { hooks: options.hooks } : {}),
   });
 
@@ -177,7 +202,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     pool: options.pool,
     authenticate: options.pool && options.verifier ? createTokenAuthenticator(options.pool, options.verifier) : undefined,
     ai,
-    live,
+    liveFor: async (userId) => (await access.providersFor(userId)).live,
     rateLimiter,
     corsOrigins: config.corsOrigins,
     maxSessions: config.voice.maxSessions,

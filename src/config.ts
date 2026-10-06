@@ -9,6 +9,8 @@ export const config = {
   apiUrl: (import.meta.env.VITE_API_URL ?? `http://${typeof location === 'undefined' ? 'localhost' : location.hostname}:8787`).replace(/\/$/, ''),
   supabaseUrl: import.meta.env.VITE_SUPABASE_URL ?? '',
   supabasePublishableKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '',
+  /** Cloudflare Turnstile SITE key (public by design). When set, sign-up, sign-in and password reset ask for the bot check. */
+  turnstileSiteKey: import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '',
   /** The local dev login (POST /dev/auth/login) is offered only by the Vite dev server, never in a production build. */
   devLoginAvailable: import.meta.env.DEV === true && import.meta.env.VITE_ENABLE_DEV_LOGIN !== 'false',
 } as const;

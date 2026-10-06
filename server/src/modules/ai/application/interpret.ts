@@ -17,7 +17,10 @@ export interface InterpretInput {
   doc: DiagramDoc;
   text: string;
   history: readonly HistoryTurn[];
-  provider: InterpretationProvider;
+  /** Fixed provider (tests), or resolve one per person when the model is needed (`resolveProvider`). */
+  provider?: InterpretationProvider;
+  /** Looks up the provider for THIS person (their own key, or the server's). Only called when the parser had no answer. */
+  resolveProvider?: () => Promise<InterpretationProvider>;
   /** Total wall-clock budget for this interpretation INCLUDING every provider retry (decision D07). */
   deadlineMs: number;
   now?: () => number;
@@ -46,7 +49,8 @@ export async function interpretRequest(input: InterpretInput): Promise<Interpret
   if (parsed.kind === 'steps') return { kind: 'plan', source: 'PARSER', steps: parsed.steps };
   if (parsed.kind === 'clarify') return { kind: 'clarify', source: 'PARSER', question: parsed.question, options: parsed.options };
 
-  if (!input.provider.available) throw new ProviderError('disabled', 'AI commands are not configured on this server.');
+  const provider = input.resolveProvider ? await input.resolveProvider() : input.provider;
+  if (!provider || !provider.available) throw new ProviderError('disabled', 'AI commands are not available for this account right now.');
 
   const prompt = buildPrompt(input.doc, input.history, input.text);
   if (!prompt.ok) {
@@ -56,7 +60,7 @@ export async function interpretRequest(input: InterpretInput): Promise<Interpret
   const release = input.beforeProvider?.();
   try {
     return await runProvider({
-    provider: input.provider,
+    provider,
     request: { systemInstruction: SYSTEM_INSTRUCTION, content: prompt.content, responseSchema: MODEL_RESPONSE_JSON_SCHEMA as unknown as Record<string, unknown> },
     deadlineMs: input.deadlineMs,
     ...(input.now ? { now: input.now } : {}),

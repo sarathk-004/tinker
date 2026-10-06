@@ -62,7 +62,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     user: null,
     workspace: null,
     diagrams: [],
-    features: { aiCommands: false, aiModel: false, voice: false, speech: false },
+    features: { aiCommands: false, aiModel: false, voice: false, speech: false, aiKey: { mode: 'server', source: 'NONE' } },
 
     async bootstrap() {
       set({ phase: 'loading', error: null });
@@ -146,7 +146,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       voice.dispose();
       session.close();
       useConversationStore.getState().reset();
-      set({ phase: 'idle', error: null, user: null, workspace: null, diagrams: [], features: { aiCommands: false, aiModel: false, voice: false, speech: false } });
+      set({ phase: 'idle', error: null, user: null, workspace: null, diagrams: [], features: { aiCommands: false, aiModel: false, voice: false, speech: false, aiKey: { mode: 'server', source: 'NONE' } } });
     },
   };
 });

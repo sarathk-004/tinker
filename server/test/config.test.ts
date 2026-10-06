@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ConfigError, loadConfig } from '../src/infrastructure/config/config.ts';
 
-const PROD_BASE = { DATABASE_URL: 'postgres://u:p@h/db', SUPABASE_URL: 'https://x.supabase.co' };
+// In production people bring their own AI key by default, which needs the secret that seals stored keys.
+const PROD_BASE = { DATABASE_URL: 'postgres://u:p@h/db', SUPABASE_URL: 'https://x.supabase.co', KEY_ENCRYPTION_SECRET: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' };
 
 describe('loadConfig', () => {
   it('applies development defaults', () => {

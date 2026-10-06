@@ -26,7 +26,7 @@ export const SECRET_SHAPES = [
 export const SERVER_ONLY_NAMES = ['GEMINI_API_KEY', 'DATABASE_URL', 'SUPABASE_SERVICE_ROLE', 'x-goog-api-key', 'WORKER_LEASE_SECONDS'];
 
 /** Public browser settings that are allowed to ship (they are public by design). */
-export const ALLOWED_VITE = new Set(['VITE_API_URL', 'VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'VITE_ENABLE_DEV_LOGIN']);
+export const ALLOWED_VITE = new Set(['VITE_API_URL', 'VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'VITE_ENABLE_DEV_LOGIN', 'VITE_TURNSTILE_SITE_KEY']);
 
 function* files(dir) {
   for (const name of readdirSync(dir)) {

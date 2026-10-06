@@ -76,7 +76,8 @@ export interface VoiceDeps {
   authenticate: TokenAuthenticator;
   /** Expiry (epoch seconds) of an ALREADY VERIFIED token. */
   tokenExpiry: (token: string) => number | null;
-  live: LiveGateway;
+  /** The speech model this person's voice session runs on (their own key, or the server's). Resolved when listening starts. */
+  liveFor: (userId: string) => Promise<LiveGateway>;
   registry: VoiceRegistry;
   limits: VoiceSessionLimits;
   rateLimiter: RateLimiter;
@@ -288,7 +289,8 @@ export class VoiceSession {
   private async start(): Promise<void> {
     if (this.listening || this.opening) return;
     this.stopping = false;
-    if (!this.deps.live.available) {
+    const gateway = await this.deps.liveFor(this.userId!);
+    if (!gateway.available) {
       this.send({ type: 'error', code: 'AI_UNAVAILABLE', message: 'Voice is not available right now. Typing still works.', fatal: false });
       return;
     }
@@ -298,7 +300,7 @@ export class VoiceSession {
     this.opening = opening;
     const timer = setTimeout(() => opening.abort(), this.deps.limits.openTimeoutMs);
     try {
-      const live = await this.deps.live.open(
+      const live = await gateway.open(
         {
           onTranscript: (text, final) => {
             if (this.state !== 'ready') return;

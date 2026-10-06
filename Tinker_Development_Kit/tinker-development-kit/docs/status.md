@@ -1,7 +1,7 @@
 # Development status
 
 Updated: 2026-10-06
-Active milestone: I9 implemented on branch `implementation-9` (stack: main <- ... <- 8 <- 9). Branches 1-8 are pushed; implementation-9 is committed locally and NOT pushed. Release verdict (docs/release-readiness.md): the software is release-ready, the deployment is not: blockers B1-B9 need accounts, a paid plan or the user's approval. After I9 the user wants: later checks, UI changes, a few fixes, setup.
+Active milestone: I9 implemented on branch `implementation-9` (plus the follow-ups of 2026-10-06: Supabase certificate verified, Google sign-in replaced by email verification, bring-your-own-key AI) (stack: main <- ... <- 8 <- 9). Branches 1-8 are pushed; implementation-9 is committed locally and NOT pushed. Release verdict (docs/release-readiness.md): the software is release-ready, the deployment is not: blockers B1-B9 need accounts, a paid plan or the user's approval. After I9 the user wants: later checks, UI changes, a few fixes, setup.
 
 ## See it locally
 Terminals: `npm run dev:db -w @tinker/server`, then `npm run dev:api:supabase` (your Supabase project) or `npm run dev:api` (local dev login), then `npm run dev`; open http://localhost:5173/ and type in the command bar. Plain commands work with no key. For free-form requests put `GEMINI_API_KEY=...` in `server/.env` (or `server/.env.supabase.local`), restart the API, and run `npm run check:gemini` first (LC22).
@@ -19,6 +19,7 @@ Full evidence table and blockers: `docs/release-readiness.md`. Costs: `docs/cost
 | Costs and limits checked against current plans | `costs-and-limits.md` (Supabase, Gemini, Railway, Cloudflare Pages, read 2026-10-06) |
 | Hosting configuration and preview | `Dockerfile`, `.dockerignore`, `railway.json`, `docker-compose.preview.yml`, `public/_headers`, `public/_redirects`, CI container step prepared. NOT verified as a built image (Docker Desktop's engine did not start, B4) and NOT deployed (B2) |
 | LC19 sign-in | Continue with Google, forgot password, new password after the reset link, confirmation landing, error-in-address handling, expired-session message: 11 tests with a fake Supabase client; the real Google round trip needs the user's two setup steps (runbook section 8) |
+Follow-ups the same day (user decisions): the Supabase root certificate is verified end to end (`check:production:supabase`); email verification replaced Google sign-in (runbook section 8); bring-your-own-key AI (runbook section 9; `check:byok` live). Tests now: shared 17, server 360, frontend 143. New later-checks: LC38 SMTP, LC39 Turnstile, LC40 account deletion and export, LC41 apply `user_api_keys` to Supabase (needs approval), LC42 secret backup and rotation drill.
 Fixes found by running the checks: plain commands no longer use AI quota; a returning user costs one read, not a write transaction (concurrent write p95 300-390 ms -> 222-264 ms); `.gitattributes` line endings.
 Commands: `npm run typecheck` PASS; `npm test` PASS (shared 17, server 338, frontend 121); `npm run check:boundaries` PASS; `npm run build` + `npm run check:artifacts` PASS.
 

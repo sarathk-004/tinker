@@ -43,7 +43,9 @@ Retrieval index: `graphify-out/` built from `6e0130d` on 2026-10-05 (333 nodes).
 | Read-only advice (ask) and graph analyzer | `server/src/modules/analysis/graph-analyzer.ts`, `server/src/modules/ai/application/{advice,advice-service,provider-call}.ts`, `src/ai/{aiCommands,questions}.ts` | I6 |
 | Release checks and operations | `scripts/{check-artifacts.mjs,fresh-setup-check.sh}`, `server/scripts/{smoke-api,check-production-mode,bench-api,backup-drill,log-report}.ts`, `server/src/infrastructure/{backup,observability}/*` | I9 |
 | Hosting files | `Dockerfile`, `.dockerignore`, `docker-compose.preview.yml`, `railway.json`, `public/_headers`, `public/_redirects`, `.github/workflows/ci.yml`, `.gitattributes` | I9 |
-| Sign-in (password, Google, reset) | `src/auth/auth.ts`, `src/components/LoginScreen.tsx` | I4, I9 |
+| Sign-up/sign-in with email verification, reset, bot check, password rules | `src/auth/{auth,passwordPolicy}.ts`, `src/components/{LoginScreen,Turnstile}.tsx`, `server/src/infrastructure/auth/verifier.ts` (confirmed-email check) | I4, I9 |
+| Bring-your-own AI key | `shared/src/ai-key.ts`, `server/src/infrastructure/crypto/secret-box.ts`, `server/src/modules/ai-keys/*`, `server/migrations/1762000000000_user_api_keys.sql`, `src/ai/aiKey.ts`, `src/components/AiKeyDialog.tsx`, `server/scripts/{check-byok,rotate-ai-keys}.ts` | I9 |
+| Build-time Content-Security-Policy | `scripts/{write-headers,preview-with-headers}.mjs`, `public/_headers`, `public/tinker-pcm-tap.js` | I9 |
 | History, restore, undo/redo | `shared/src/history.ts`, `server/src/modules/history/*`, `src/history/history.ts`, `src/components/VersionsPanel.tsx` | I8 |
 | Background jobs and worker | `server/migrations/1761000000000_jobs.sql`, `server/src/modules/jobs/{queue,handlers,worker}.ts`, `server/src/worker.ts` | I8 |
 | Voice: contract, gateway, session, routes | `shared/src/voice.ts`, `server/src/modules/voice/{live-gateway,gemini-live,fake-live,voice-session,routes,speech-provider,speak-service}.ts` | I7 |

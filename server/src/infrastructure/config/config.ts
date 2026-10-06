@@ -36,6 +36,8 @@ const envSchema = z
     JWT_AUDIENCE: z.string().min(1).default('authenticated'),
     /** `dev` signs and verifies tokens with a throwaway local key through /dev/auth/login. Development only. */
     AUTH_MODE: z.enum(['supabase', 'dev']).optional(),
+    /** Refuse tokens whose email address was never confirmed (defence in depth on top of Supabase's "Confirm email"). */
+    REQUIRE_VERIFIED_EMAIL: z.enum(['true', 'false']).default('true'),
     RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(120),
     /** Server-side only. Without it AI commands answer 503 AI_UNAVAILABLE and manual editing is unaffected. */
     GEMINI_API_KEY: z.string().min(8).optional(),
@@ -43,6 +45,16 @@ const envSchema = z
     GEMINI_MODEL: z.string().min(1).default('gemini-3.5-flash-lite'),
     /** `off` omits the setting. `minimal` is rejected by some models (it was by gemini-3.8-flash). */
     GEMINI_THINKING_LEVEL: z.enum(['off', 'minimal', 'low', 'medium', 'high']).default('low'),
+    /**
+     * Whose model key the AI runs on: `server` (the operator's GEMINI_API_KEY serves everyone), `user` (every person brings their own
+     * key; nothing runs on the operator's), or `user_or_server`. Default: `server` in development and tests, `user` in production, so a
+     * deployed app never spends the operator's key unless the operator asks for it.
+     */
+    AI_KEY_MODE: z.enum(['server', 'user', 'user_or_server']).optional(),
+    /** 32 random bytes, base64: seals people's own API keys at rest (required unless AI_KEY_MODE=server). Host secret store only. */
+    KEY_ENCRYPTION_SECRET: z.string().optional(),
+    /** Retired secrets, comma separated: stored keys sealed with them stay readable until `rotate-ai-keys` re-seals them. */
+    KEY_ENCRYPTION_SECRET_PREVIOUS: z.string().optional(),
     /** Gemini Live model used for voice (verified against the real endpoint on 2026-10-06). */
     GEMINI_LIVE_MODEL: z.string().min(1).default('gemini-3.8-live'),
     /** Background worker (decision D12): how often to look for work, and how long a claim lasts without a heartbeat. */
@@ -70,6 +82,14 @@ const envSchema = z
         need('DATABASE_SSL', 'no-verify is not allowed in production (use verify with DATABASE_SSL_CA_FILE)');
       }
     }
+    const keyMode = env.AI_KEY_MODE ?? (env.NODE_ENV === 'production' ? 'user' : 'server');
+    if (keyMode !== 'server') {
+      if (!env.KEY_ENCRYPTION_SECRET) need('KEY_ENCRYPTION_SECRET', `is required when AI_KEY_MODE is ${keyMode} (people's API keys are stored encrypted)`);
+      else if (!/^[A-Za-z0-9+/]{43}=$/.test(env.KEY_ENCRYPTION_SECRET.trim())) need('KEY_ENCRYPTION_SECRET', 'must be 32 random bytes encoded as base64 (44 characters)');
+    }
+    for (const previous of (env.KEY_ENCRYPTION_SECRET_PREVIOUS ?? '').split(',').map((v) => v.trim()).filter(Boolean)) {
+      if (!/^[A-Za-z0-9+/]{43}=$/.test(previous)) need('KEY_ENCRYPTION_SECRET_PREVIOUS', 'every entry must be 32 random bytes encoded as base64 (44 characters)');
+    }
     if (env.AUTH_MODE === 'dev' && env.NODE_ENV !== 'development') {
       need('AUTH_MODE', 'dev auth is allowed only when NODE_ENV=development');
     }
@@ -88,6 +108,7 @@ export interface Config {
   authMode: 'supabase' | 'dev';
   supabaseUrl: string | undefined;
   jwtAudience: string;
+  requireVerifiedEmail: boolean;
   rateLimitPerMinute: number;
   ai: {
     /** Secret. Never log or return it. */
@@ -104,6 +125,7 @@ export interface Config {
   };
   voice: { maxSessions: number; maxSessionMs: number };
   worker: { pollMs: number; leaseSeconds: number };
+  aiKeys: { mode: 'server' | 'user' | 'user_or_server'; secret: string | undefined; previousSecrets: string[] };
 }
 
 export class ConfigError extends Error {
@@ -146,6 +168,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     authMode: e.AUTH_MODE ?? 'supabase',
     supabaseUrl: e.SUPABASE_URL,
     jwtAudience: e.JWT_AUDIENCE,
+    requireVerifiedEmail: e.REQUIRE_VERIFIED_EMAIL === 'true',
     rateLimitPerMinute: e.RATE_LIMIT_PER_MINUTE,
     ai: {
       apiKey: e.GEMINI_API_KEY,
@@ -160,5 +183,10 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     },
     voice: { maxSessions: e.VOICE_MAX_SESSIONS, maxSessionMs: e.VOICE_MAX_SESSION_MS },
     worker: { pollMs: e.WORKER_POLL_MS, leaseSeconds: e.WORKER_LEASE_SECONDS },
+    aiKeys: {
+      mode: e.AI_KEY_MODE ?? (e.NODE_ENV === 'production' ? 'user' : 'server'),
+      secret: e.KEY_ENCRYPTION_SECRET?.trim(),
+      previousSecrets: (e.KEY_ENCRYPTION_SECRET_PREVIOUS ?? '').split(',').map((v) => v.trim()).filter(Boolean),
+    },
   };
 }

@@ -10,18 +10,17 @@ import { failure, versionConflict, type Actor, type ServiceDeps } from '../../di
 import { getDiagramRow, insertPlanExecution, insertRevision, lockDiagramRow, updateDocument } from '../../diagrams/persistence/diagrams.ts';
 import { buildAliases, executePlan, type PlanStep } from '../domain/plan.ts';
 import { appendMessages, conversationBelongsTo, createConversation, latestConversation, recentTurns } from '../persistence/conversations.ts';
-import { ProviderError, type InterpretationProvider } from '../providers/types.ts';
-import type { SpeechProvider } from '../../voice/speech-provider.ts';
+import { ProviderError } from '../providers/types.ts';
+import type { AiAccess } from '../../ai-keys/ai-access.ts';
 import { interpretRequest, type AiSource } from './interpret.ts';
 
 export interface AiRuntime {
-  provider: InterpretationProvider;
+  /** Whose model key each person's requests run on (their own, the server's, or none) and how a person manages their own key. */
+  access: AiAccess;
   /** Total interpretation budget, including provider retries (D07). */
   deadlineMs: number;
   /** Model name, for latency metrics only. */
   model?: string;
-  /** Reads assistant messages aloud (the browser falls back to its own voice when this is unavailable). */
-  speech: SpeechProvider;
   /** Per-user AI requests per minute (D10, single instance). */
   limiter: RateLimiter;
   /** Per-user simultaneous AI requests (D10, single instance). */
@@ -100,7 +99,7 @@ export async function executeAiCommand(deps: AiDeps, actor: Actor, diagramId: st
 
       const doc = { graph: current.graph, presentation: current.presentation };
       const history = request.conversationId ? await recentTurns(deps.pool, request.conversationId, HISTORY_TURNS) : [];
-      const interpretation = await interpretRequest({ doc, text, history, provider: deps.ai.provider,
+      const interpretation = await interpretRequest({ doc, text, history, resolveProvider: async () => (await deps.ai.access.providersFor(actor.userId)).provider,
         deadlineMs: deps.ai.deadlineMs,
         beforeProvider: () => {
           deps.ai.limiter.check(actor.userId);

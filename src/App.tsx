@@ -5,6 +5,7 @@ import { DiagramCanvas } from './components/DiagramCanvas';
 import { ManualToolbar } from './components/ManualToolbar';
 import { CommandBar } from './components/CommandBar';
 import { SidebarPanel } from './components/SidebarPanel';
+import { AiKeyDialog } from './components/AiKeyDialog';
 import { LoginScreen } from './components/LoginScreen';
 import { StatusBanners } from './components/StatusBanners';
 import { initAuth, signOut, useAuthStore } from './auth/auth';
@@ -94,6 +95,7 @@ export const App: React.FC = () => {
     <div className="flex flex-col w-screen h-screen bg-[#f7f7f4] text-[#26251e] overflow-hidden select-none font-sans">
       <Header />
       <StatusBanners />
+      <AiKeyDialog />
 
       <div className="flex flex-1 w-full min-h-0 overflow-hidden relative">
         <SidebarPanel />

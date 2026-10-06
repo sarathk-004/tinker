@@ -129,6 +129,31 @@ describe('identity provisioning', () => {
     expect((await ensureUser(h.pool, { ...claims, email: null, displayName: null })).email).toBe('new@example.test');
   });
 
+  it('a token whose email address was never confirmed is refused with a clear 403, a confirmed one works (defence in depth)', async () => {
+    const subject = `unverified:${Math.random()}`;
+    const unverified = await h.signer.sign({ subject, email: 'new@example.test', emailVerified: false });
+    const denied = await call(h, { subject, token: unverified, headers: (x = {}) => ({ authorization: `Bearer ${unverified}`, 'content-type': 'application/json', ...x }) }, 'GET', '/v1/me');
+    expect(denied.status).toBe(403);
+    expect(denied.body.error.code).toBe('EMAIL_NOT_VERIFIED');
+    expect(denied.body.error.message).toMatch(/confirm your email/i);
+    // nothing was created for the unconfirmed address
+    const rows = await h.pool.query(`SELECT count(*)::int AS n FROM users WHERE external_auth_id = $1`, [subject]);
+    expect(rows.rows[0].n).toBe(0);
+    const confirmed = await h.signer.sign({ subject, email: 'new@example.test', emailVerified: true });
+    const ok = await call(h, { subject, token: confirmed, headers: (x = {}) => ({ authorization: `Bearer ${confirmed}`, 'content-type': 'application/json', ...x }) }, 'GET', '/v1/me');
+    expect(ok.status).toBe(200);
+  });
+
+  it('a token with no email_verified claim at all is treated as unconfirmed when the check is on, and ignored when it is off', async () => {
+    const { generateKeyPair, exportJWK, SignJWT, createLocalJWKSet } = await import('jose');
+    const { publicKey, privateKey } = await generateKeyPair('ES256');
+    const jwk = { ...(await exportJWK(publicKey)), alg: 'ES256', use: 'sig', kid: 'k' };
+    const sign = () => new SignJWT({ email: 'a@example.test' }).setProtectedHeader({ alg: 'ES256', kid: 'k' }).setSubject('s').setIssuer('i').setAudience('a').setIssuedAt().setExpirationTime('1h').sign(privateKey);
+    const keys = createLocalJWKSet({ keys: [jwk] });
+    await expect(createTokenVerifier({ issuer: 'i', audience: 'a', keys, requireVerifiedEmail: true })(await sign())).rejects.toMatchObject({ code: 'EMAIL_NOT_VERIFIED' });
+    await expect(createTokenVerifier({ issuer: 'i', audience: 'a', keys, requireVerifiedEmail: false })(await sign())).resolves.toMatchObject({ subject: 's' });
+  });
+
   it('never trusts a user id from the request body or headers', async () => {
     const mallory = await h.newUser('mallory');
     const victim = await h.newUser('victim');

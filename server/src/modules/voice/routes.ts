@@ -15,7 +15,8 @@ export interface VoiceRouteDeps {
   /** Without a verifier/pool sessions are refused with UNAVAILABLE. */
   authenticate: TokenAuthenticator | undefined;
   ai: AiRuntime;
-  live: LiveGateway;
+  /** Resolves the realtime speech gateway for one person (their own key, or the server's). */
+  liveFor: (userId: string) => Promise<LiveGateway>;
   rateLimiter: RateLimiter;
   corsOrigins: string[];
   maxSessions: number;
@@ -78,7 +79,7 @@ export async function registerVoiceRoutes(root: FastifyInstance, deps: VoiceRout
             },
             authenticate: deps.authenticate,
             tokenExpiry,
-            live: deps.live,
+            liveFor: deps.liveFor,
             registry,
             limits,
             rateLimiter: deps.rateLimiter,

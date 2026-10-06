@@ -27,6 +27,7 @@ const fake = vi.hoisted(() => {
       updateUser: async (arg: unknown) => ({ error: record('updateUser', arg) }),
       signUp: async (arg: unknown) => ({ data: { session: null }, error: record('signUp', arg) }),
       signInWithPassword: async (arg: unknown) => ({ error: record('signInWithPassword', arg) }),
+      resend: async (arg: unknown) => ({ error: record('resend', arg) }),
       signOut: async () => ({ error: record('signOut', null) }),
       refreshSession: async () => ({ data: { session: f.session }, error: null }),
     },
@@ -54,6 +55,7 @@ let auth: typeof import('./auth');
 const replaceState = vi.fn();
 
 beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
   vi.resetModules();
   fake.f.calls.length = 0;
   fake.f.created.length = 0;
@@ -67,27 +69,21 @@ beforeEach(async () => {
   auth = await import('./auth');
 });
 
-describe('Continue with Google', () => {
-  it('asks Supabase for the Google provider and returns to this app (PKCE, session picked up from the address)', async () => {
+describe('the session client', () => {
+  it('uses PKCE and picks the session up from the address (email confirmation and reset links land here)', async () => {
     await auth.initAuth();
-    await auth.signInWithGoogle();
-    expect(fake.f.calls.find(([n]) => n === 'signInWithOAuth')![1]).toEqual({ provider: 'google', options: { redirectTo: ORIGIN } });
     const options = (fake.f.created[0] as [string, string, { auth: Record<string, unknown> }])[2].auth;
     expect(options).toMatchObject({ flowType: 'pkce', detectSessionInUrl: true, persistSession: true, autoRefreshToken: true });
-    expect(auth.useAuthStore.getState().error).toBeNull();
   });
 
-  it('shows the provider\'s message when Google is not enabled in Supabase, and stays signed out', async () => {
-    await auth.initAuth();
-    fake.f.nextError = { message: 'Unsupported provider: provider is not enabled' };
-    await auth.signInWithGoogle();
-    expect(auth.useAuthStore.getState()).toMatchObject({ status: 'signedOut', error: 'Unsupported provider: provider is not enabled', busy: false });
+  it('there is no social login any more', () => {
+    expect((auth as Record<string, unknown>)['signInWithGoogle']).toBeUndefined();
   });
 
-  it('becomes signed in when Supabase reports the returned session', async () => {
+  it('becomes signed in when Supabase reports the session', async () => {
     await auth.initAuth();
-    fake.f.authListener?.('SIGNED_IN', { access_token: 't', user: { email: 'g@example.com' } });
-    expect(auth.useAuthStore.getState()).toMatchObject({ status: 'signedIn', email: 'g@example.com', mode: 'supabase' });
+    fake.f.authListener?.('SIGNED_IN', { access_token: 't', user: { email: 'me@example.com' } });
+    expect(auth.useAuthStore.getState()).toMatchObject({ status: 'signedIn', email: 'me@example.com', mode: 'supabase' });
   });
 });
 
@@ -110,7 +106,7 @@ describe('password reset and email confirmation landing', () => {
     expect(fake.f.calls.some(([n]) => n === 'resetPasswordForEmail')).toBe(false);
     fake.f.nextError = { message: 'Email rate limit exceeded' };
     await auth.requestPasswordReset('me@example.com');
-    expect(auth.useAuthStore.getState().error).toBe('Email rate limit exceeded');
+    expect(auth.useAuthStore.getState().error).toMatch(/too many attempts/i); // Supabase's wording, translated
   });
 
   it('arriving from the reset email forces choosing a new password before the app opens', async () => {
@@ -118,18 +114,94 @@ describe('password reset and email confirmation landing', () => {
     fake.f.authListener?.('PASSWORD_RECOVERY', { access_token: 't', user: { email: 'me@example.com' } });
     expect(auth.useAuthStore.getState()).toMatchObject({ recovery: true, status: 'signedIn' });
     await auth.setNewPassword('short');
-    expect(auth.useAuthStore.getState().error).toMatch(/at least 8/);
+    expect(auth.useAuthStore.getState().error).toMatch(/still needs/i);
     expect(fake.f.calls.some(([n]) => n === 'updateUser')).toBe(false);
-    await auth.setNewPassword('a-long-enough-password');
-    expect(fake.f.calls.find(([n]) => n === 'updateUser')![1]).toEqual({ password: 'a-long-enough-password' });
+    await auth.setNewPassword('Str0ng!Passw0rd');
+    expect(fake.f.calls.find(([n]) => n === 'updateUser')![1]).toEqual({ password: 'Str0ng!Passw0rd' });
     expect(auth.useAuthStore.getState()).toMatchObject({ recovery: false, info: 'Password updated.' });
   });
 
   it('sign-up asks for the confirmation email to land back in this app', async () => {
     await auth.initAuth();
-    await auth.signUp('new@example.com', 'a-long-enough-password');
-    expect(fake.f.calls.find(([n]) => n === 'signUp')![1]).toEqual({ email: 'new@example.com', password: 'a-long-enough-password', options: { emailRedirectTo: ORIGIN } });
-    expect(auth.useAuthStore.getState().info).toMatch(/check your email/i);
+    await auth.signUp('new@example.com', 'Str0ng!Passw0rd');
+    expect(fake.f.calls.find(([n]) => n === 'signUp')![1]).toEqual({ email: 'new@example.com', password: 'Str0ng!Passw0rd', options: { emailRedirectTo: ORIGIN } });
+    expect(auth.useAuthStore.getState().pending).toEqual({ email: 'new@example.com' });
+    expect(auth.useAuthStore.getState().info).toMatch(/confirmation link/i);
+  });
+});
+
+describe('email verification', () => {
+  it('a weak password is refused before anything is sent, naming what is missing', async () => {
+    await auth.initAuth();
+    await auth.signUp('new@example.com', 'weakpass');
+    expect(fake.f.calls.some(([n]) => n === 'signUp')).toBe(false);
+    expect(auth.useAuthStore.getState().error).toMatch(/at least 10 characters.*uppercase.*digit.*symbol/i);
+    expect(auth.useAuthStore.getState().pending).toBeNull();
+  });
+
+  it('the same neutral screen is shown whether or not the address already has an account (no account probing)', async () => {
+    await auth.initAuth();
+    await auth.signUp('fresh@example.com', 'Str0ng!Passw0rd');
+    const first = { ...auth.useAuthStore.getState() };
+    auth.leavePendingConfirmation();
+    await auth.signUp('taken@example.com', 'Str0ng!Passw0rd'); // Supabase answers the same way for an existing address
+    const second = auth.useAuthStore.getState();
+    expect(second.pending).toEqual({ email: 'taken@example.com' });
+    expect(second.info?.replace('taken@', 'fresh@')).toBe(first.info);
+    expect(second.error).toBeNull();
+  });
+
+  it('the bot-check token travels with sign-up, sign-in and reset when there is one', async () => {
+    await auth.initAuth();
+    await auth.signUp('a@example.com', 'Str0ng!Passw0rd', 'tok-1');
+    expect((fake.f.calls.find(([n]) => n === 'signUp')![1] as { options: { captchaToken: string } }).options.captchaToken).toBe('tok-1');
+    await auth.signInWithPassword('a@example.com', 'x', 'tok-2');
+    expect((fake.f.calls.find(([n]) => n === 'signInWithPassword')![1] as { options: { captchaToken: string } }).options.captchaToken).toBe('tok-2');
+    await auth.requestPasswordReset('a@example.com', 'tok-3');
+    expect((fake.f.calls.find(([n]) => n === 'resetPasswordForEmail')![1] as { opts: { captchaToken: string } }).opts.captchaToken).toBe('tok-3');
+  });
+
+  it('signing in before confirming shows the check-your-email screen instead of a scary error', async () => {
+    await auth.initAuth();
+    fake.f.nextError = { message: 'Email not confirmed' };
+    await auth.signInWithPassword('waiting@example.com', 'Str0ng!Passw0rd');
+    expect(auth.useAuthStore.getState()).toMatchObject({ pending: { email: 'waiting@example.com' }, error: null, status: 'signedOut' });
+  });
+
+  it('wrong credentials always read the same, and Supabase wording is translated', async () => {
+    await auth.initAuth();
+    fake.f.nextError = { message: 'Invalid login credentials' };
+    await auth.signInWithPassword('x@example.com', 'nope');
+    expect(auth.useAuthStore.getState().error).toBe('Wrong email or password.');
+    expect(auth.friendlyAuthError('email rate limit exceeded')).toMatch(/too many attempts/i);
+    expect(auth.friendlyAuthError('captcha verification process failed')).toMatch(/security check/i);
+    expect(auth.friendlyAuthError('something unexpected')).toBe('something unexpected');
+  });
+
+  it('the confirmation email can be requested again, at most once a minute, with a neutral answer', async () => {
+    await auth.initAuth();
+    await auth.signUp('new@example.com', 'Str0ng!Passw0rd');
+    await auth.resendConfirmation('new@example.com'); // inside the cooldown that started at sign-up: nothing is sent
+    expect(fake.f.calls.some(([n]) => n === 'resend')).toBe(false);
+    expect(auth.useAuthStore.getState().error).toMatch(/wait \d+ seconds/i);
+    vi.setSystemTime(Date.now() + 61_000);
+    await auth.resendConfirmation('new@example.com');
+    expect(fake.f.calls.find(([n]) => n === 'resend')![1]).toEqual({ type: 'signup', email: 'new@example.com', options: { emailRedirectTo: ORIGIN } });
+    expect(auth.useAuthStore.getState().info).toMatch(/if that address is waiting/i);
+    // an unknown or already-confirmed address gets the same answer
+    vi.setSystemTime(Date.now() + 61_000);
+    fake.f.nextError = { message: 'User not found' };
+    await auth.resendConfirmation('ghost@example.com');
+    expect(auth.useAuthStore.getState().error).toBeNull();
+    expect(auth.useAuthStore.getState().info).toMatch(/if that address is waiting/i);
+  });
+
+  it('when the API says the email was never confirmed the app returns to sign-in with instructions', async () => {
+    await auth.initAuth();
+    fake.f.authListener?.('SIGNED_IN', { access_token: 't', user: { email: 'me@example.com' } });
+    auth.authSource.onEmailNotVerified?.();
+    await vi.waitFor(() => expect(auth.useAuthStore.getState().status).toBe('signedOut'));
+    expect(auth.useAuthStore.getState().info).toMatch(/confirm your email/i);
   });
 });
 

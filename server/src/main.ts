@@ -29,7 +29,7 @@ async function main(): Promise<void> {
     console.warn('AUTH_MODE=dev: tokens come from POST /dev/auth/login (throwaway local key). Never use this outside local development.');
   } else {
     if (!config.supabaseUrl) fatal('Invalid configuration:\n  - SUPABASE_URL: is required when AUTH_MODE=supabase (or set AUTH_MODE=dev for local development)');
-    verifier = createSupabaseVerifier(config.supabaseUrl, config.jwtAudience);
+    verifier = createSupabaseVerifier(config.supabaseUrl, config.jwtAudience, { requireVerifiedEmail: config.requireVerifiedEmail });
   }
 
   const pool = createPool(config.databaseUrl, { mode: config.databaseSsl, caFile: config.databaseSslCaFile });

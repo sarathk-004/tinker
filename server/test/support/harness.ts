@@ -10,6 +10,7 @@ import type { RateLimiter } from '../../src/infrastructure/http/rate-limiter.ts'
 import type { InterpretationProvider } from '../../src/modules/ai/providers/types.ts';
 import type { LiveGateway } from '../../src/modules/voice/live-gateway.ts';
 import type { SpeechProvider } from '../../src/modules/voice/speech-provider.ts';
+import type { AiProviders, KeyCheck } from '../../src/modules/ai-keys/ai-access.ts';
 import type { VoiceSessionLimits } from '../../src/modules/voice/voice-session.ts';
 
 export interface Harness {
@@ -36,6 +37,9 @@ export interface HarnessOptions {
   logStream?: { write(line: string): void };
   liveGateway?: LiveGateway;
   speechProvider?: SpeechProvider;
+  /** Personal keys: how a submitted key is checked, and how a person's providers are built from it. */
+  checkAiKey?: (apiKey: string) => Promise<KeyCheck>;
+  buildUserProviders?: (apiKey: string) => Omit<AiProviders, 'source'>;
   voiceLimits?: Partial<VoiceSessionLimits>;
   env?: Record<string, string>;
   /** Share an existing pool/signer (simulates an API restart against the same database). */
@@ -59,6 +63,8 @@ export async function startHarness(options: HarnessOptions = {}): Promise<Harnes
     ...(options.aiRateLimiter ? { aiRateLimiter: options.aiRateLimiter } : {}),
     ...(options.liveGateway ? { liveGateway: options.liveGateway } : {}),
     ...(options.speechProvider ? { speechProvider: options.speechProvider } : {}),
+    ...(options.checkAiKey ? { checkAiKey: options.checkAiKey } : {}),
+    ...(options.buildUserProviders ? { buildUserProviders: options.buildUserProviders } : {}),
     ...(options.voiceLimits ? { voiceLimits: options.voiceLimits } : {}),
   });
   return {
@@ -83,7 +89,7 @@ export const key = () => randomUUID();
 export async function call<T = any>(
   h: Harness,
   user: TestUser | null,
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   url: string,
   body?: unknown,
   headers: Record<string, string> = {},

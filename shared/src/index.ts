@@ -8,3 +8,4 @@ export * from './api.ts';
 export * from './ai.ts';
 export * from './voice.ts';
 export * from './history.ts';
+export * from './ai-key.ts';

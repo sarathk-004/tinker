@@ -2,10 +2,12 @@
  * Starts the API exactly as production would (NODE_ENV=production, real Supabase token verification, exact allowed origins, no
  * development routes) against a database you point it at, and checks what must be true of a deployed instance. No credentials are
  * needed beyond a reachable DATABASE_URL (default: the local dev database) and the public SUPABASE_URL.
- *   npm run check:production -w @tinker/server
+ *   npm run check:production -w @tinker/server            (local database)
+ *   npm run check:production:supabase -w @tinker/server   (your Supabase database, certificate VERIFIED with server/certs/supabase-ca.crt)
  * It starts its own server process on PORT (default 8799) and stops it afterwards. Nothing is written to the database.
  */
 import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
 import WebSocket from 'ws';
 
@@ -31,8 +33,11 @@ const env = {
   LOG_LEVEL: 'warn',
   DATABASE_URL: databaseUrl,
   DATABASE_SSL: databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1') ? 'off' : 'verify',
+  ...(process.env.DATABASE_SSL_CA_FILE ? { DATABASE_SSL_CA_FILE: process.env.DATABASE_SSL_CA_FILE } : {}),
   SUPABASE_URL: supabaseUrl,
   CORS_ORIGINS: allowed,
+  // Production defaults to "people bring their own AI key", which needs the secret that seals stored keys.
+  KEY_ENCRYPTION_SECRET: randomBytes(32).toString('base64'),
 };
 // 1. Misconfiguration must be refused loudly, never half-started.
 const bad = spawn('npx', ['tsx', 'src/main.ts'], { cwd: server, env: { PATH: env.PATH, SystemRoot: env.SystemRoot, NODE_ENV: 'production' }, shell: true });
@@ -48,6 +53,11 @@ const dev = spawn('npx', ['tsx', 'src/main.ts'], { cwd: server, env: { ...env, A
 let devOutput = '';
 dev.stderr.on('data', (d) => (devOutput += d));
 check((await new Promise<number | null>((r) => dev.on('exit', r))) !== 0 && /AUTH_MODE/.test(devOutput), 'development login cannot be switched on in production');
+
+const noSecret = spawn('npx', ['tsx', 'src/main.ts'], { cwd: server, env: { ...env, KEY_ENCRYPTION_SECRET: '' }, shell: true });
+let noSecretOutput = '';
+noSecret.stderr.on('data', (d) => (noSecretOutput += d));
+check((await new Promise<number | null>((r) => noSecret.on('exit', r))) !== 0 && /KEY_ENCRYPTION_SECRET/.test(noSecretOutput), 'production refuses to start without the secret that seals stored API keys');
 
 // 2. A correctly configured instance.
 const child = spawn('npx', ['tsx', 'src/main.ts'], { cwd: server, env, shell: true });

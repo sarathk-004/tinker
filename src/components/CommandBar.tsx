@@ -23,6 +23,8 @@ export const CommandBar: React.FC = () => {
   const working = useVoiceStore((s) => s.working);
   const voiceError = useVoiceStore((s) => s.error);
   const voiceInfo = useVoiceStore((s) => s.info);
+  const keySource = useWorkspaceStore((s) => s.features.aiKey.source);
+  const keyMode = useWorkspaceStore((s) => s.features.aiKey.mode);
   const pending = useConversationStore((s) => s.pending);
   const draft = useConversationStore((s) => s.draft);
   const hasDiagram = useDiagramStore((s) => s.doc.diagram !== null);
@@ -115,6 +117,8 @@ export const CommandBar: React.FC = () => {
           placeholder={
             !aiAvailable
               ? 'Typed commands are not available right now. Manual editing works as usual.'
+              : keyMode !== 'server' && keySource === 'NONE'
+              ? 'Plain commands work. Add your own Gemini key (top right) for free-form AI, voice and spoken replies…'
               : modelAvailable
               ? askMode
                 ? 'Ask about the diagram, e.g. "What happens if Orders goes down?"…'

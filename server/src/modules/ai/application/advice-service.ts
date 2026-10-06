@@ -34,13 +34,14 @@ export async function askAdvice(deps: AiDeps, actor: { userId: string }, diagram
     let answer: string | undefined;
     let source: AiAskResponse['source'] = 'ANALYZER';
     let modelHighlights: string[] = [];
-    if (deps.ai.provider.available) {
+    const providers = await deps.ai.access.providersFor(actor.userId);
+    if (providers.provider.available) {
       const history = request.conversationId ? await recentTurns(deps.pool, request.conversationId, HISTORY_TURNS) : [];
       const prompt = buildAdvicePrompt(doc, analysis, history, request.question);
       if (prompt.ok) {
         try {
           const out = await runProvider({
-            provider: deps.ai.provider,
+            provider: providers.provider,
             request: { systemInstruction: ADVICE_SYSTEM_INSTRUCTION, content: prompt.content, responseSchema: ADVICE_RESPONSE_JSON_SCHEMA as unknown as Record<string, unknown> },
             deadlineMs: deps.ai.deadlineMs,
             onAttempt: (a) => deps.metric?.('ai provider attempt', { ...a, kind: 'ask', model: deps.ai.model, deadlineMs: deps.ai.deadlineMs }),

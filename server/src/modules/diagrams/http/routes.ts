@@ -10,6 +10,7 @@ import {
   expectedVersionQuerySchema,
   idempotencyKeySchema,
   presentationPatchRequestSchema,
+  putAiKeyRequestSchema,
   renameDiagramRequestSchema,
   restoreRequestSchema,
   revisionListQuerySchema,
@@ -48,8 +49,8 @@ export interface ApiDeps {
   hooks?: TestHooks;
   /** AI gateway, limits and deadline. Always present; `ai.provider.available` says whether a model is configured. */
   ai: AiRuntime;
-  /** A voice gateway is configured (shown to the browser through /v1/me). */
-  voiceAvailable?: boolean;
+  /** Limits how often one person may submit a key to be checked (5 a minute). */
+  keyWriteLimiter: RateLimiter;
 }
 
 const diagramParams = z.object({ diagramId: uuidSchema });
@@ -95,12 +96,34 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
     }
     const svc: ServiceDeps = { pool, ...(deps.hooks ? { hooks: deps.hooks } : {}) };
 
+    /** What this person's AI can do right now depends on whose key their requests run on. */
+    const featuresFor = async (userId: string): Promise<MeResponse['features']> => {
+      const access = await deps.ai.access.providersFor(userId);
+      return {
+        aiCommands: true,
+        aiModel: access.provider.available,
+        voice: access.live.available,
+        speech: access.speech.available,
+        aiKey: { mode: deps.ai.access.mode, source: access.source },
+      };
+    };
+
+    // Bring-your-own-key. The key is accepted once (PUT), checked with the provider, stored encrypted, and never returned.
+    const keyWriteLimiter = deps.keyWriteLimiter;
+    app.get(`${API_PREFIX}/me/ai-key`, async (request) => deps.ai.access.status(request.auth!.userId));
+    app.put(`${API_PREFIX}/me/ai-key`, async (request) => {
+      const body = parseOrThrow(putAiKeyRequestSchema, request.body, 'INVALID_REQUEST', 'That does not look like a complete API key.');
+      keyWriteLimiter.check(request.auth!.userId); // guessing keys through us is not a thing
+      return deps.ai.access.save(request.auth!.userId, body.apiKey);
+    });
+    app.delete(`${API_PREFIX}/me/ai-key`, async (request) => deps.ai.access.remove(request.auth!.userId));
+
     app.get(`${API_PREFIX}/me`, async (request): Promise<MeResponse> => {
       const auth = request.auth!;
       return {
         user: { id: auth.userId, email: auth.email, displayName: auth.displayName },
         workspaces: await listWorkspaces(pool, auth.userId),
-        features: { aiCommands: true, aiModel: deps.ai.provider.available, voice: deps.voiceAvailable ?? false, speech: deps.ai.speech.available },
+        features: await featuresFor(auth.userId),
       };
     });
 

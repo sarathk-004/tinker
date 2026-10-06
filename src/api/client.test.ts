@@ -147,6 +147,17 @@ describe('api client', () => {
     expect(stillBad.auth.onUnauthorized).toHaveBeenCalledTimes(1);
   });
 
+  it('403 EMAIL_NOT_VERIFIED: tells the app once, is not retried, and never refreshes or signs out as if the session expired', async () => {
+    const onEmailNotVerified = vi.fn();
+    const { client, calls, auth } = setup([json(403, envelope('EMAIL_NOT_VERIFIED'))], { onEmailNotVerified });
+    const error = (await client.mutate.command(spec).catch((e) => e)) as ApiError;
+    expect(error.code).toBe('EMAIL_NOT_VERIFIED');
+    expect(error.retryable).toBe(false);
+    expect(onEmailNotVerified).toHaveBeenCalledTimes(1);
+    expect(auth.onUnauthorized).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
+  });
+
   it('reads send no idempotency key or body', async () => {
     const { client, calls } = setup([json(200, { diagrams: [] })]);
     await client.listDiagrams(U(7));

@@ -1,6 +1,8 @@
 import React from 'react';
 import { useDiagramStore } from '../diagram/store';
-import { RotateCcw, ArrowRightLeft, ArrowUpDown, Undo2, Redo2 } from 'lucide-react';
+import { RotateCcw, ArrowRightLeft, ArrowUpDown, Undo2, Redo2, KeyRound } from 'lucide-react';
+import { useAiKeyStore } from '../ai/aiKey';
+import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { useHistoryStore } from '../history/history';
 import { TinkerLogo } from './TinkerLogo';
 import { DiagramBar } from './DiagramBar';
@@ -13,6 +15,8 @@ export const Header: React.FC = () => {
   const canUndo = useHistoryStore((s) => s.canUndo);
   const canRedo = useHistoryStore((s) => s.canRedo);
   const busy = useHistoryStore((s) => s.busy);
+  const keyMode = useWorkspaceStore((s) => s.features.aiKey.mode);
+  const keySource = useWorkspaceStore((s) => s.features.aiKey.source);
 
   const toggleLayout = () => void useDiagramStore.getState().applyLayout(layoutDir === 'LR' ? 'TB' : 'LR');
   const resetCanvas = () => {
@@ -37,6 +41,19 @@ export const Header: React.FC = () => {
           <span className="text-[#a09c92]">·</span>
           <span className="text-[#26251e] font-medium">{edges.length}</span> edges
         </div>
+
+        {keyMode !== 'server' && (
+          <button
+            onClick={() => useAiKeyStore.getState().show()}
+            title={keySource === 'USER' ? 'Your own Gemini key is in use. Click to change or remove it.' : 'Add your own Gemini key to turn on free-form AI, voice and spoken replies.'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-all ${
+              keySource === 'NONE' ? 'text-[#f54e00] bg-[#f54e00]/5 border-[#f54e00]/40 hover:bg-[#f54e00]/10' : 'text-[#26251e] bg-white border-[#e6e5e0] hover:border-[#cfcdc4] hover:bg-[#fafaf7]'
+            }`}
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{keySource === 'NONE' ? 'Add AI key' : 'AI key'}</span>
+          </button>
+        )}
 
         <div className="flex items-center rounded-md border border-[#e6e5e0] bg-white overflow-hidden">
           <button

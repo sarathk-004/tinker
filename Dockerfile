@@ -23,6 +23,8 @@ COPY shared ./shared
 COPY server/package.json server/tsconfig.json ./server/
 COPY server/src ./server/src
 COPY server/migrations ./server/migrations
+# The public Supabase root certificate, so the API can VERIFY the database (set DATABASE_SSL_CA_FILE=/app/server/certs/supabase-ca.crt).
+COPY server/certs ./server/certs
 RUN chown -R node:node /app
 USER node
 EXPOSE 8787

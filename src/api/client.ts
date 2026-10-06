@@ -8,10 +8,12 @@ import {
   aiCommandResponseSchema,
   conversationResponseSchema,
   speakResponseSchema,
+  aiKeyStatusSchema,
   revisionListResponseSchema,
   errorEnvelopeSchema,
   meResponseSchema,
   type AiAskResponse,
+  type AiKeyStatus,
   type AiCommandResponse,
   type CommandResponse,
   type ConversationResponse,
@@ -51,6 +53,8 @@ export interface AuthSource {
   refresh(): Promise<string | null>;
   /** Called when the API keeps rejecting our credentials. */
   onUnauthorized(): void;
+  /** Called when the account's email address was never confirmed (the API answers 403 EMAIL_NOT_VERIFIED). */
+  onEmailNotVerified?(): void;
 }
 
 export interface ApiClientOptions {
@@ -168,6 +172,10 @@ export function createApiClient(options: ApiClientOptions) {
       if (error.retryable && error.code !== 'NETWORK_ERROR' && opts.noRetryCodes?.includes(error.code as ErrorCode)) {
         error = new ApiError(error.code, error.message, error.status, error.details, error.requestId, false);
       }
+      if (error.code === 'EMAIL_NOT_VERIFIED') {
+        options.auth.onEmailNotVerified?.();
+        throw error;
+      }
       if (error.code === 'UNAUTHENTICATED') {
         if (!refreshed) {
           refreshed = true;
@@ -206,6 +214,10 @@ export function createApiClient(options: ApiClientOptions) {
       const qs = params.toString();
       return request('GET', `/v1/diagrams/${diagramId}/revisions${qs ? `?${qs}` : ''}`, undefined, undefined, revisionListResponseSchema).then((r) => r.data as RevisionListResponse);
     },
+    /** Bring-your-own-key. The key is sent once (PUT) and never comes back: only its last four characters. */
+    aiKey: () => request('GET', '/v1/me/ai-key', undefined, undefined, aiKeyStatusSchema).then((r) => r.data as AiKeyStatus),
+    saveAiKey: (apiKey: string) => request('PUT', '/v1/me/ai-key', { apiKey }, undefined, aiKeyStatusSchema, { timeoutMs: 20_000, noRetryCodes: ['RATE_LIMITED', 'SERVICE_UNAVAILABLE'] }).then((r) => r.data as AiKeyStatus),
+    removeAiKey: () => request('DELETE', '/v1/me/ai-key', undefined, undefined, aiKeyStatusSchema).then((r) => r.data as AiKeyStatus),
     /** Read one of my assistant messages aloud (server-synthesized). The server only accepts a message id, never text. */
     speak: (diagramId: string, messageId: string) =>
       request('POST', `/v1/diagrams/${diagramId}/ai/speak`, { messageId }, undefined, speakResponseSchema, {

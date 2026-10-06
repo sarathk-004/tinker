@@ -14,17 +14,8 @@ export class MicrophoneError extends Error {
   }
 }
 
-/** Runs in the audio thread: hands each 128-sample block of the first channel to the page. */
-const WORKLET_SOURCE = `
-class TinkerPcmTap extends AudioWorkletProcessor {
-  process(inputs) {
-    const channel = inputs[0] && inputs[0][0];
-    if (channel) this.port.postMessage(channel.slice(0));
-    return true;
-  }
-}
-registerProcessor('tinker-pcm-tap', TinkerPcmTap);
-`;
+/** The audio-thread tap lives in public/tinker-pcm-tap.js (a static file, so the page's Content-Security-Policy stays strict). */
+const WORKLET_URL = '/tinker-pcm-tap.js';
 
 export type CaptureFactory = (onFrame: (frame: Uint8Array) => void) => Promise<MicCapture>;
 
@@ -42,12 +33,7 @@ export const startMicrophone: CaptureFactory = async (onFrame) => {
     throw new MicrophoneError('unavailable', 'No microphone is available.');
   }
   const context = new AudioContext();
-  const url = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: 'text/javascript' }));
-  try {
-    await context.audioWorklet.addModule(url);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  await context.audioWorklet.addModule(WORKLET_URL);
   const encoder = new PcmEncoder(context.sampleRate, onFrame);
   const source = context.createMediaStreamSource(stream);
   const node = new AudioWorkletNode(context, 'tinker-pcm-tap');

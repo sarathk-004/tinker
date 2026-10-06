@@ -30,7 +30,7 @@ async function makeKey(kid: string): Promise<SigningKey> {
     kid,
     jwk,
     sign: (subject) =>
-      new SignJWT({ email: `${subject}@example.test` })
+      new SignJWT({ email: `${subject}@example.test`, user_metadata: { email_verified: true } })
         .setProtectedHeader({ alg: 'ES256', kid })
         .setSubject(subject)
         .setIssuer(ISSUER)

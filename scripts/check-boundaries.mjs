@@ -73,9 +73,10 @@ for (const { dir, forbid } of rules) {
 }
 
 // Secrets must not be exposed through VITE_* variables (committed examples and typings).
-// Supabase publishable keys are public by design (sb_publishable_...), so VITE_*PUBLISHABLE* names are allowed.
+// Supabase publishable keys are public by design (sb_publishable_...), so VITE_*PUBLISHABLE* names are allowed, and so is the
+// Cloudflare Turnstile SITE key (VITE_TURNSTILE_SITE_KEY: it is rendered in the page; the SECRET key lives only in Supabase).
 // Everything else that looks like a secret must never be exposed to the browser bundle.
-const secretish = /VITE_(?![A-Z0-9_]*PUBLISHABLE)[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)/;
+const secretish = /VITE_(?![A-Z0-9_]*(PUBLISHABLE|TURNSTILE_SITE_KEY))[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)/;
 for (const file of [...walk(join(root, 'src')), join(root, '.env.example'), join(root, 'server', '.env.example')]) {
   let text;
   try {

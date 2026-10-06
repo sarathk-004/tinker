@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { aiKeyModeSchema, aiKeySourceSchema } from './ai-key.ts';
 import { LIMITS } from './limits.ts';
 import { graphSchema, uuidSchema } from './graph.ts';
 import {
@@ -87,9 +88,9 @@ export const meResponseSchema = z.strictObject({
   /**
    * aiCommands: typed commands are offered (the deterministic parser needs no model).
    * aiModel: a model is configured, so free-form requests can be interpreted; without it only plain commands work.
-   * voice: spoken requests are possible. speech: the server can synthesize spoken replies (otherwise the browser's own voice is used).
+   * aiKey: whose model key this person's AI runs on (see ai-key.ts). voice: spoken requests are possible. speech: the server can synthesize spoken replies (otherwise the browser's own voice is used).
    */
-  features: z.strictObject({ aiCommands: z.boolean(), aiModel: z.boolean(), voice: z.boolean(), speech: z.boolean() }),
+  features: z.strictObject({ aiCommands: z.boolean(), aiModel: z.boolean(), voice: z.boolean(), speech: z.boolean(), aiKey: z.strictObject({ mode: aiKeyModeSchema, source: aiKeySourceSchema }) }),
 });
 export type MeResponse = z.infer<typeof meResponseSchema>;
 
