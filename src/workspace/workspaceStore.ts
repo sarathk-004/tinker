@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { DiagramSummary, MeResponse, WorkspaceSummary } from '../contracts';
+import type { DiagramSummary, MeResponse, Quota, WorkspaceSummary } from '../contracts';
 import { ApiError } from '../api/client';
 import { api, session } from '../document/instance';
 import { useConversationStore } from '../ai/conversationStore';
@@ -8,6 +8,22 @@ import { voice } from '../voice/voice';
 import { useSpeechSettings } from '../voice/speech';
 
 const lastKey = (userId: string) => `tinker_last_diagram:${userId}`;
+const lastWorkspaceKey = (userId: string) => `tinker_last_workspace:${userId}`;
+const rememberWorkspace = (userId: string | undefined, workspaceId: string) => {
+  if (!userId) return;
+  try {
+    localStorage.setItem(lastWorkspaceKey(userId), workspaceId);
+  } catch {
+    /* storage unavailable */
+  }
+};
+const recallWorkspace = (userId: string): string | null => {
+  try {
+    return localStorage.getItem(lastWorkspaceKey(userId));
+  } catch {
+    return null;
+  }
+};
 const remember = (userId: string | undefined, diagramId: string | null) => {
   if (!userId) return;
   try {
@@ -30,12 +46,20 @@ interface WorkspaceState {
   error: string | null;
   user: MeResponse['user'] | null;
   workspace: WorkspaceSummary | null;
+  /** Every workspace this person belongs to (the switcher lists them). */
+  workspaces: WorkspaceSummary[];
   diagrams: DiagramSummary[];
+  /** Today's AI allowance (from /v1/me); refreshed after anything that can use it. */
+  quota: Quota | null;
   /** What this server can do (from /v1/me): typed commands are offered only when a model is configured. */
   features: MeResponse['features'];
 
   bootstrap(): Promise<void>;
   refreshList(): Promise<void>;
+  refreshQuota(): Promise<void>;
+  switchWorkspace(id: string): Promise<void>;
+  /** Returns an error message to show, or null on success. */
+  createWorkspace(name: string): Promise<string | null>;
   openDiagram(id: string): Promise<void>;
   createDiagram(name?: string): Promise<void>;
   renameDiagram(name: string): Promise<void>;
@@ -61,16 +85,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     error: null,
     user: null,
     workspace: null,
+    workspaces: [],
     diagrams: [],
+    quota: null,
     features: { aiCommands: false, aiModel: false, voice: false, speech: false, aiKey: { mode: 'server', source: 'NONE' } },
 
     async bootstrap() {
       set({ phase: 'loading', error: null });
       try {
         const me = await api.me();
-        const workspace = me.workspaces.find((w) => w.personal) ?? me.workspaces[0] ?? null;
+        const wanted0 = recallWorkspace(me.user.id);
+        const workspace = me.workspaces.find((w) => w.id === wanted0) ?? me.workspaces.find((w) => w.personal) ?? me.workspaces[0] ?? null;
         if (!workspace) throw new Error('No workspace is available for this account.');
-        set({ user: me.user, workspace, features: me.features });
+        set({ user: me.user, workspace, workspaces: me.workspaces, features: me.features, quota: me.quota });
         useSpeechSettings.setState({ serverCanSpeak: me.features.speech });
         await get().refreshList();
         const diagrams = get().diagrams;
@@ -81,6 +108,44 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         set({ phase: 'ready' });
       } catch (e) {
         set({ phase: 'error', error: describe(e) });
+      }
+    },
+
+    async refreshQuota() {
+      try {
+        const me = await api.me();
+        set({ quota: me.quota, features: me.features });
+      } catch {
+        /* the readout is a convenience: it catches up on the next refresh */
+      }
+    },
+
+    async switchWorkspace(id) {
+      const target = get().workspaces.find((w) => w.id === id);
+      if (!target || target.id === get().workspace?.id) return;
+      if (session.getState().diagram && !(await settleBeforeLeaving())) return;
+      voice.dispose();
+      session.close();
+      useConversationStore.getState().reset();
+      set({ workspace: target, diagrams: [] });
+      rememberWorkspace(get().user?.id, target.id);
+      await get().refreshList();
+      const diagrams = get().diagrams;
+      const target0 = diagrams[0];
+      if (target0) await get().openDiagram(target0.id);
+      else if (target.role !== 'VIEWER') await get().createDiagram('My first diagram');
+    },
+
+    async createWorkspace(name) {
+      const trimmed = name.trim();
+      if (!trimmed) return 'Give the workspace a name.';
+      try {
+        const created = await api.createWorkspace(trimmed, crypto.randomUUID());
+        set({ workspaces: [...get().workspaces.filter((w) => w.id !== created.data.id), created.data] });
+        await get().switchWorkspace(created.data.id);
+        return null;
+      } catch (e) {
+        return e instanceof ApiError && e.code === 'DOMAIN_VALIDATION_FAILED' ? e.message : describe(e);
       }
     },
 
@@ -146,7 +211,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       voice.dispose();
       session.close();
       useConversationStore.getState().reset();
-      set({ phase: 'idle', error: null, user: null, workspace: null, diagrams: [], features: { aiCommands: false, aiModel: false, voice: false, speech: false, aiKey: { mode: 'server', source: 'NONE' } } });
+      set({ phase: 'idle', error: null, user: null, workspace: null, workspaces: [], quota: null, diagrams: [], features: { aiCommands: false, aiModel: false, voice: false, speech: false, aiKey: { mode: 'server', source: 'NONE' } } });
     },
   };
 });

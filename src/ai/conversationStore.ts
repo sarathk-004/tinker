@@ -16,6 +16,8 @@ export interface ConversationTurn {
   options?: string[];
   kind?: 'applied' | 'clarification' | 'refused' | 'error' | 'sending' | 'advice';
   source?: 'PARSER' | 'AI' | 'ANALYZER';
+  /** The diagram version this turn produced or was answered against (from the saved message). */
+  version?: number;
   /** Components an advice answer is about. "Show on diagram" highlights them (transient, never saved in the diagram). */
   highlight?: string[];
 }
@@ -57,6 +59,7 @@ export function messageToTurn(m: ChatMessage): ConversationTurn {
     ...(highlight && highlight.length > 0 ? { highlight } : {}),
     ...(options && options.length > 0 ? { options } : {}),
     ...(source ? { source } : {}),
+    ...(typeof meta['diagramVersion'] === 'number' ? { version: meta['diagramVersion'] as number } : {}),
   };
 }
 

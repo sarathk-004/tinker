@@ -1,13 +1,7 @@
 import React, { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
-import { Header } from './components/Header';
-import { DiagramCanvas } from './components/DiagramCanvas';
-import { ManualToolbar } from './components/ManualToolbar';
-import { CommandBar } from './components/CommandBar';
-import { SidebarPanel } from './components/SidebarPanel';
-import { AiKeyDialog } from './components/AiKeyDialog';
+import { AppShell } from './shell/AppShell';
 import { LoginScreen } from './components/LoginScreen';
-import { StatusBanners } from './components/StatusBanners';
 import { initAuth, signOut, useAuthStore } from './auth/auth';
 import { session } from './document/instance';
 import { useWorkspaceStore } from './workspace/workspaceStore';
@@ -91,22 +85,7 @@ export const App: React.FC = () => {
     );
   }
 
-  return (
-    <div className="flex flex-col w-screen h-screen bg-[#f7f7f4] text-[#26251e] overflow-hidden select-none font-sans">
-      <Header />
-      <StatusBanners />
-      <AiKeyDialog />
-
-      <div className="flex flex-1 w-full min-h-0 overflow-hidden relative">
-        <SidebarPanel />
-        <main className="relative flex-1 h-full overflow-hidden bg-[#f7f7f4]">
-          <DiagramCanvas />
-          <ManualToolbar />
-          <CommandBar />
-        </main>
-      </div>
-    </div>
-  );
+  return <AppShell />;
 };
 
 export default App;

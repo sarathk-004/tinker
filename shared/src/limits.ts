@@ -6,6 +6,9 @@ export const LIMITS = {
   maxTechnologyLength: 120,
   maxRelationshipLength: 120,
   maxDiagramNameLength: 160,
+  maxWorkspaceNameLength: 80,
+  /** Team workspaces one person may own (their personal workspace is not counted). */
+  maxOwnedWorkspaces: 5,
   maxCommandTextBytes: 8 * 1024,
   maxMetadataChars: 8 * 1024,
   maxMetadataKeyLength: 64,

@@ -45,8 +45,12 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['"CursorGothic"', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['"JetBrains Mono"', '"Fira Code"', 'monospace'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        mono: ['"JetBrains Mono"', '"Fira Code"', 'ui-monospace', 'monospace'],
+      },
+      fontSize: {
+        // The design's small mono labels ("ECS FARGATE", "REQUIREMENTS"): tiny, uppercase, loosely tracked.
+        '2xs': ['10px', { lineHeight: '14px', letterSpacing: '0.06em' }],
       },
       borderRadius: {
         'xs': '4px',

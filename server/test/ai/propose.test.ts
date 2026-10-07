@@ -20,7 +20,7 @@ describe('parser: a word for a KIND of component means the component of that kin
 
   it('"the database" / "the db" / "database" resolve to the one database, whatever it is named', () => {
     for (const text of ['put a cache between Orders and the database', 'put a cache between Orders and the db', 'put a cache between orders and database']) {
-      expect(steps(parseCommand(doc, text))).toEqual([{ type: 'INSERT_BETWEEN', name: 'cache', source: 'n2', target: 'n3', edge: 'e2' }]);
+      expect(steps(parseCommand(doc, text))).toEqual([{ type: 'INSERT_BETWEEN', name: 'Cache', source: 'n2', target: 'n3', edge: 'e2' }]);
     }
     expect(steps(parseCommand(doc, 'connect Web Client to the database'))).toEqual([{ type: 'CONNECT', source: 'n1', target: 'n3' }]);
     expect(steps(parseCommand(doc, 'remove the database'))).toEqual([{ type: 'REMOVE_NODE', ref: 'n3' }]);
@@ -47,7 +47,7 @@ describe('parser: a word for a KIND of component means the component of that kin
     for (const text of ['add a cache in front of the database', 'add redis after orders', 'add a queue before billing', 'add a cache for orders', 'add a cache next to the database']) {
       expect(kindOf(parseCommand(doc, text)), text).toBe('none');
     }
-    expect(steps(parseCommand(doc, 'add a database'))).toEqual([{ type: 'ADD_NODE', name: 'database' }]);
+    expect(steps(parseCommand(doc, 'add a database'))).toEqual([{ type: 'ADD_NODE', name: 'Database' }]);
   });
 
   it('a typo gets "did you mean", not a refusal and not a new component', () => {
@@ -85,7 +85,7 @@ describe('parser: wordings that used to be mis-read', () => {
   });
 
   it('ordinary phrasings still work', () => {
-    expect(steps(parseCommand(doc, 'add a new payments service'))).toEqual([{ type: 'ADD_NODE', name: 'payments' }]);
+    expect(steps(parseCommand(doc, 'add a new payments service'))).toEqual([{ type: 'ADD_NODE', name: 'Payments' }]);
     expect(steps(parseCommand(doc, 'create a Kafka queue'))).toEqual([{ type: 'ADD_NODE', name: 'Kafka queue' }]);
     expect(steps(parseCommand(doc, 'connect the cache to the database'))).toEqual([{ type: 'CONNECT', source: 'n4', target: 'n3' }]);
   });
@@ -100,7 +100,7 @@ describe('parser: a missing component is OFFERED, never silently invented', () =
     expect(p.question).toMatch(/Should I add one/);
     expect(p.steps).toEqual([
       { type: 'ADD_NODE', name: 'Database', kind: 'DATABASE', as: 'new1' },
-      { type: 'ADD_NODE', name: 'cache', as: 'new2' },
+      { type: 'ADD_NODE', name: 'Cache', as: 'new2' },
       { type: 'CONNECT', source: 'n1', target: 'new2' },
       { type: 'CONNECT', source: 'new2', target: 'new1' },
     ]);
@@ -192,9 +192,9 @@ describe('ask first, then apply exactly that (through the real API)', () => {
     const after = await state(d.id);
     expect(after.version).toBe(d.version + 1); // one version for the whole plan
     const byId = new Map<string, { name: string; kind: string }>(after.graph.nodes.map((n: { id: string; name: string; kind: string }) => [n.id, n]));
-    expect([...byId.values()].map((n) => `${n.name}:${n.kind}`).sort()).toEqual(['Database:DATABASE', 'Orders:SERVICE', 'cache:CACHE']);
+    expect([...byId.values()].map((n) => `${n.name}:${n.kind}`).sort()).toEqual(['Cache:CACHE', 'Database:DATABASE', 'Orders:SERVICE']);
     const wires = after.graph.edges.map((e: { sourceNodeId: string; targetNodeId: string }) => `${byId.get(e.sourceNodeId)!.name}->${byId.get(e.targetNodeId)!.name}`).sort();
-    expect(wires).toEqual(['Orders->cache', 'cache->Database']);
+    expect(wires).toEqual(['Cache->Database', 'Orders->Cache']);
     expect(provider.calls.length).toBe(calls); // the model was never involved
   });
 

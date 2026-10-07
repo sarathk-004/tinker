@@ -2,12 +2,10 @@ import React, { useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Background,
-  Controls,
   BackgroundVariant,
   useNodesState,
   useEdgesState,
   useReactFlow,
-  ReactFlowProvider,
   type Connection,
   type Edge,
   type Node,
@@ -15,14 +13,17 @@ import {
 import '@xyflow/react/dist/style.css';
 import { AWSArchitectureNode } from './AWSArchitectureNode';
 import { useDiagramStore } from '../diagram/store';
-import { TypewriterPrompt } from './TypewriterPrompt';
+import { EmptyCanvas } from './EmptyCanvas';
+import { useUi } from '../shell/uiStore';
 import type { DiagramNode } from '../types/diagram';
 
 const nodeTypes = {
   awsNode: AWSArchitectureNode,
 };
 
-const InnerCanvas: React.FC = () => {
+/** The React Flow provider lives in the app shell, so the toolbar can zoom and frame the same canvas. */
+export const DiagramCanvas: React.FC = () => {
+  const tool = useUi((s) => s.tool);
   const storeNodes = useDiagramStore((state) => state.nodes);
   const storeEdges = useDiagramStore((state) => state.edges);
   const diagramId = useDiagramStore((state) => state.doc.diagram?.id ?? null);
@@ -61,7 +62,7 @@ const InnerCanvas: React.FC = () => {
     const hasNodes = storeNodes.length > 0;
     const prev = framedFor.current;
     if (hasNodes && (prev.id !== diagramId || !prev.hadNodes)) {
-      const timer = setTimeout(() => fitView({ padding: 0.25, duration: 400 }), 60);
+      const timer = setTimeout(() => fitView({ padding: 0.25, duration: 400, maxZoom: 1 }), 60);
       framedFor.current = { id: diagramId, hadNodes: true };
       return () => clearTimeout(timer);
     }
@@ -107,7 +108,7 @@ const InnerCanvas: React.FC = () => {
 
   return (
     <div className="relative w-full h-full bg-[#f7f7f4]">
-      {isEmpty && diagramId && <TypewriterPrompt />}
+      {isEmpty && diagramId && <EmptyCanvas />}
 
       <ReactFlow
         nodes={nodes}
@@ -123,26 +124,19 @@ const InnerCanvas: React.FC = () => {
         onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
         deleteKeyCode={['Backspace', 'Delete']}
+        // Select tool: drag on empty canvas draws a selection box and Space (or the middle/right button) pans. Pan tool: drag pans.
+        selectionOnDrag={tool === 'select'}
+        panOnDrag={tool === 'pan' ? true : [1, 2]}
+        panActivationKeyCode="Space"
         fitView
+        fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
         minZoom={0.2}
         maxZoom={1.5}
         proOptions={{ hideAttribution: true }}
         className="touch-none"
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} color="#cfcdc4" />
-        <Controls
-          className="!bg-white !border !border-[#e6e5e0] !rounded-md overflow-hidden [&>button]:!bg-transparent [&>button]:!border-[#e6e5e0] [&>button]:!text-[#26251e] hover:[&>button]:!bg-[#fafaf7]"
-          showInteractive={false}
-        />
       </ReactFlow>
     </div>
-  );
-};
-
-export const DiagramCanvas: React.FC = () => {
-  return (
-    <ReactFlowProvider>
-      <InnerCanvas />
-    </ReactFlowProvider>
   );
 };

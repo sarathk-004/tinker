@@ -12,6 +12,7 @@ import {
   revisionListResponseSchema,
   errorEnvelopeSchema,
   meResponseSchema,
+  workspaceSummarySchema,
   type AiAskResponse,
   type AiKeyStatus,
   type AiCommandResponse,
@@ -22,6 +23,7 @@ import {
   type DiagramListResponse,
   type ErrorCode,
   type MeResponse,
+  type WorkspaceSummary,
   type RevisionListResponse,
   type SpeakResponse,
 } from '../contracts';
@@ -225,6 +227,9 @@ export function createApiClient(options: ApiClientOptions) {
         noRetryCodes: ['AI_TIMEOUT', 'AI_PROVIDER_ERROR', 'AI_UNAVAILABLE', 'RATE_LIMITED'],
       }).then((r) => r.data as SpeakResponse),
     me: () => request('GET', '/v1/me', undefined, undefined, meResponseSchema).then((r) => r.data as MeResponse),
+    /** Start a team workspace (the caller becomes its owner). The caller owns the idempotency key. */
+    createWorkspace: (name: string, idempotencyKey: string) =>
+      request('POST', '/v1/workspaces', { name }, idempotencyKey, workspaceSummarySchema) as Promise<Replayable<WorkspaceSummary>>,
     listDiagrams: (workspaceId: string) =>
       request('GET', `/v1/workspaces/${workspaceId}/diagrams`, undefined, undefined, diagramListResponseSchema).then((r) => r.data as DiagramListResponse),
     loadDiagram: (diagramId: string) => request('GET', `/v1/diagrams/${diagramId}`, undefined, undefined, diagramDetailSchema).then((r) => r.data as DiagramDetail),

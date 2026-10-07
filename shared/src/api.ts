@@ -81,6 +81,10 @@ export const workspaceSummarySchema = z.strictObject({
 });
 export type WorkspaceSummary = z.infer<typeof workspaceSummarySchema>;
 
+/** POST /v1/workspaces: start a team workspace (the caller becomes its owner). */
+export const createWorkspaceRequestSchema = z.strictObject({ name: z.string().trim().min(1).max(LIMITS.maxWorkspaceNameLength) });
+export type CreateWorkspaceRequest = z.infer<typeof createWorkspaceRequestSchema>;
+
 const usageSchema = z.strictObject({ used: z.number().int().min(0), limit: z.number().int().min(0) });
 /** The day's AI allowance (resets at `resetsAt`, midnight UTC). `ai` counts every request that needs the model; `voice` counts voice sessions. */
 export const quotaSchema = z.strictObject({ resetsAt: z.iso.datetime(), ai: usageSchema, voice: usageSchema });

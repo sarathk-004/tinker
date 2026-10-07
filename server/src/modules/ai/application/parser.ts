@@ -52,6 +52,9 @@ const norm = (s: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+/** "cache" -> "Cache", "kafka queue" -> "Kafka Queue". Anything with a capital letter was written on purpose ("PostgreSQL", "iOS App") and is left alone. */
+export const tidyName = (s: string): string => (s === s.toLowerCase() ? s.replace(/(^|\s)(\p{L})/gu, (_m, space: string, letter: string) => `${space}${letter.toUpperCase()}`) : s);
+
 const stripSuffix = (s: string) => s.replace(/\s+(?:node|service|component|box|block|layer)$/i, '').trim();
 
 type Resolved = { ok: true; alias: string; name: string } | { ok: false; result: Extract<ParseResult, { kind: 'clarify' | 'none' }>; missing?: Missing };
@@ -183,7 +186,7 @@ function nameWorthAdding(raw: string): boolean {
   const words = raw.trim().split(/\s+/);
   return raw.length >= 2 && raw.length <= 40 && words.length <= 3 && /^[\p{L}\p{N}][\p{L}\p{N} ._&+-]*$/u.test(raw) && !/^(?:it|that|this|them|there|everything|all)$/i.test(raw.trim());
 }
-const displayName = (raw: string) => raw.trim().replace(/^(?:the|a|an)\s+/i, '').replace(/\s+/g, ' ');
+const displayName = (raw: string) => tidyName(raw.trim().replace(/^(?:the|a|an)\s+/i, '').replace(/\s+/g, ' '));
 
 type Found = Extract<Resolved, { ok: true }>;
 type Pair = { a: Found; b: Found };
@@ -241,7 +244,7 @@ export function parseCommand(doc: DiagramDoc, input: string): ParseResult {
 
   // --- insert between ---
   if ((m = /^(?:put|insert|add|place|drop|stick|slot)\s+(?:in\s+)?(?:a\s+|an\s+|the\s+|new\s+)*(.+?)\s+(?:in\s+)?between\s+(.+?)\s+and\s+(.+)$/i.exec(text))) {
-    const name = stripSuffix(m[1]!);
+    const name = tidyName(stripSuffix(m[1]!));
     if (!name || name.length > 120) return { kind: 'none' };
     const pair = both(doc, aliases, m[2]!, m[3]!);
     if (isOneMissing(pair)) {
@@ -339,7 +342,7 @@ export function parseCommand(doc: DiagramDoc, input: string): ParseResult {
 
   // --- add (one component) ---
   if ((m = /^(?:add|create|new|spin up)\s+(?:a\s+|an\s+|the\s+|new\s+)*(.+?)(?:\s+(?:to|into|in|on)\s+(?:the\s+|this\s+|my\s+)?(?:diagram|canvas|board|architecture))?$/i.exec(text))) {
-    const name = stripSuffix(m[1]!);
+    const name = tidyName(stripSuffix(m[1]!));
     const notJustAName = /\b(?:and|between|connect(?:ed)?|with|from|then|to|after|before|behind|beside|near|next to|in front of|infront of|above|below|under|over|using|via|inside|within|alongside|around|on top of|that|which|for|so that|instead)\b|,/i;
     // "two caches", "3 queues": a count is more than a name: the model (or a clear question) handles it.
     if (/\b(?:two|three|four|five|six|several|some|many|few|\d+)\b/i.test(name)) return { kind: 'none' };

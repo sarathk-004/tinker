@@ -64,7 +64,8 @@ export function toViewNodes(graph: Graph, presentation: Presentation, ctx: ViewC
   }));
 }
 
-const INK = '#26251e';
+/** Connections are quiet: a solid mid-grey line that only turns orange (and moves) when it is part of what is being shown. */
+const INK = '#a09c92';
 
 export function toViewEdges(graph: Graph, highlightedIds: readonly string[]): DiagramEdge[] {
   const highlighted = new Set(highlightedIds);
@@ -86,10 +87,14 @@ export function toViewEdges(graph: Graph, highlightedIds: readonly string[]): Di
       target: edge.targetNodeId,
       ...(edge.relationship ? { label: edge.relationship } : {}),
       type: crowded ? 'default' : 'smoothstep',
-      animated: highlighted.size === 0 || lit,
-      style: { stroke: color, strokeWidth: lit ? 2.5 : 1.8, opacity: dim ? 0.25 : 1 },
-      ...(bidirectional ? { markerStart: { type: MarkerType.ArrowClosed, width: 16, height: 16, color } } : {}),
-      markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color },
+      animated: lit,
+      style: { stroke: color, strokeWidth: lit ? 2.25 : 1.5, opacity: dim ? 0.3 : 1 },
+      labelStyle: { fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 10.5, fill: lit ? '#d04200' : '#5a5852', letterSpacing: '0.02em' },
+      labelBgStyle: { fill: '#f7f7f4', fillOpacity: 1 },
+      labelBgPadding: [6, 3] as [number, number],
+      labelBgBorderRadius: 6,
+      ...(bidirectional ? { markerStart: { type: MarkerType.Arrow, width: 14, height: 14, color } } : {}),
+      markerEnd: { type: MarkerType.Arrow, width: 14, height: 14, color },
     };
   });
 }
