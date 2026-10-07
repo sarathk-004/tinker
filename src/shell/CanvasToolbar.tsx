@@ -91,8 +91,8 @@ export const CanvasToolbar: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center justify-between gap-3 px-6 h-12 border-b border-[#e6e5e0] flex-shrink-0 overflow-x-auto bg-white">
-      <div className="flex items-stretch h-full flex-shrink-0">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-6 min-h-12 py-1 border-b border-[#e6e5e0] flex-shrink-0 bg-white">
+      <div className="flex items-stretch h-10 flex-shrink-0">
         <button className="flex items-center gap-2 px-1 mr-6 h-full text-[14px] font-medium text-[#f54e00] border-b-2 border-[#f54e00] -mb-px" aria-current="page">
           <Shapes className="w-4 h-4" /> Diagram
         </button>

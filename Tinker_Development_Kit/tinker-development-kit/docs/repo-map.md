@@ -108,3 +108,9 @@ No durable diagram data exists (store is memory only, no persist middleware, no 
 
 ## Baseline failures
 None observed (build passes). Gaps: no automated tests, no lint, no CI, 526 kB bundle.
+
+## Frontend shell (2026-10-07)
+- `src/shell/`: AppShell (layout, Cmd/Ctrl+K), TopBar, WorkspaceSwitcher, LeftNav, CanvasHeader (save status, Export), CanvasToolbar, NodeBar (properties bar and status footer), ChatPanel, Composer (push to talk, allowance), CommandPalette, search.ts and exportDiagram.ts (pure, tested in `shell.test.ts`), exportCurrent.ts, palette.ts (component palette data), Popover.tsx (shared menu behaviour and classes), uiStore.ts (view-only state).
+- `src/advisor/useAdvisor.ts`: the architecture advisor (suggestions and readiness), shown in the left column.
+- `src/components/`: AWSArchitectureNode (node card), DiagramCanvas (React Flow, provider lives in AppShell), EmptyCanvas, LoginScreen, StatusBanners, NodeEditModal, AiKeyDialog, VersionsPanel, icons.
+- Server: `modules/workspaces/workspace-service.ts` (`POST /v1/workspaces`), `modules/usage/daily-usage.ts` (daily allowance), `modules/ai/application/confirm.ts` (yes/no replies and stored proposals).
