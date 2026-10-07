@@ -18,7 +18,7 @@ export interface GeminiOptions {
   fetchImpl?: typeof fetch;
 }
 
-const MAX_OUTPUT_TOKENS = 2048;
+const MAX_OUTPUT_TOKENS = 1024;
 
 /** Pull the generated text out of the response, trying the documented shape first and known alternatives after it. */
 export function extractText(json: unknown): string | undefined {

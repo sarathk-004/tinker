@@ -9,10 +9,11 @@ import { authorizeDiagram } from '../../workspaces/access.ts';
 import { failure, versionConflict, type Actor, type ServiceDeps } from '../../diagrams/application/diagram-service.ts';
 import { getDiagramRow, insertPlanExecution, insertRevision, lockDiagramRow, updateDocument } from '../../diagrams/persistence/diagrams.ts';
 import { buildAliases, executePlan, type PlanStep } from '../domain/plan.ts';
-import { appendMessages, conversationBelongsTo, createConversation, latestConversation, recentTurns } from '../persistence/conversations.ts';
+import { appendMessages, conversationBelongsTo, createConversation, latestAssistantMessage, latestConversation, recentTurns } from '../persistence/conversations.ts';
 import { ProviderError } from '../providers/types.ts';
 import type { AiAccess } from '../../ai-keys/ai-access.ts';
 import type { DailyUsage } from '../../usage/daily-usage.ts';
+import { NO_OPTION, YES_OPTION, classifyReply, readProposal } from './confirm.ts';
 import { interpretRequest, type AiSource } from './interpret.ts';
 
 export interface AiRuntime {
@@ -39,6 +40,12 @@ export interface AiDeps extends ServiceDeps {
 }
 
 const HISTORY_TURNS = 8;
+
+/** Did the model's latest answer in this conversation ask a question about THIS version of the diagram (and nothing else came since)? */
+function isModelQuestion(metadata: unknown, version: number): boolean {
+  const m = (metadata ?? {}) as { status?: unknown; source?: unknown; diagramVersion?: unknown };
+  return m.status === 'CLARIFICATION' && m.source === 'AI' && m.diagramVersion === version;
+}
 const FRIENDLY = "Couldn't interpret that command. Your diagram hasn't changed.";
 
 /** Provider failures become contract errors; transient ones keep the key for bounded same-key retries (D03). */
@@ -101,6 +108,29 @@ export async function executeAiCommand(deps: AiDeps, actor: Actor, diagramId: st
       if (current.version !== request.expectedVersion) return async () => versionConflict(actor, request.expectedVersion, current.version);
 
       const doc = { graph: current.graph, presentation: current.presentation };
+
+      // "yes" / "no" to a question the system asked earlier: answered here, with no model call and nothing counted against the daily allowance.
+      const reply = classifyReply(text);
+      if (reply) {
+        const last = request.conversationId ? await latestAssistantMessage(deps.pool, request.conversationId) : null;
+        const pending = readProposal(last?.metadata);
+        if (reply === 'NO') return clarification('PARSER', pending ? 'OK, I left the diagram as it is.' : 'OK, nothing was changed.', [], current.version);
+        // The MODEL asked an open question without a plan to confirm ("Should I add a database?"): a "yes" answers that question, so it goes back
+        // to the model together with the conversation (the one case where "yes" costs a model request).
+        const modelAsked = !pending && last && isModelQuestion(last.metadata, current.version);
+        if (!pending && !modelAsked) return clarification('PARSER', 'Yes to what? Tell me what you would like to change in the diagram.', [], current.version);
+        if (pending) {
+          // Aliases (n1, n2...) mean the same components only at the version the plan was made against.
+          if (pending.diagramVersion !== current.version) {
+            return clarification('PARSER', 'The diagram changed after I suggested that, so I did not apply it. Tell me again what you would like.', [], current.version);
+          }
+          const confirmed = executePlan(doc, pending.steps, buildAliases(doc), newId);
+          if (!confirmed.ok && confirmed.kind === 'CLARIFY') return clarification(pending.source, confirmed.question, confirmed.options, current.version);
+          if (!confirmed.ok) return refusal(pending.source, confirmed.error.message, { reason: confirmed.error.reason, stepIndex: confirmed.stepIndex, ...confirmed.error.details });
+          return commit(pending.source, pending.steps);
+        }
+      }
+
       const history = request.conversationId ? await recentTurns(deps.pool, request.conversationId, HISTORY_TURNS) : [];
       const interpretation = await interpretRequest({ doc, text, history, resolveProvider: async () => (await deps.ai.access.providersFor(actor.userId)).provider,
         deadlineMs: deps.ai.deadlineMs,
@@ -120,6 +150,14 @@ export async function executeAiCommand(deps: AiDeps, actor: Actor, diagramId: st
 
       if (interpretation.kind === 'clarify') return clarification(interpretation.source, interpretation.question, interpretation.options, current.version);
 
+      if (interpretation.kind === 'propose') {
+        // Only a plan that would really work is offered: it is dry-run now, so "yes" cannot lead to a refusal later.
+        const offered = executePlan(doc, interpretation.steps, buildAliases(doc), newId);
+        if (!offered.ok && offered.kind === 'CLARIFY') return clarification(interpretation.source, offered.question, offered.options, current.version);
+        if (!offered.ok) return refusal(interpretation.source, offered.error.message, { reason: offered.error.reason, stepIndex: offered.stepIndex, ...offered.error.details });
+        return proposal(interpretation.source, interpretation.question, interpretation.steps, current.version);
+      }
+
       const dry = executePlan(doc, interpretation.steps, buildAliases(doc), newId);
       if (!dry.ok && dry.kind === 'CLARIFY') return clarification(interpretation.source, dry.question, dry.options, current.version);
       if (!dry.ok) return refusal(interpretation.source, dry.error.message, { reason: dry.error.reason, stepIndex: dry.stepIndex, ...dry.error.details });
@@ -133,6 +171,24 @@ export async function executeAiCommand(deps: AiDeps, actor: Actor, diagramId: st
       await authorizeDiagram(tx, actor.userId, diagramId, 'modify');
       const turn = await persistTurn(tx, { conversationId: request.conversationId, diagramId, userId: actor.userId, userText: text, assistantText: question, metadata: { source, status: 'CLARIFICATION', diagramVersion: version, options } });
       const body: AiCommandResponse = { status: 'CLARIFICATION', source, question, options: options.slice(0, 6), conversationId: turn.conversationId, messages: turn.messages, diagram: { id: diagramId, version } };
+      return { status: 200, body };
+    };
+
+  /** Ask first: the question and the exact plan are stored by the server; "yes" later applies that plan and nothing else. */
+  const proposal =
+    (source: AiSource, question: string, steps: PlanStep[], version: number): Finish =>
+    async (tx) => {
+      await authorizeDiagram(tx, actor.userId, diagramId, 'modify');
+      const options = [YES_OPTION, NO_OPTION];
+      const turn = await persistTurn(tx, {
+        conversationId: request.conversationId,
+        diagramId,
+        userId: actor.userId,
+        userText: text,
+        assistantText: question,
+        metadata: { source, status: 'PROPOSAL', diagramVersion: version, options, proposal: { source, diagramVersion: version, steps } },
+      });
+      const body: AiCommandResponse = { status: 'CLARIFICATION', source, question, options, conversationId: turn.conversationId, messages: turn.messages, diagram: { id: diagramId, version } };
       return { status: 200, body };
     };
 

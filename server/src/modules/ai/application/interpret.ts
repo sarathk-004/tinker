@@ -11,7 +11,9 @@ export type AiSource = 'PARSER' | 'AI';
 export type Interpretation =
   | { kind: 'plan'; source: AiSource; steps: PlanStep[] }
   /** Nothing to do yet: the request is ambiguous, refers to something unknown, or is not an edit. Ask, do not guess. */
-  | { kind: 'clarify'; source: AiSource; question: string; options: string[] };
+  | { kind: 'clarify'; source: AiSource; question: string; options: string[] }
+  /** The request needs something that does not exist yet. Nothing is applied: the user is asked, and "yes" applies exactly this plan. */
+  | { kind: 'propose'; source: AiSource; question: string; steps: PlanStep[] };
 
 export interface InterpretInput {
   doc: DiagramDoc;
@@ -48,6 +50,7 @@ export async function interpretRequest(input: InterpretInput): Promise<Interpret
   const parsed = parseCommand(input.doc, input.text);
   if (parsed.kind === 'steps') return { kind: 'plan', source: 'PARSER', steps: parsed.steps };
   if (parsed.kind === 'clarify') return { kind: 'clarify', source: 'PARSER', question: parsed.question, options: parsed.options };
+  if (parsed.kind === 'propose') return { kind: 'propose', source: 'PARSER', question: parsed.question, steps: parsed.steps };
 
   const provider = input.resolveProvider ? await input.resolveProvider() : input.provider;
   if (!provider || !provider.available) throw new ProviderError('disabled', 'AI commands are not available for this account right now.');
@@ -97,6 +100,12 @@ function fromModelOutput(out: ReturnType<typeof modelOutputSchema.parse>): Inter
   if (out.outcome === 'COMMANDS') {
     if (!out.commands || out.commands.length === 0) throw new ProviderError('bad_output', 'The AI returned no steps.');
     return { kind: 'plan', source: 'AI', steps: dedupeSteps(out.commands) };
+  }
+  if (out.outcome === 'PROPOSE') {
+    if (!out.question) throw new ProviderError('bad_output', 'The AI proposed something without a question.');
+    // A question with nothing concrete to apply is simply a question: ask it, do not pretend there is a plan to confirm.
+    if (!out.commands || out.commands.length === 0) return { kind: 'clarify', source: 'AI', question: out.question, options: out.options ?? [] };
+    return { kind: 'propose', source: 'AI', question: out.question, steps: dedupeSteps(out.commands) };
   }
   if (out.outcome === 'CLARIFY') {
     if (!out.question) throw new ProviderError('bad_output', 'The AI asked a question without text.');

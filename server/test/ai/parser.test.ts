@@ -69,7 +69,7 @@ describe('parser: insert between (the gate command)', () => {
 describe('parser: unknown and ambiguous references are questions, never guesses', () => {
   it('an unknown component lists what exists and suggests close names', () => {
     const d = mkDoc(['Orders', 'Order History', 'PostgreSQL']);
-    const r = clarify(parseCommand(d, 'connect Payments to PostgreSQL'));
+    const r = clarify(parseCommand(d, 'remove Payments'));
     expect(r.question).toContain('"Payments"');
     expect(r.question).toContain('Orders');
     const close = clarify(parseCommand(d, 'remove Order'));
@@ -90,8 +90,13 @@ describe('parser: unknown and ambiguous references are questions, never guesses'
 
   it('a short unknown NAME is still a question (only descriptions are left to the model)', () => {
     const d = mkDoc(['Orders', 'PostgreSQL']);
-    expect(clarify(parseCommand(d, 'connect Payments to Orders')).question).toContain('"Payments"');
-    expect(clarify(parseCommand(d, 'connect the Payments service to Orders')).question).toContain('Payments');
+    // Removing or renaming something that is not there only says so; connecting to it OFFERS to add it (nothing is applied until "yes").
+    expect(clarify(parseCommand(d, 'remove Payments')).question).toContain('"Payments"');
+    for (const text of ['connect Payments to Orders', 'connect the Payments service to Orders']) {
+      const r = parseCommand(d, text);
+      expect(r.kind).toBe('propose');
+      expect((r as { question: string }).question).toContain('"Payments"');
+    }
   });
 
   it('an empty diagram says so', () => {

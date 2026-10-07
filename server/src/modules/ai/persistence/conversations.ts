@@ -22,6 +22,15 @@ export async function recentTurns(db: Queryable, conversationId: string, limit: 
   return rows.reverse();
 }
 
+/** The newest ASSISTANT message of a conversation (its metadata may hold a pending proposal). */
+export async function latestAssistantMessage(db: Queryable, conversationId: string): Promise<{ id: string; metadata: unknown } | null> {
+  const { rows } = await db.query<{ id: string; metadata: unknown }>(
+    `SELECT id, metadata FROM conversation_messages WHERE conversation_id = $1 AND role = 'ASSISTANT' ORDER BY created_at DESC, id DESC LIMIT 1`,
+    [conversationId],
+  );
+  return rows[0] ?? null;
+}
+
 /** The text of an ASSISTANT message, only when it sits in the caller's own conversation for this diagram. */
 export async function assistantMessageText(db: Queryable, messageId: string, diagramId: string, userId: string): Promise<string | null> {
   const { rows } = await db.query<{ content: string }>(

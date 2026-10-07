@@ -53,7 +53,7 @@ export function messageToTurn(m: ChatMessage): ConversationTurn {
     timestamp: Date.parse(m.createdAt),
     role: m.role === 'USER' ? 'user' : 'assistant',
     text: m.content,
-    ...(status === 'APPLIED' ? { kind: 'applied' as const } : status === 'CLARIFICATION' ? { kind: 'clarification' as const } : status === 'REFUSED' ? { kind: 'refused' as const } : status === 'ADVICE' ? { kind: 'advice' as const } : {}),
+    ...(status === 'APPLIED' ? { kind: 'applied' as const } : status === 'CLARIFICATION' || status === 'PROPOSAL' ? { kind: 'clarification' as const } : status === 'REFUSED' ? { kind: 'refused' as const } : status === 'ADVICE' ? { kind: 'advice' as const } : {}),
     ...(highlight && highlight.length > 0 ? { highlight } : {}),
     ...(options && options.length > 0 ? { options } : {}),
     ...(source ? { source } : {}),

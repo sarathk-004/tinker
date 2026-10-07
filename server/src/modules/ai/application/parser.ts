@@ -1,3 +1,4 @@
+import type { NodeKind } from '@tinker/shared';
 import type { DiagramDoc } from '../../diagrams/domain/index.ts';
 import { buildAliases, type AliasMap, type PlanStep } from '../domain/plan.ts';
 
@@ -6,11 +7,39 @@ import { buildAliases, type AliasMap, type PlanStep } from '../domain/plan.ts';
  * Rules: a reference must resolve to exactly ONE component (exact name, else an unambiguous partial name, else a UUID).
  * Anything unknown or ambiguous becomes a clarification question; anything it does not recognise returns `none` so the
  * model gets a chance. Typed RESET is deliberately never executed (destructive and not yet undoable).
+ *
+ * `propose`: the request needs a component that is not in the diagram yet ("put a cache between Orders and the database" with no
+ * database). Nothing is applied: the user is asked first, and the plan is kept by the server so that "yes" applies exactly that.
  */
 export type ParseResult =
   | { kind: 'steps'; steps: PlanStep[] }
   | { kind: 'clarify'; question: string; options: string[] }
+  | { kind: 'propose'; question: string; steps: PlanStep[] }
   | { kind: 'none' };
+
+/**
+ * People say "the database", not "PostgreSQL": a word for a KIND of component refers to the component of that kind. With exactly one
+ * it is that one, with several the user is asked which, with none the user is offered to add it.
+ */
+const KIND_WORDS: Record<string, NodeKind> = {
+  database: 'DATABASE', db: 'DATABASE', datastore: 'DATABASE', 'data store': 'DATABASE',
+  cache: 'CACHE', 'cache layer': 'CACHE', caching: 'CACHE',
+  queue: 'QUEUE', 'message queue': 'QUEUE', broker: 'QUEUE', 'message broker': 'QUEUE',
+  gateway: 'GATEWAY', 'api gateway': 'GATEWAY',
+  client: 'CLIENT', frontend: 'CLIENT', 'front end': 'CLIENT', browser: 'CLIENT',
+};
+const KIND_LABEL: Partial<Record<NodeKind, string>> = { DATABASE: 'database', CACHE: 'cache', QUEUE: 'message queue', GATEWAY: 'gateway', CLIENT: 'client' };
+const KIND_DEFAULT_NAME: Partial<Record<NodeKind, string>> = { DATABASE: 'Database', CACHE: 'Cache', QUEUE: 'Message Queue', GATEWAY: 'API Gateway', CLIENT: 'Client' };
+const QUALIFIER = /\s+(?:database|db|cache|queue|service|gateway|component|server)$/;
+
+/** A reference to something that does not exist yet: what to call it if the user agrees to add it. */
+interface Missing {
+  raw: string;
+  /** Wording for the question: "a database" or the quoted name. */
+  phrase: string;
+  name: string;
+  kind?: NodeKind;
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -25,17 +54,47 @@ const norm = (s: string) =>
 
 const stripSuffix = (s: string) => s.replace(/\s+(?:node|service|component|box|block|layer)$/i, '').trim();
 
-type Resolved = { ok: true; alias: string; name: string } | { ok: false; result: Extract<ParseResult, { kind: 'clarify' | 'none' }> };
+type Resolved = { ok: true; alias: string; name: string } | { ok: false; result: Extract<ParseResult, { kind: 'clarify' | 'none' }>; missing?: Missing };
+
+/** Edit distance, for typos ("Ordrs" for "Orders"). Small inputs only. */
+function distance(a: string, b: string): number {
+  const row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0]!;
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = row[j]!;
+      row[j] = Math.min(row[j]! + 1, row[j - 1]! + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return row[b.length]!;
+}
+
+/** Components whose name is a typo of what was typed: the whole name, or one word of it, within a couple of letters. */
+function typoNames(doc: DiagramDoc, raw: string): string[] {
+  const q = norm(raw);
+  if (q.length < 4) return [];
+  const limit = q.length >= 8 ? 2 : 1;
+  return doc.graph.nodes
+    .filter((n) => {
+      const name = norm(n.name);
+      return distance(q, name) <= limit || name.split(' ').some((w) => w.length >= 4 && distance(q, w) <= limit);
+    })
+    .map((n) => n.name)
+    .slice(0, 4);
+}
 
 function closeNames(doc: DiagramDoc, raw: string): string[] {
   const q = norm(raw);
   const tokens = new Set(q.split(' ').filter((t) => t.length > 2));
+  const typos = new Set(typoNames(doc, raw));
   return doc.graph.nodes
     .map((n) => {
       const name = norm(n.name);
       const overlap = name.split(' ').filter((t) => tokens.has(t)).length;
       const near = name.includes(q) || q.includes(name) ? 2 : 0;
-      return { name: n.name, score: overlap + near };
+      return { name: n.name, score: overlap + near + (typos.has(n.name) ? 3 : 0) };
     })
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)
@@ -49,7 +108,7 @@ function closeNames(doc: DiagramDoc, raw: string): string[] {
  */
 function looksLikeDescription(raw: string): boolean {
   const q = norm(raw);
-  return q.split(' ').length > 4 || /^new\b/.test(q) || /\b(?:from|that|which|using|via|for|into|on top of)\b/.test(q);
+  return q.split(' ').length > 4 || /^new\b/.test(q) || /\b(?:and|from|that|which|using|via|for|into|on top of)\b/.test(q) || /,/.test(raw);
 }
 
 function resolveRef(doc: DiagramDoc, aliases: AliasMap, rawIn: string): Resolved {
@@ -64,34 +123,92 @@ function resolveRef(doc: DiagramDoc, aliases: AliasMap, rawIn: string): Resolved
   // Only an exact name may match a description-like phrase; partial matching would grab "orders" out of
   // "a cache that sits in front of orders" and silently act on the wrong thing.
   if (exact.length === 0 && looksLikeDescription(raw)) return { ok: false, result: { kind: 'none' } };
+
+  // "the database": the component OF THAT KIND (a name match above always wins).
+  const kindWord = exact.length === 0 ? KIND_WORDS[q] : undefined;
+  if (kindWord) {
+    const ofKind = doc.graph.nodes.filter((n) => n.kind === kindWord);
+    if (ofKind.length === 1) return found(ofKind[0]!.id, ofKind[0]!.name);
+    if (ofKind.length > 1) {
+      const names = ofKind.map((n) => n.name);
+      return { ok: false, result: { kind: 'clarify', question: `There is more than one ${KIND_LABEL[kindWord]}: ${names.slice(0, 4).join(', ')}. Which one do you mean?`, options: names.slice(0, 4) } };
+    }
+  }
+  // "the postgres database": the qualifying word is a hint, the rest is the name.
+  const core = q.replace(QUALIFIER, '');
+  const partial = (needle: string) =>
+    doc.graph.nodes.filter((n) => {
+      const name = norm(n.name);
+      return needle.length >= 3 && name.length >= 3 && (name.includes(needle) || needle.includes(name));
+    });
   const candidates =
     exact.length > 1
       ? exact
-      : doc.graph.nodes.filter((n) => {
-          const name = norm(n.name);
-          return q.length >= 3 && name.length >= 3 && (name.includes(q) || q.includes(name));
-        });
+      : (() => {
+          const direct = partial(q);
+          return direct.length > 0 || core === q ? direct : partial(core);
+        })();
   if (candidates.length === 1) return found(candidates[0]!.id, candidates[0]!.name);
   if (candidates.length > 1) {
     const names = candidates.map((n) => n.name);
     return { ok: false, result: { kind: 'clarify', question: `"${raw}" could mean ${names.slice(0, 4).join(', ')}. Which one do you mean?`, options: names.slice(0, 4) } };
   }
   if (looksLikeDescription(raw)) return { ok: false, result: { kind: 'none' } };
-  const suggestions = closeNames(doc, raw);
   const listing = doc.graph.nodes.length === 0 ? 'The diagram is empty.' : `Components here: ${doc.graph.nodes.slice(0, 6).map((n) => n.name).join(', ')}.`;
-  return { ok: false, result: { kind: 'clarify', question: `I couldn't find a component called "${raw}". ${listing}`, options: suggestions } };
+
+  if (kindWord) {
+    // No component of that kind, and none named like it: the caller decides whether offering to add one makes sense.
+    const label = KIND_LABEL[kindWord]!;
+    return {
+      ok: false,
+      result: { kind: 'clarify', question: `There is no ${label} in this diagram yet. ${listing}`, options: [] },
+      missing: { raw, phrase: `a ${label}`, name: KIND_DEFAULT_NAME[kindWord]!, kind: kindWord },
+    };
+  }
+  const suggestions = closeNames(doc, raw);
+  const typos = typoNames(doc, raw);
+  if (typos.length > 0) {
+    return { ok: false, result: { kind: 'clarify', question: `I couldn't find a component called "${raw}". Did you mean ${typos.slice(0, 3).join(' or ')}?`, options: typos } };
+  }
+  const missing: Missing | undefined = nameWorthAdding(raw) ? { raw, phrase: `"${displayName(raw)}"`, name: displayName(raw) } : undefined;
+  return {
+    ok: false,
+    result: { kind: 'clarify', question: `I couldn't find a component called "${raw}". ${listing}`, options: suggestions },
+    ...(missing && suggestions.length === 0 ? { missing } : {}),
+  };
 }
 
-function both(doc: DiagramDoc, aliases: AliasMap, a: string, b: string): { a: Extract<Resolved, { ok: true }>; b: Extract<Resolved, { ok: true }> } | Extract<ParseResult, { kind: 'clarify' | 'none' }> {
+/** Something that reads like a component NAME (short, no sentence): worth offering to add when it does not exist. */
+function nameWorthAdding(raw: string): boolean {
+  const words = raw.trim().split(/\s+/);
+  return raw.length >= 2 && raw.length <= 40 && words.length <= 3 && /^[\p{L}\p{N}][\p{L}\p{N} ._&+-]*$/u.test(raw) && !/^(?:it|that|this|them|there|everything|all)$/i.test(raw.trim());
+}
+const displayName = (raw: string) => raw.trim().replace(/^(?:the|a|an)\s+/i, '').replace(/\s+/g, ' ');
+
+type Found = Extract<Resolved, { ok: true }>;
+type Pair = { a: Found; b: Found };
+/** Exactly one of the two components is missing and could be added; the other one exists. */
+type OneMissing = { missing: Missing; side: 'a' | 'b'; other: Found; fallback: Extract<ParseResult, { kind: 'clarify' | 'none' }> };
+
+function both(doc: DiagramDoc, aliases: AliasMap, a: string, b: string): Pair | OneMissing | Extract<ParseResult, { kind: 'clarify' | 'none' }> {
   const ra = resolveRef(doc, aliases, a);
-  if (!ra.ok) return ra.result;
   const rb = resolveRef(doc, aliases, b);
+  if (!ra.ok && rb.ok && ra.missing) return { missing: ra.missing, side: 'a', other: rb, fallback: ra.result };
+  if (!rb.ok && ra.ok && rb.missing) return { missing: rb.missing, side: 'b', other: ra, fallback: rb.result };
+  if (!ra.ok) return ra.result;
   if (!rb.ok) return rb.result;
   if (ra.alias === rb.alias) return { kind: 'clarify', question: `"${ra.name}" and "${rb.name}" are the same component. Which two components do you mean?`, options: [] };
   return { a: ra, b: rb };
 }
 
 const label = (e: { relationship?: string | undefined }) => e.relationship ?? '(no label)';
+
+const isPair = (v: Pair | OneMissing | Extract<ParseResult, { kind: 'clarify' | 'none' }>): v is Pair => 'a' in v && 'b' in v;
+const isOneMissing = (v: Pair | OneMissing | Extract<ParseResult, { kind: 'clarify' | 'none' }>): v is OneMissing => 'missing' in v;
+
+const addMissing = (m: Missing): PlanStep => ({ type: 'ADD_NODE', name: m.name, ...(m.kind ? { kind: m.kind } : {}), as: 'new1' });
+const askToAdd = (m: Missing, action: string) =>
+  `${m.kind ? `There is no ${m.phrase.replace(/^a /, '')} in the diagram yet.` : `I couldn't find ${m.phrase} in the diagram.`} Should I ${m.kind ? `add one ("${m.name}")` : 'add it'} and ${action}?`;
 
 export function parseCommand(doc: DiagramDoc, input: string): ParseResult {
   const original = input
@@ -115,7 +232,10 @@ export function parseCommand(doc: DiagramDoc, input: string): ParseResult {
   let m: RegExpExecArray | null;
 
   // --- reset (never executed from text) ---
-  if (/^(?:reset|clear|wipe|start over|delete everything|clear everything)(?:\s+(?:the\s+)?(?:diagram|canvas|everything|all|board))?$/i.test(text)) {
+  if (
+    /^(?:reset|clear|wipe|start over|delete everything|clear everything)(?:\s+(?:the\s+)?(?:diagram|canvas|everything|all|board))?$/i.test(text) ||
+    /^(?:reset|clear|wipe|erase|empty|delete|remove|destroy)\s+(?:the\s+|my\s+|this\s+)?(?:whole\s+|entire\s+|full\s+)?(?:diagram|canvas|board|architecture|everything|all(?:\s+of\s+it|\s+components|\s+nodes)?)$/i.test(text)
+  ) {
     return { kind: 'clarify', question: "Clearing the whole diagram can't be undone yet, so I won't do it from a typed command. Use the Reset button in the header; it asks you to confirm.", options: [] };
   }
 
@@ -124,7 +244,16 @@ export function parseCommand(doc: DiagramDoc, input: string): ParseResult {
     const name = stripSuffix(m[1]!);
     if (!name || name.length > 120) return { kind: 'none' };
     const pair = both(doc, aliases, m[2]!, m[3]!);
-    if ('kind' in pair) return pair;
+    if (isOneMissing(pair)) {
+      // One end does not exist: offer to add it and wire the new component in between. Nothing is applied until the user says yes.
+      const [first, last] = pair.side === 'a' ? ['new1', pair.other.alias] : [pair.other.alias, 'new1'];
+      return {
+        kind: 'propose',
+        question: askToAdd(pair.missing, `put ${name} between ${pair.side === 'a' ? `it and ${pair.other.name}` : `${pair.other.name} and it`}`),
+        steps: [addMissing(pair.missing), { type: 'ADD_NODE', name, as: 'new2' }, { type: 'CONNECT', source: first, target: 'new2' }, { type: 'CONNECT', source: 'new2', target: last }],
+      };
+    }
+    if (!isPair(pair)) return pair;
     const { forward, reverse } = edgesBetween(pair.a.alias, pair.b.alias);
     if (forward.length === 1) {
       return { kind: 'steps', steps: [{ type: 'INSERT_BETWEEN', name, source: pair.a.alias, target: pair.b.alias, edge: edgeAlias(forward[0]!.id) }] };
@@ -152,7 +281,8 @@ export function parseCommand(doc: DiagramDoc, input: string): ParseResult {
     /^(?:remove|delete|drop|cut)\s+(?:the\s+)?(?:connection|link|arrow|edge|line)\s+(?:between|from)\s+(.+?)\s+(?:and|to)\s+(.+)$/i.exec(text);
   if (disconnect) {
     const pair = both(doc, aliases, disconnect[1]!, disconnect[2]!);
-    if ('kind' in pair) return pair;
+    if (isOneMissing(pair)) return pair.fallback;
+    if (!isPair(pair)) return pair;
     const { forward, reverse } = edgesBetween(pair.a.alias, pair.b.alias);
     const all = [...forward, ...reverse];
     if (all.length === 0) return { kind: 'clarify', question: `${pair.a.name} and ${pair.b.name} are not connected.`, options: [] };
@@ -169,7 +299,15 @@ export function parseCommand(doc: DiagramDoc, input: string): ParseResult {
     /^(.+?)\s*(?:->|→)\s*(.+)$/.exec(text);
   if (connect) {
     const pair = both(doc, aliases, connect[1]!, connect[2]!);
-    if ('kind' in pair) return pair;
+    if (isOneMissing(pair)) {
+      const [source, target] = pair.side === 'a' ? ['new1', pair.other.alias] : [pair.other.alias, 'new1'];
+      return {
+        kind: 'propose',
+        question: askToAdd(pair.missing, `connect ${pair.side === 'a' ? `it to ${pair.other.name}` : `${pair.other.name} to it`}`),
+        steps: [addMissing(pair.missing), { type: 'CONNECT', source, target }],
+      };
+    }
+    if (!isPair(pair)) return pair;
     return { kind: 'steps', steps: [{ type: 'CONNECT', source: pair.a.alias, target: pair.b.alias }] };
   }
 
@@ -189,10 +327,26 @@ export function parseCommand(doc: DiagramDoc, input: string): ParseResult {
     return { kind: 'steps', steps: [{ type: 'REMOVE_NODE', ref: target.alias }] };
   }
 
+  // --- add with an explicit name: "add a database called Reports" ---
+  if ((m = /^(?:add|create|new|spin up)\s+(?:a\s+|an\s+|the\s+|new\s+)*(.+?)\s+(?:called|named|titled)\s+["'`]?(.+?)["'`]?$/i.exec(text))) {
+    const name = m[2]!.trim();
+    const hint = KIND_WORDS[norm(stripSuffix(m[1]!))];
+    if (name && name.length <= 120 && !/\b(?:and|between|connect|connected|then|to|after|before|behind|that|which)\b|,/i.test(name)) {
+      return { kind: 'steps', steps: [{ type: 'ADD_NODE', name, ...(hint ? { kind: hint } : {}) }] };
+    }
+    return { kind: 'none' };
+  }
+
   // --- add (one component) ---
   if ((m = /^(?:add|create|new|spin up)\s+(?:a\s+|an\s+|the\s+|new\s+)*(.+?)(?:\s+(?:to|into|in|on)\s+(?:the\s+|this\s+|my\s+)?(?:diagram|canvas|board|architecture))?$/i.exec(text))) {
     const name = stripSuffix(m[1]!);
-    if (name && name.length <= 120 && !/\b(?:and|between|connect|connected|with|from|then|to)\b|,/i.test(name)) {
+    const notJustAName = /\b(?:and|between|connect(?:ed)?|with|from|then|to|after|before|behind|beside|near|next to|in front of|infront of|above|below|under|over|using|via|inside|within|alongside|around|on top of|that|which|for|so that|instead)\b|,/i;
+    // "two caches", "3 queues": a count is more than a name: the model (or a clear question) handles it.
+    if (/\b(?:two|three|four|five|six|several|some|many|few|\d+)\b/i.test(name)) return { kind: 'none' };
+    if (/^(?:new|node|component|something|thing|one|another|box|block|service|item|element)$/i.test(name)) {
+      return { kind: 'clarify', question: 'What should the new component be called?', options: [] };
+    }
+    if (name && name.length <= 120 && !notJustAName.test(name)) {
       return { kind: 'steps', steps: [{ type: 'ADD_NODE', name }] };
     }
   }

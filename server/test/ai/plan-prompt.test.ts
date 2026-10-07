@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PROMPT_LIMITS, SYSTEM_INSTRUCTION, buildPrompt, renderDiagram } from '../../src/modules/ai/application/prompt.ts';
-import { MODEL_RESPONSE_JSON_SCHEMA, dropOverlongOptionalFields, modelOutputSchema } from '../../src/modules/ai/domain/model-output.ts';
+import { MODEL_RESPONSE_JSON_SCHEMA, cutGluedJunk, dropOverlongOptionalFields, modelOutputSchema } from '../../src/modules/ai/domain/model-output.ts';
 import { buildAliases, executePlan, inferNodeKind, type PlanStep } from '../../src/modules/ai/domain/plan.ts';
 import { mkDoc, ordersToPostgres, uid } from './helpers.ts';
 
@@ -164,5 +164,64 @@ describe('dropOverlongOptionalFields', () => {
   it('drops empty optional text too (a model sometimes sends "")', () => {
     const cleaned = dropOverlongOptionalFields({ outcome: 'COMMANDS', commands: [{ type: 'ADD_NODE', name: 'Redis', technology: '', relationship: '  ' }] });
     expect(modelOutputSchema.safeParse(cleaned).success).toBe(true);
+  });
+});
+
+describe('model output tolerance (found by running the real model)', () => {
+  it('empty strings mean "not given": they are dropped from steps, never read as an empty name or alias', () => {
+    const cleaned = dropOverlongOptionalFields({
+      outcome: 'COMMANDS',
+      commands: [{ type: 'ADD_NODE', name: 'Queue', as: '', ref: ' ', edge: '', technology: '' }, { type: 'CONNECT', source: 'n1', target: 'n2', relationship: '' }],
+    });
+    expect(modelOutputSchema.parse(cleaned).commands).toEqual([{ type: 'ADD_NODE', name: 'Queue' }, { type: 'CONNECT', source: 'n1', target: 'n2' }]);
+  });
+
+  it('an over-long question is shortened and empty or surplus buttons are dropped, instead of failing the whole answer', () => {
+    const cleaned = dropOverlongOptionalFields({ outcome: 'CLARIFY', question: `${'x'.repeat(900)}?`, options: ['', 'ok', 'y'.repeat(300), 'a', 'b', 'c', 'd', 'e'] });
+    const parsed = modelOutputSchema.parse(cleaned);
+    expect(parsed.question!.length).toBeLessThanOrEqual(400);
+    expect(parsed.question!.endsWith('…')).toBe(true);
+    expect(parsed.options).toHaveLength(6);
+    expect(parsed.options![1]!.length).toBeLessThanOrEqual(120);
+    expect(parsed.options).not.toContain('');
+  });
+
+  it('names that matter are still strictly checked: an empty NAME is dropped so the plan asks for it, an unknown field is still refused', () => {
+    expect(modelOutputSchema.safeParse(dropOverlongOptionalFields({ outcome: 'COMMANDS', commands: [{ type: 'ADD_NODE', name: '' }] })).success).toBe(true);
+    expect(modelOutputSchema.safeParse(dropOverlongOptionalFields({ outcome: 'COMMANDS', commands: [{ type: 'ADD_NODE', name: 'X', sql: 'drop table' }] })).success).toBe(false);
+  });
+});
+
+describe('stray text glued onto a sentence (found by running the real model)', () => {
+  it('is cut at the question mark; ordinary text is untouched', () => {
+    expect(cutGluedJunk('What would you like to improve?ptorsttpsn1: n1 -> n2HTTP')).toBe('What would you like to improve?');
+    expect(cutGluedJunk('Should I add a database？ెs')).toBe('Should I add a database?');
+    expect(cutGluedJunk('Wow!junk')).toBe('Wow!');
+    for (const fine of ['Should I add a database? It would sit behind Orders.', 'Use Node.js v1.2 for this.', 'Really?!', 'Add "Redis"? (yes/no)', 'Done.']) expect(cutGluedJunk(fine)).toBe(fine);
+  });
+
+  it('cleans questions and buttons before validation', () => {
+    const cleaned = dropOverlongOptionalFields({ outcome: 'CLARIFY', question: 'Which one?abc', options: ['Orders?xx', '?junk'] });
+    expect(modelOutputSchema.parse(cleaned)).toMatchObject({ question: 'Which one?', options: ['Orders?', '?'] });
+  });
+});
+
+describe('names and labels from the model must look like names', () => {
+  const plan = (step: Record<string, unknown>) => modelOutputSchema.safeParse({ outcome: 'COMMANDS', commands: [{ type: 'ADD_NODE', ...step }] });
+
+  it('rejects leaked reasoning and over-long names, so the gateway retries instead of saving them', () => {
+    for (const name of ['Redisurcetablehostnamesoripaddresses...nospacesoredges...wait, Redis is fine', 'Redis, wait, no', "Cache let's keep it short", 'x'.repeat(61), 'Queue or something similar']) {
+      expect(plan({ name }).success, name).toBe(false);
+    }
+    expect(plan({ name: 'Redis', technology: 'Redis; hmm maybe Memcached' }).success).toBe(false);
+  });
+
+  it('accepts ordinary names, including ones with punctuation and digits', () => {
+    for (const name of ['Redis', 'Event Queue', 'Orders API v2', 'PostgreSQL 16', 'S3 (uploads)', 'Auth & Billing']) expect(plan({ name }).success, name).toBe(true);
+  });
+
+  it('a question stops at its first question mark', () => {
+    const cleaned = dropOverlongOptionalFields({ outcome: 'CLARIFY', question: 'Should I add a database? biofuels or something else? Wait, no, just the database?' });
+    expect(modelOutputSchema.parse(cleaned).question).toBe('Should I add a database?');
   });
 });

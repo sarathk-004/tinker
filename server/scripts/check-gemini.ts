@@ -49,9 +49,17 @@ const reachable = (g: Graph, from: string): Set<string> => {
   return seen;
 };
 
+// A diagram with NO database: a request that needs "the database" must be PROPOSED (asked first), never applied silently.
+const docNoDb: DiagramDoc = {
+  graph: { schemaVersion: 1, nodes: doc.graph.nodes.slice(0, 2), edges: doc.graph.edges.slice(0, 1) },
+  presentation: doc.presentation,
+};
+
 interface Case {
   text: string;
-  expect: 'plan' | 'clarify';
+  /** The diagram this request is made against (default: the one with a database). */
+  doc?: DiagramDoc;
+  expect: 'plan' | 'clarify' | 'propose';
   /** Is the RESULTING diagram what the user asked for? */
   verify?: (after: Graph) => string | null;
 }
@@ -78,6 +86,18 @@ const cases: Case[] = [
       return reachable(g, id(2)).has(billing.id) ? null : 'Billing is not connected downstream of Orders';
     },
   },
+  {
+    text: 'sprinkle some caching between the order service and the database',
+    doc: docNoDb,
+    expect: 'propose',
+    verify: (g) => (g.nodes.some((n) => n.kind === 'DATABASE') && g.nodes.some((n) => n.kind === 'CACHE') ? null : 'the proposal does not add both a database and a cache'),
+  },
+  {
+    text: 'make the orders data durable with persistent storage behind it',
+    doc: docNoDb,
+    expect: 'propose',
+    verify: (g) => (g.nodes.length > docNoDb.graph.nodes.length ? null : 'the proposal adds nothing'),
+  },
   { text: 'make it better', expect: 'clarify' },
   { text: 'what is the capital of France?', expect: 'clarify' },
 ];
@@ -90,13 +110,22 @@ for (const c of cases) {
     const started = Date.now();
     const tag = runs > 1 ? ` (run ${run})` : '';
     try {
-      const result = await interpretRequest({ doc, text: c.text, history: [], provider, deadlineMs: config.ai.deadlineMs });
+      const base = c.doc ?? doc;
+      const result = await interpretRequest({ doc: base, text: c.text, history: [], provider, deadlineMs: config.ai.deadlineMs });
       const ms = Date.now() - started;
       timings.push(ms);
-      if (result.kind === 'plan') {
-        const outcome = executePlan(doc, result.steps, buildAliases(doc), () => crypto.randomUUID());
+      if (result.kind === 'propose') {
+        const outcome = executePlan(base, result.steps, buildAliases(base), () => crypto.randomUUID());
         let problem: string | null = null;
-        if (c.expect !== 'plan') problem = 'expected a question, got a plan';
+        if (c.expect !== 'propose') problem = 'expected a plan or a question, got a proposal';
+        else if (!outcome.ok) problem = `the proposed plan does not apply (${outcome.kind})`;
+        else if (c.verify) problem = c.verify(outcome.doc.graph);
+        if (problem) failures++;
+        console.log(`${problem ? 'FAIL' : 'PASS'}  ${ms} ms${tag}  PROPOSAL: ${result.question} -> ${outcome.ok ? outcome.summaries.map((x) => x.summary).join(' | ') : '-'}${problem ? `   !! ${problem}` : ''}   <- "${c.text}"`);
+      } else if (result.kind === 'plan') {
+        const outcome = executePlan(base, result.steps, buildAliases(base), () => crypto.randomUUID());
+        let problem: string | null = null;
+        if (c.expect !== 'plan') problem = c.expect === 'propose' ? 'a plan was applied directly: it should have asked first' : 'expected a question, got a plan';
         else if (!outcome.ok) problem = `plan does not apply (${outcome.kind})`;
         else if (c.verify) problem = c.verify(outcome.doc.graph);
         if (problem) failures++;
@@ -104,7 +133,8 @@ for (const c of cases) {
         console.log(`${problem ? 'FAIL' : 'PASS'}  ${ms} ms${tag}  plan (${result.steps.length}): ${summary || '-'}${problem ? `   !! ${problem}` : ''}   <- "${c.text}"`);
         if (problem) console.log(`        steps: ${JSON.stringify(result.steps).slice(0, 500)}`);
       } else {
-        const good = c.expect === 'clarify';
+        // Asking first (a question instead of a plan) is acceptable where a plan would add something unnamed; only a silent change fails.
+        const good = c.expect === 'clarify' || c.expect === 'propose';
         if (!good) failures++;
         console.log(`${good ? 'PASS' : 'FAIL'}  ${ms} ms${tag}  question: ${result.question}   <- "${c.text}"`);
       }

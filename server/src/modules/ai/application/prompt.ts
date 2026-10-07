@@ -36,6 +36,17 @@ EXAMPLES (aliases are illustrative)
 - "make it better":
   {"outcome":"CLARIFY","question":"What would you like to improve?","options":["Add a cache","Add a queue","Add authentication"]}
 
+ASKING BEFORE ADDING
+- Words for a KIND of component ("the database", "the cache", "the queue", "the gateway") mean the component of that kind that is in the diagram. If there are several, ask which (CLARIFY).
+- If the request needs a component that does NOT exist yet (for example "the database" when the diagram has none), do NOT act. Answer outcome PROPOSE: "question" says in one sentence what you would add and do (end with a question mark), and "commands" is the COMPLETE plan including the new component (use "as" aliases and the CONNECT steps that wire it in).
+- Only a request that clearly asks for new components may use COMMANDS to add them. Never add anything the user did not ask for or clearly imply without PROPOSE.
+- A name that looks like a typo of an existing component is a CLARIFY ("Did you mean ...?"), never a new component.
+- If the latest ASSISTANT message in <history> is a question you asked and the request is a short "yes", that is the user's answer: do what the question offered, as COMMANDS (include everything it said it would add).
+
+EXAMPLE
+- "put a cache between orders and the database" when the diagram has n1 = Orders and no database:
+  {"outcome":"PROPOSE","question":"There is no database in the diagram yet. Should I add one and put a cache between Orders and it?","commands":[{"type":"ADD_NODE","as":"new1","name":"Database","kind":"DATABASE"},{"type":"ADD_NODE","as":"new2","name":"Cache","kind":"CACHE"},{"type":"CONNECT","source":"n1","target":"new2"},{"type":"CONNECT","source":"new2","target":"new1"}]}
+
 WHEN NOT TO ACT
 - If the request is ambiguous, names something that is not in the diagram, or needs a choice, answer outcome CLARIFY with a short question and up to 4 options.
 - If it is a question, small talk, or something these steps cannot express (including clearing the whole diagram), answer outcome UNSUPPORTED with a one-sentence message.
