@@ -40,6 +40,8 @@ export async function askAdvice(deps: AiDeps, actor: { userId: string }, diagram
       const prompt = buildAdvicePrompt(doc, analysis, history, request.question);
       if (prompt.ok) {
         try {
+          // The daily allowance: when it is used up the question is still answered, by the computed (non-model) analysis.
+          await deps.ai.usage.consume(actor.userId, 'AI');
           const out = await runProvider({
             provider: providers.provider,
             request: { systemInstruction: ADVICE_SYSTEM_INSTRUCTION, content: prompt.content, responseSchema: ADVICE_RESPONSE_JSON_SCHEMA as unknown as Record<string, unknown> },
@@ -55,8 +57,10 @@ export async function askAdvice(deps: AiDeps, actor: { userId: string }, diagram
           source = 'AI';
           modelHighlights = resolveHighlights(doc, out.highlight);
         } catch (error) {
-          if (!(error instanceof ProviderError)) throw error;
-          deps.log?.('ai provider failure', { kind: error.kind, detail: error.detail, during: 'ask' });
+          if (error instanceof AppError && error.code === 'DAILY_LIMIT_REACHED') {
+            deps.log?.('ai daily limit reached', { during: 'ask', scope: error.details?.['scope'] });
+          } else if (!(error instanceof ProviderError)) throw error;
+          else deps.log?.('ai provider failure', { kind: error.kind, detail: error.detail, during: 'ask' });
         }
       }
     }

@@ -29,7 +29,7 @@ function tlsFor(connectionString: string, ssl: SslOptions): { connectionString: 
 }
 
 export function createPool(connectionString: string, ssl: SslOptions = { mode: 'off' }): Pool {
-  return new pg.Pool({
+  const pool = new pg.Pool({
     ...tlsFor(connectionString, ssl),
     max: 10,
     idleTimeoutMillis: 30_000,
@@ -38,6 +38,10 @@ export function createPool(connectionString: string, ssl: SslOptions = { mode: '
     statement_timeout: 15_000,
     idle_in_transaction_session_timeout: 30_000,
   });
+  // An IDLE connection can be dropped by the database or its pooler (restart, failover, network). The pool emits `error` for it and
+  // Node kills the process when nobody listens. Log it and carry on: the pool discards that connection and opens a new one.
+  pool.on('error', (error) => console.error(JSON.stringify({ level: 'warn', msg: 'idle database connection failed', name: error.name, code: (error as { code?: string }).code })));
+  return pool;
 }
 
 /** Run `fn` in one transaction: commit on success, roll back on any error. */

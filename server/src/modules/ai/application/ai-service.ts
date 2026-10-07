@@ -12,6 +12,7 @@ import { buildAliases, executePlan, type PlanStep } from '../domain/plan.ts';
 import { appendMessages, conversationBelongsTo, createConversation, latestConversation, recentTurns } from '../persistence/conversations.ts';
 import { ProviderError } from '../providers/types.ts';
 import type { AiAccess } from '../../ai-keys/ai-access.ts';
+import type { DailyUsage } from '../../usage/daily-usage.ts';
 import { interpretRequest, type AiSource } from './interpret.ts';
 
 export interface AiRuntime {
@@ -25,6 +26,8 @@ export interface AiRuntime {
   limiter: RateLimiter;
   /** Per-user simultaneous AI requests (D10, single instance). */
   concurrency: ConcurrencyLimiter;
+  /** Daily allowance per person and for the whole service (spend cap). */
+  usage: DailyUsage;
 }
 
 export interface AiDeps extends ServiceDeps {
@@ -101,9 +104,16 @@ export async function executeAiCommand(deps: AiDeps, actor: Actor, diagramId: st
       const history = request.conversationId ? await recentTurns(deps.pool, request.conversationId, HISTORY_TURNS) : [];
       const interpretation = await interpretRequest({ doc, text, history, resolveProvider: async () => (await deps.ai.access.providersFor(actor.userId)).provider,
         deadlineMs: deps.ai.deadlineMs,
-        beforeProvider: () => {
+        beforeProvider: async () => {
           deps.ai.limiter.check(actor.userId);
-          return deps.ai.concurrency.acquire(actor.userId);
+          const release = deps.ai.concurrency.acquire(actor.userId);
+          try {
+            await deps.ai.usage.consume(actor.userId, 'AI'); // the daily allowance: counted only now, when the model is really needed
+          } catch (error) {
+            release();
+            throw error;
+          }
+          return release;
         },
         onAttempt: (a) => deps.metric?.('ai provider attempt', { ...a, model: deps.ai.model, deadlineMs: deps.ai.deadlineMs }),
       });

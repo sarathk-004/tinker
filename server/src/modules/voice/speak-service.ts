@@ -22,6 +22,12 @@ export async function speakMessage(deps: AiDeps, actor: { userId: string }, diag
 
   // Bounded by the ordinary per-user request limit, the AI concurrency cap and the text cap (not the 10/min AI limit, which asking uses).
   const release = deps.ai.concurrency.acquire(actor.userId);
+  try {
+    await deps.ai.usage.consume(actor.userId, 'AI'); // a spoken reply costs the same as one model request
+  } catch (error) {
+    release();
+    throw error;
+  }
   const started = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), deps.ai.deadlineMs);

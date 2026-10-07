@@ -58,6 +58,8 @@ Server (all optional unless marked; defaults in `server/src/infrastructure/confi
 | `GEMINI_API_KEY` | - | enables free-form AI, voice and spoken replies. Server only |
 | `GEMINI_MODEL`, `GEMINI_THINKING_LEVEL`, `GEMINI_LIVE_MODEL`, `GEMINI_TTS_MODEL`, `GEMINI_TTS_VOICE` | see `.env.example` | measured defaults |
 | `AI_DEADLINE_MS`, `AI_RATE_LIMIT_PER_MINUTE`, `AI_MAX_CONCURRENT` | 15000, 10, 2 | model requests only; plain commands cost no quota |
+| `AI_DAILY_LIMIT`, `VOICE_DAILY_LIMIT` | 20, 10 | per person per UTC day: model requests (free-form command, model-explained question, spoken reply) and voice sessions. Plain parser commands are free. Counted in Postgres (`usage_daily`), so restarts cannot reset it. |
+| `AI_GLOBAL_DAILY_LIMIT`, `VOICE_GLOBAL_DAILY_LIMIT` | 1000, 100 | the whole service per day (budget breaker): when reached, model features pause for everyone until 00:00 UTC. |
 | `VOICE_MAX_SESSIONS`, `VOICE_MAX_SESSION_MS` | 20, 600000 | |
 | `WORKER_POLL_MS`, `WORKER_LEASE_SECONDS` | 5000, 60 | the worker process |
 | `HOST`, `PORT`, `LOG_LEVEL` | 127.0.0.1, 8787, info | containers set `HOST=0.0.0.0`; hosts usually inject `PORT` |

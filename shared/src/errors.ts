@@ -16,6 +16,7 @@ export const ERROR_HTTP_STATUS = {
   PAYLOAD_TOO_LARGE: 413,
   DOMAIN_VALIDATION_FAILED: 422,
   RATE_LIMITED: 429,
+  DAILY_LIMIT_REACHED: 429,
   INTERNAL_ERROR: 500,
   NOT_IMPLEMENTED: 501,
   AI_PROVIDER_ERROR: 502,
@@ -53,6 +54,8 @@ export const ERROR_RETRY_POLICY: Readonly<Record<ErrorCode, RetryPolicy>> = {
   PAYLOAD_TOO_LARGE: 'never',
   DOMAIN_VALIDATION_FAILED: 'never',
   RATE_LIMITED: 'same-key-backoff',
+  // Retrying today cannot succeed: the person's (or the whole service's) AI allowance for the day is used up.
+  DAILY_LIMIT_REACHED: 'never',
   INTERNAL_ERROR: 'same-key-backoff',
   NOT_IMPLEMENTED: 'never',
   AI_PROVIDER_ERROR: 'same-key-backoff',

@@ -1,6 +1,7 @@
 import { REVISION_RETENTION } from '@tinker/shared';
 import { REPLAY_DAYS } from '../../infrastructure/idempotency/mutation-requests.ts';
 import type { Pool } from '../../infrastructure/database/pool.ts';
+import { purgeOldUsage } from '../usage/daily-usage.ts';
 import { JobError, type JobType } from './queue.ts';
 
 /** Retention policy (decision D11). One place, so product copy and cleanup cannot drift apart. */
@@ -81,13 +82,13 @@ export const cleanupExpiredRequests: JobHandler = async (_payload, { pool, polic
       )`,
     [REPLAY_DAYS, policy.batchSize * 20],
   );
-  if (signal.aborted) return { bodiesDropped: bodies.rowCount ?? 0, executionsDeleted: 0, tombstonesDeleted: 0 };
+  if (signal.aborted) return { bodiesDropped: bodies.rowCount ?? 0, executionsDeleted: 0, tombstonesDeleted: 0, usageRowsDeleted: 0 };
   const executions = await pool.query(
     `DELETE FROM command_executions
       WHERE id IN (SELECT id FROM command_executions WHERE created_at < now() - make_interval(days => $1) LIMIT $2)`,
     [policy.executionDays, policy.batchSize * 20],
   );
-  if (signal.aborted) return { bodiesDropped: bodies.rowCount ?? 0, executionsDeleted: executions.rowCount ?? 0, tombstonesDeleted: 0 };
+  if (signal.aborted) return { bodiesDropped: bodies.rowCount ?? 0, executionsDeleted: executions.rowCount ?? 0, tombstonesDeleted: 0, usageRowsDeleted: 0 };
   const tombstones = await pool.query(
     `DELETE FROM mutation_requests
       WHERE id IN (
@@ -98,7 +99,8 @@ export const cleanupExpiredRequests: JobHandler = async (_payload, { pool, polic
       )`,
     [policy.tombstoneDays, policy.batchSize * 20],
   );
-  return { bodiesDropped: bodies.rowCount ?? 0, executionsDeleted: executions.rowCount ?? 0, tombstonesDeleted: tombstones.rowCount ?? 0 };
+  const usageDays = await purgeOldUsage(pool);
+  return { bodiesDropped: bodies.rowCount ?? 0, executionsDeleted: executions.rowCount ?? 0, tombstonesDeleted: tombstones.rowCount ?? 0, usageRowsDeleted: usageDays };
 };
 
 /**
@@ -116,6 +118,10 @@ export const purgeDeletedDiagrams: JobHandler = async (_payload, { pool, policy,
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // Same lock order as every edit (idempotency rows first, then the diagram row), so a purge and an edit can never wait on each
+      // other in a circle; and if a row is busy, give up quickly: the job retries (the diagram is still due next run).
+      await client.query(`SET LOCAL lock_timeout = '3s'`);
+      await client.query(`SELECT id FROM mutation_requests WHERE diagram_id = $1 ORDER BY id FOR UPDATE`, [id]);
       // Re-check inside the transaction: the diagram must still be deleted and still past the window.
       const still = await client.query(`SELECT 1 FROM diagrams WHERE id = $1 AND deleted_at IS NOT NULL AND deleted_at < now() - make_interval(days => $2) FOR UPDATE`, [id, policy.deletedDiagramDays]);
       if (still.rows.length === 0) {

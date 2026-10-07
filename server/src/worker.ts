@@ -1,5 +1,6 @@
 import { ConfigError, loadConfig } from './infrastructure/config/config.ts';
 import { createPool } from './infrastructure/database/pool.ts';
+import { installProcessGuards } from './infrastructure/process-guards.ts';
 import { startWorker } from './modules/jobs/worker.ts';
 
 /**
@@ -28,14 +29,10 @@ async function main(): Promise<void> {
   const worker = startWorker({ pool, log, leaseSeconds: config.worker.leaseSeconds, pollMs: config.worker.pollMs });
   log('worker started', { pollMs: config.worker.pollMs, leaseSeconds: config.worker.leaseSeconds });
 
-  const shutdown = async (signal: string) => {
-    log('worker stopping', { signal });
+  installProcessGuards(async () => {
     await worker.stop();
     await pool.end();
-    process.exit(0);
-  };
-  process.on('SIGINT', () => void shutdown('SIGINT'));
-  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  });
 }
 
 main().catch((error) => {

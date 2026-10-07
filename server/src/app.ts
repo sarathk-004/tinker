@@ -23,6 +23,7 @@ import { createGeminiSpeech, disabledSpeech, type SpeechProvider } from './modul
 import { disabledLiveGateway, type LiveGateway } from './modules/voice/live-gateway.ts';
 import { registerVoiceRoutes } from './modules/voice/routes.ts';
 import type { VoiceSessionLimits } from './modules/voice/voice-session.ts';
+import { createDailyUsage, type DailyUsage } from './modules/usage/daily-usage.ts';
 
 export interface BuildAppOptions {
   config: Config;
@@ -48,6 +49,8 @@ export interface BuildAppOptions {
   speechProvider?: SpeechProvider;
   /** Tests: shorter timers and smaller quotas for voice sessions. */
   voiceLimits?: Partial<VoiceSessionLimits>;
+  /** Override the daily allowance (tests). Defaults to the Postgres-backed counters with the configured limits. */
+  usage?: DailyUsage;
   /** Override the AI rate limiter (tests). */
   aiRateLimiter?: RateLimiter;
   /** Test-only: fault injection into the commit path and a short lease. */
@@ -57,6 +60,13 @@ export interface BuildAppOptions {
   /** Tests: capture log lines instead of writing them to stdout. */
   logStream?: { write(line: string): void };
 }
+
+const refusingUsage: DailyUsage = {
+  consume: async () => {
+    throw new AppError('SERVICE_UNAVAILABLE', 'The database is not configured.');
+  },
+  snapshot: async () => ({ resetsAt: new Date().toISOString(), ai: { used: 0, limit: 0 }, voice: { used: 0, limit: 0 } }),
+};
 
 const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{8,64}$/;
 
@@ -99,6 +109,9 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   app.addHook('onSend', async (request, reply, payload) => {
     reply.header('x-request-id', request.id);
+    // API answers carry personal data: never let a browser or a shared cache keep them, and never let a browser guess a content type.
+    reply.header('x-content-type-options', 'nosniff');
+    if (request.url.startsWith('/v1/')) reply.header('cache-control', 'no-store');
     // Remember WHICH error code a failed API answer carried (conflict, rate limit, AI timeout...) for the request log below.
     if (reply.statusCode >= 400 && typeof payload === 'string' && payload.length < 4_096) {
       try {
@@ -187,6 +200,8 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     model: config.ai.model,
     limiter: options.aiRateLimiter ?? createRateLimiter({ limit: config.ai.ratePerMinute }),
     concurrency: createConcurrencyLimiter({ max: config.ai.maxConcurrent }),
+    // Without a database there is nothing to count in: model features are off in that situation anyway (no authentication either).
+    usage: options.usage ?? (options.pool ? createDailyUsage(options.pool, config.ai.dailyLimits) : refusingUsage),
   };
   const rateLimiter = options.rateLimiter ?? createRateLimiter({ limit: config.rateLimitPerMinute });
   await registerApiRoutes(app, {

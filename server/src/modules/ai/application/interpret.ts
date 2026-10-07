@@ -30,7 +30,7 @@ export interface InterpretInput {
    * Called only when the MODEL is actually needed (after the parser had no answer): enforce per-user AI limits here, so plain
    * commands the parser handles cost nothing. Returns a function that releases what it acquired.
    */
-  beforeProvider?: () => () => void;
+  beforeProvider?: () => (() => void) | Promise<() => void>;
   /** Latency metric: one call per provider attempt (never user text, never the key). */
   onAttempt?: (attempt: { attempt: number; ms: number; outcome: 'ok' | ProviderError['kind'] }) => void;
 }
@@ -57,7 +57,7 @@ export async function interpretRequest(input: InterpretInput): Promise<Interpret
     return { kind: 'clarify', source: 'AI', question: 'This diagram is too large for AI commands. Try a precise command such as "connect Orders to Billing" instead.', options: [] };
   }
 
-  const release = input.beforeProvider?.();
+  const release = await input.beforeProvider?.();
   try {
     return await runProvider({
     provider,

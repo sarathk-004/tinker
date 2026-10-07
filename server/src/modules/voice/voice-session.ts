@@ -294,6 +294,16 @@ export class VoiceSession {
       this.send({ type: 'error', code: 'AI_UNAVAILABLE', message: 'Voice is not available right now. Typing still works.', fatal: false });
       return;
     }
+    // The daily allowance: one unit per voice session actually opened (the speech model runs for the whole session).
+    try {
+      await this.deps.ai.ai.usage.consume(this.userId!, 'VOICE');
+    } catch (error) {
+      if (error instanceof AppError && error.code === 'DAILY_LIMIT_REACHED') {
+        this.send({ type: 'error', code: 'DAILY_LIMIT_REACHED', message: error.message, fatal: false });
+        return;
+      }
+      throw error;
+    }
     const diagram = await getDiagramRow(this.deps.ai.pool, this.diagramId!);
     const names = diagram?.graph.nodes.map((n) => n.name) ?? [];
     const opening = new AbortController();

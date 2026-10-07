@@ -81,6 +81,11 @@ export const workspaceSummarySchema = z.strictObject({
 });
 export type WorkspaceSummary = z.infer<typeof workspaceSummarySchema>;
 
+const usageSchema = z.strictObject({ used: z.number().int().min(0), limit: z.number().int().min(0) });
+/** The day's AI allowance (resets at `resetsAt`, midnight UTC). `ai` counts every request that needs the model; `voice` counts voice sessions. */
+export const quotaSchema = z.strictObject({ resetsAt: z.iso.datetime(), ai: usageSchema, voice: usageSchema });
+export type Quota = z.infer<typeof quotaSchema>;
+
 export const meResponseSchema = z.strictObject({
   user: z.strictObject({ id: uuidSchema, email: z.string().nullable(), displayName: z.string().nullable() }),
   workspaces: z.array(workspaceSummarySchema),
@@ -91,6 +96,7 @@ export const meResponseSchema = z.strictObject({
    * aiKey: whose model key this person's AI runs on (see ai-key.ts). voice: spoken requests are possible. speech: the server can synthesize spoken replies (otherwise the browser's own voice is used).
    */
   features: z.strictObject({ aiCommands: z.boolean(), aiModel: z.boolean(), voice: z.boolean(), speech: z.boolean(), aiKey: z.strictObject({ mode: aiKeyModeSchema, source: aiKeySourceSchema }) }),
+  quota: quotaSchema,
 });
 export type MeResponse = z.infer<typeof meResponseSchema>;
 

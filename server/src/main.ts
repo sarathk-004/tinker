@@ -2,6 +2,7 @@ import { buildApp } from './app.ts';
 import { createLocalSigner, createSupabaseVerifier, type LocalSigner, type TokenVerifier } from './infrastructure/auth/verifier.ts';
 import { ConfigError, loadConfig, type Config } from './infrastructure/config/config.ts';
 import { createPool } from './infrastructure/database/pool.ts';
+import { installProcessGuards } from './infrastructure/process-guards.ts';
 
 function fatal(message: string): never {
   console.error(message);
@@ -41,14 +42,14 @@ async function main(): Promise<void> {
 
   const app = await buildApp({ config, pool, verifier, ...(devSigner ? { devSigner } : {}) });
 
-  const shutdown = async (signal: string) => {
-    app.log.info({ signal }, 'shutting down');
+  installProcessGuards(async () => {
     await app.close();
     await pool.end();
-    process.exit(0);
-  };
-  process.on('SIGINT', () => void shutdown('SIGINT'));
-  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  });
+  // A hand-run deploy that forgot NODE_ENV=production would keep the development routes and relaxed checks: say so loudly.
+  if (config.nodeEnv === 'development' && !['127.0.0.1', 'localhost', '::1'].includes(config.host)) {
+    console.warn(`WARNING: NODE_ENV is "development" but the API listens on ${config.host}. Set NODE_ENV=production for any deployment.`);
+  }
 
   await app.listen({ host: config.host, port: config.port });
 }

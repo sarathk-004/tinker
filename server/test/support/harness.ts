@@ -50,7 +50,7 @@ export interface HarnessOptions {
 export async function startHarness(options: HarnessOptions = {}): Promise<Harness> {
   const pool = options.pool ?? createPool(inject('dbUrl'));
   const signer = options.signer ?? (await createLocalSigner());
-  const config = loadConfig({ NODE_ENV: 'test', LOG_LEVEL: 'silent', ...options.env });
+  const config = loadConfig({ NODE_ENV: 'test', LOG_LEVEL: 'silent', AI_DAILY_LIMIT: '100000', VOICE_DAILY_LIMIT: '100000', AI_GLOBAL_DAILY_LIMIT: '100000000', VOICE_GLOBAL_DAILY_LIMIT: '100000000', ...options.env });
   const app = await buildApp({
     config,
     pool,

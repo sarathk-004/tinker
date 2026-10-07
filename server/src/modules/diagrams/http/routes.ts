@@ -124,6 +124,7 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
         user: { id: auth.userId, email: auth.email, displayName: auth.displayName },
         workspaces: await listWorkspaces(pool, auth.userId),
         features: await featuresFor(auth.userId),
+        quota: await deps.ai.usage.snapshot(auth.userId),
       };
     });
 

@@ -90,7 +90,10 @@ async function refreshList() {
     const li = document.createElement('li');
     if (d.id === current?.diagramId) li.className = 'active';
     const b = document.createElement('button');
-    b.innerHTML = `${d.name}<small>version ${d.version} · updated ${new Date(d.updatedAt).toLocaleTimeString()}</small>`;
+    b.textContent = d.name; // a diagram name is user text: never HTML
+    const meta = document.createElement('small');
+    meta.textContent = `version ${d.version} · updated ${new Date(d.updatedAt).toLocaleTimeString()}`;
+    b.append(meta);
     b.onclick = () => void openDiagram(d.id);
     li.appendChild(b);
     list.appendChild(li);

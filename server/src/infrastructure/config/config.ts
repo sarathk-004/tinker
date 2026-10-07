@@ -70,6 +70,12 @@ const envSchema = z
     AI_DEADLINE_MS: z.coerce.number().int().min(500).max(60_000).default(15_000),
     AI_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(10_000).default(10),
     AI_MAX_CONCURRENT: z.coerce.number().int().min(1).max(100).default(2),
+    /** Daily allowance (security review H1). Strict on purpose; raise it deliberately, never by default. */
+    AI_DAILY_LIMIT: z.coerce.number().int().min(0).max(1_000_000).default(20),
+    VOICE_DAILY_LIMIT: z.coerce.number().int().min(0).max(1_000_000).default(10),
+    /** The service-wide ceiling per day (budget breaker): when it is reached, model features pause for everyone until 00:00 UTC. */
+    AI_GLOBAL_DAILY_LIMIT: z.coerce.number().int().min(0).max(100_000_000).default(1_000),
+    VOICE_GLOBAL_DAILY_LIMIT: z.coerce.number().int().min(0).max(100_000_000).default(100),
   })
   .superRefine((env, ctx) => {
     const need = (key: string, message = 'is required in production') =>
@@ -122,6 +128,8 @@ export interface Config {
     deadlineMs: number;
     ratePerMinute: number;
     maxConcurrent: number;
+    /** Per-person and service-wide daily allowance (modules/usage). */
+    dailyLimits: { ai: number; voice: number; globalAi: number; globalVoice: number };
   };
   voice: { maxSessions: number; maxSessionMs: number };
   worker: { pollMs: number; leaseSeconds: number };
@@ -182,6 +190,7 @@ export function loadConfig(input: Record<string, string | undefined> = process.e
       deadlineMs: e.AI_DEADLINE_MS,
       ratePerMinute: e.AI_RATE_LIMIT_PER_MINUTE,
       maxConcurrent: e.AI_MAX_CONCURRENT,
+      dailyLimits: { ai: e.AI_DAILY_LIMIT, voice: e.VOICE_DAILY_LIMIT, globalAi: e.AI_GLOBAL_DAILY_LIMIT, globalVoice: e.VOICE_GLOBAL_DAILY_LIMIT },
     },
     voice: { maxSessions: e.VOICE_MAX_SESSIONS, maxSessionMs: e.VOICE_MAX_SESSION_MS },
     worker: { pollMs: e.WORKER_POLL_MS, leaseSeconds: e.WORKER_LEASE_SECONDS },
