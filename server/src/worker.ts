@@ -24,7 +24,12 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   const pool = createPool(config.databaseUrl, { mode: config.databaseSsl, caFile: config.databaseSslCaFile });
-  await pool.query('SELECT 1');
+  try {
+    await pool.query('SELECT 1');
+  } catch {
+    console.error('Cannot connect to the database at DATABASE_URL.');
+    process.exit(1);
+  }
   const log = (message: string, data: Record<string, unknown>) => console.log(JSON.stringify({ level: 'info', msg: message, ...data }));
   const worker = startWorker({ pool, log, leaseSeconds: config.worker.leaseSeconds, pollMs: config.worker.pollMs });
   log('worker started', { pollMs: config.worker.pollMs, leaseSeconds: config.worker.leaseSeconds });
