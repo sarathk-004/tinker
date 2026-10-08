@@ -27,6 +27,12 @@
   --success-ink: 26 127 55;
   --success-tint: 231 245 236;
   --warn: 192 133 50;
+  --blue: 45 112 210; /* accents that tell the landing page's kinds of thing apart */
+  --blue-tint: 232 240 252;
+  --violet: 118 82 214;
+  --violet-tint: 241 236 252;
+  --amber: 178 112 18;
+  --amber-tint: 252 242 222;
   --warn-ink: 178 90 0;
   --question: 243 241 232; /* "One question" cards */
   --question-line: 230 225 207;
@@ -62,6 +68,12 @@
   --success-ink: 120 220 170;
   --success-tint: 24 48 38;
   --warn: 214 163 76;
+  --blue: 124 176 255;
+  --blue-tint: 27 38 58;
+  --violet: 176 150 255;
+  --violet-tint: 38 31 60;
+  --amber: 232 180 100;
+  --amber-tint: 52 42 22;
   --warn-ink: 232 180 100;
   --question: 44 41 32;
   --question-line: 66 61 46;

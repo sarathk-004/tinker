@@ -4,6 +4,8 @@ const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 
 export default {
   darkMode: 'class',
+  // Hover styles only where a pointer can hover: on touch screens :hover sticks after a tap and makes things look selected.
+  future: { hoverOnlyWhenSupported: true },
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -34,6 +36,12 @@ export default {
         success: token('success'),
         'success-ink': token('success-ink'),
         'success-tint': token('success-tint'),
+        blue: token('blue'),
+        'blue-tint': token('blue-tint'),
+        violet: token('violet'),
+        'violet-tint': token('violet-tint'),
+        amber: token('amber'),
+        'amber-tint': token('amber-tint'),
         warn: token('warn'),
         'warn-ink': token('warn-ink'),
         question: token('question'),

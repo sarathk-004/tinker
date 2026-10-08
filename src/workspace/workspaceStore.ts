@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { DiagramSummary, MeResponse, ProjectCover, ProjectSummary, Quota, WorkspaceDetail, WorkspaceSummary } from '../contracts';
 import { useUi } from '../shell/uiStore';
+import { playSound } from '../sound/uiSound';
 import { ApiError } from '../api/client';
 import { api, session } from '../document/instance';
 import { useConversationStore } from '../ai/conversationStore';
@@ -262,6 +263,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       if (!trimmed) return 'Give the project a name.';
       try {
         await api.createProject(ws.id, trimmed, description?.trim() || undefined);
+        playSound('chime');
         await get().loadProjects();
         void get().refreshWorkspaces();
         return null;
@@ -345,6 +347,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         const created = await api.createWorkspace(trimmed, crypto.randomUUID());
         set({ workspaces: [...get().workspaces.filter((w) => w.id !== created.data.id), created.data] });
         await get().openWorkspacePage(created.data.id);
+        playSound('chime');
         return null;
       } catch (e) {
         return e instanceof ApiError && e.code === 'DOMAIN_VALIDATION_FAILED' ? e.message : describe(e);

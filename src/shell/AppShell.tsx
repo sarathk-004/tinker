@@ -56,6 +56,9 @@ const ShellBody: React.FC = () => {
   return (
     <>
       <div className="flex flex-col w-screen h-screen bg-canvas text-ink overflow-hidden select-none font-sans">
+        <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[60] focus:rounded-xl focus:bg-surface focus:px-4 focus:py-2 focus:text-[13px] focus:font-medium focus:lifted">
+          Skip to content
+        </a>
         <TopBar />
         <StatusBanners />
         {view === 'editor' && viewerOnly && (
@@ -80,7 +83,7 @@ const ShellBody: React.FC = () => {
             <LeftNav />
           </div>
 
-          <main className="relative flex-1 min-w-0 flex flex-col bg-canvas">
+          <main id="main" tabIndex={-1} className="relative flex-1 min-w-0 flex flex-col bg-canvas outline-none">
             <CanvasHeader />
             <CanvasToolbar />
             <div className="relative flex-1 min-h-0">

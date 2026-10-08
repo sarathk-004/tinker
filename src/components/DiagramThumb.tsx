@@ -7,9 +7,7 @@ const H = 90;
 /** A tiny drawing of a diagram's layout (boxes and the lines between them), from the positions the server sends with each card. */
 export const DiagramThumb: React.FC<{ preview: DiagramCard['preview']; className?: string }> = ({ preview, className = '' }) => {
   const { nodes, edges } = preview;
-  if (nodes.length === 0) {
-    return <div className={`flex items-center justify-center text-[12px] text-muted ${className}`}>Empty diagram</div>;
-  }
+  if (nodes.length === 0) return null;
   const xs = nodes.map((n) => n[0]);
   const ys = nodes.map((n) => n[1]);
   const minX = Math.min(...xs);

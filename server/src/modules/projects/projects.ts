@@ -138,6 +138,7 @@ interface CardRow {
   project_id: string;
   workspace_name: string;
   project_name: string;
+  project_cover: ProjectCover | null;
   name: string;
   graph: unknown;
   presentation: unknown;
@@ -167,6 +168,7 @@ function toCard(r: CardRow): DiagramCard {
     projectId: r.project_id,
     workspaceName: r.workspace_name,
     projectName: r.project_name,
+    projectCover: r.project_cover,
     name: r.name,
     nodeCount: graph.nodes.length,
     edgeCount: graph.edges.length,
@@ -175,7 +177,7 @@ function toCard(r: CardRow): DiagramCard {
   };
 }
 
-const CARD_SELECT = `d.id, d.workspace_id, d.project_id, w.name AS workspace_name, p.name AS project_name, d.name, d.graph, d.presentation, d.updated_at
+const CARD_SELECT = `d.id, d.workspace_id, d.project_id, w.name AS workspace_name, p.name AS project_name, p.cover AS project_cover, d.name, d.graph, d.presentation, d.updated_at
   FROM diagrams d JOIN workspaces w ON w.id = d.workspace_id AND w.deleted_at IS NULL JOIN projects p ON p.id = d.project_id`;
 
 export async function listProjectDiagrams(pool: Pool, userId: string, projectId: string, limit = 100): Promise<DiagramCard[]> {

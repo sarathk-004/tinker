@@ -6,6 +6,7 @@
  * Every structural action below sends a DiagramCommand through the session (one serialized, idempotent write path).
  */
 import { create } from 'zustand';
+import { playSound, type Voice } from '../sound/uiSound';
 import type { DiagramCommand } from '../contracts';
 import { session } from '../document/instance';
 import { newNodeIds, type SessionState } from '../document/session';
@@ -18,6 +19,16 @@ import { planLayoutSwitch } from './layoutMemory';
 import { freshGroupName, groupOfNode, sharedParentGroup } from './groups';
 import { groupJoin, groupParent, isInGroup, normalizeGroupPath } from '../contracts';
 import type { AWSServiceIcon, SystemNodeType } from '../types/diagram';
+
+/** What each kind of change sounds like: something appears, something goes, something is rearranged. */
+const SOUND_OF: Partial<Record<DiagramCommand['type'], Voice>> = {
+  ADD_NODE: 'pop',
+  CONNECT: 'pop',
+  INSERT_BETWEEN: 'pop',
+  REMOVE_NODE: 'thump',
+  DISCONNECT: 'thump',
+  RESET: 'thump',
+};
 
 export interface NodeEdit {
   label: string;
@@ -82,7 +93,10 @@ export const useDiagramStore = create<DiagramView>((set, get) => {
 
   const run = async (command: DiagramCommand, label: string) => {
     const res = await settle(session.command(command, label), undefined);
-    if (res) set({ activeAction: label });
+    if (res) {
+      set({ activeAction: label });
+      playSound(SOUND_OF[command.type] ?? 'tock');
+    }
     return res;
   };
 

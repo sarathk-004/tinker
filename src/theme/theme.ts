@@ -19,8 +19,13 @@ export const resolveTheme = (choice: ThemeChoice, systemPrefersDark: boolean): R
 
 const systemDark = (): boolean => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
+/** Apply the theme with every transition switched off for a moment, so nothing slides between the two palettes. */
 function apply(resolved: ResolvedTheme): void {
-  document.documentElement.classList.toggle('dark', resolved === 'dark');
+  const root = document.documentElement;
+  const changing = root.classList.contains('dark') !== (resolved === 'dark');
+  if (changing) root.classList.add('no-theme-transition');
+  root.classList.toggle('dark', resolved === 'dark');
+  if (changing) setTimeout(() => root.classList.remove('no-theme-transition'), 60);
 }
 
 interface ThemeState {

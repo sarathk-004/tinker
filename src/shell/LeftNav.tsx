@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronDown, ChevronRight, FileText, History, LayoutGrid, Plus, Trash2, X } from 'lucide-react';
 import { useDiagramStore } from '../diagram/store';
+import { CoverArt } from '../components/ProjectCoverArt';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { VersionsPanel } from '../components/VersionsPanel';
 import { AdvisorPanel } from './AdvisorPanel';
@@ -40,7 +41,7 @@ export const LeftNav: React.FC<{ overlay?: boolean }> = ({ overlay = false }) =>
         </div>
       )}
       <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 pb-3">
-        <NavRow icon={<LayoutGrid className="w-[18px] h-[18px]" />} label={project ? project.name : 'Diagrams'} count={diagrams.length} active onClick={() => project && void useWorkspaceStore.getState().openProject(project.id)} />
+        <NavRow icon={project ? <CoverArt projectId={project.id} cover={project.cover} preview={null} className="w-[18px] h-[18px] rounded-[5px]" /> : <LayoutGrid className="w-[18px] h-[18px]" />} label={project ? project.name : 'Diagrams'} count={diagrams.length} active onClick={() => project && void useWorkspaceStore.getState().openProject(project.id)} />
         <div className="mt-1 mb-2 ml-[22px] pl-3 border-l border-line space-y-0.5">
           {diagrams.map((d) => {
             const active = d.id === currentId;

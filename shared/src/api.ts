@@ -178,6 +178,8 @@ export const diagramCardSchema = z.strictObject({
   projectId: uuidSchema,
   workspaceName: z.string(),
   projectName: z.string(),
+  /** The cover chosen for the project this diagram is in (null: automatic). */
+  projectCover: projectCoverSchema.nullable(),
   name: z.string(),
   nodeCount: z.number().int().min(0),
   edgeCount: z.number().int().min(0),

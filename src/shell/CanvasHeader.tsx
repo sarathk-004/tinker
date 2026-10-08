@@ -7,6 +7,7 @@ import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { exportCurrent } from './exportCurrent';
 import type { ExportFormat } from './exportDiagram';
 import { MENU_ITEM, MENU_PANEL, useDismiss } from './Popover';
+import { CoverArt } from '../components/ProjectCoverArt';
 import { useUi } from './uiStore';
 
 /** Saved / Saving / Not saved / Changed elsewhere: the one place the user learns whether their work is safe. */
@@ -115,6 +116,7 @@ export const CanvasHeader: React.FC = () => {
           <span className="truncate max-w-[260px]">{diagram?.name ?? 'No diagram'}</span>
         </div>
         <div className="flex items-center gap-3 min-w-0">
+          {project && <CoverArt projectId={project.id} cover={project.cover} preview={project.latestDiagram?.preview ?? null} bare className="w-9 h-9 rounded-[10px] flex-shrink-0" />}
           {editing ? (
             <input
               autoFocus

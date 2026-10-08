@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { FolderInput, Loader2, Plus, Settings } from 'lucide-react';
 import type { DiagramCard } from '../contracts';
 import { api } from '../document/instance';
+import { DitherGradient } from '../components/dither-kit/gradient';
 import { ProjectDialog } from '../components/ProjectDialog';
+import { CoverArt, presetFor } from '../components/ProjectCoverArt';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { Crumbs, DiagramCardView, PageFrame, SectionTitle } from './pages';
 import { useUi } from './uiStore';
@@ -62,6 +64,7 @@ export const ProjectPage: React.FC = () => {
   if (!workspace || !project) return null;
   const canEdit = workspace.role !== 'VIEWER';
   const owner = workspace.role === 'OWNER';
+  const preset = presetFor(project.id, project.cover);
 
   const start = async () => {
     setCreating(true);
@@ -78,26 +81,32 @@ export const ProjectPage: React.FC = () => {
           { label: project.name },
         ]}
       />
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-[28px] font-semibold tracking-[-0.03em] text-ink truncate">{project.name}</h1>
-          {project.description && <p className="mt-2 max-w-2xl text-[14px] text-body">{project.description}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          {canEdit && (
-            <button onClick={() => setEditing(true)} className="h-9 px-3 rounded-lg border border-line bg-surface hover:bg-canvas text-[13px] font-medium flex items-center gap-1.5">
-              <Settings className="w-3.5 h-3.5" /> Project settings
-            </button>
-          )}
-          {canEdit && (
-            <button onClick={() => void start()} disabled={creating} className="h-9 px-3.5 rounded-lg bg-primary hover:bg-primary-hover disabled:opacity-60 text-white text-[13px] font-medium flex items-center gap-1.5">
-              {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} New diagram
-            </button>
-          )}
+      <div className="arrive relative overflow-hidden rounded-[28px] bg-surface lifted px-6 sm:px-8 py-7" style={{ ['--group' as string]: 0 }}>
+        {preset && <DitherGradient from={preset.from} to={preset.to} direction={preset.direction} cell={4} opacity={0.55} className="[mask-image:linear-gradient(to_left,black,transparent_65%)]" />}
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-4 min-w-0">
+            <CoverArt projectId={project.id} cover={project.cover} preview={project.latestDiagram?.preview ?? null} className="w-16 h-16 rounded-2xl flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="text-[30px] leading-tight font-semibold tracking-[-0.03em] text-ink truncate">{project.name}</h1>
+              {project.description && <p className="pretty mt-2 max-w-2xl text-[14px] leading-relaxed text-body">{project.description}</p>}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {canEdit && (
+              <button onClick={() => setEditing(true)} className="h-10 px-3.5 rounded-xl bg-surface lifted text-[13px] font-medium flex items-center gap-1.5">
+                <Settings className="w-3.5 h-3.5" aria-hidden /> Project settings
+              </button>
+            )}
+            {canEdit && (
+              <button onClick={() => void start()} disabled={creating} className="h-10 pl-3 pr-3.5 rounded-xl bg-primary hover:bg-primary-hover disabled:opacity-60 text-white text-[13px] font-medium flex items-center gap-1.5 shadow-[0_1px_2px_rgb(0_0_0/0.12),inset_0_1px_0_rgb(255_255_255/0.18)]">
+                {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> : <Plus className="w-3.5 h-3.5" aria-hidden />} New diagram
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      <section className="mt-8">
+      <section className="arrive mt-8" style={{ ['--group' as string]: 1 }}>
         <SectionTitle>Diagrams</SectionTitle>
         {cards === null && (
           <div className="py-10 flex justify-center text-muted">
@@ -105,7 +114,7 @@ export const ProjectPage: React.FC = () => {
           </div>
         )}
         {cards?.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-10 text-center">
+          <div className="rounded-[20px] bg-surface lifted px-4 py-10 text-center">
             <p className="text-[14px] text-ink font-medium">No diagrams in this project yet</p>
             <p className="mt-1 text-[13px] text-muted">{canEdit ? 'Start one, or describe a system to Tinker and let it draw.' : 'Nothing here yet.'}</p>
           </div>

@@ -64,3 +64,90 @@ body {
   background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
   background-position: -1px -1px, -1px -1px, -1px -1px, -1px -1px;
 }
+
+/* ── Interface polish ─────────────────────────────────────────────────────────────────────────────────────────────────── */
+
+h1, h2, h3 {
+  text-wrap: balance; /* even out headings */
+}
+.pretty {
+  text-wrap: pretty; /* no orphaned last word in short descriptions */
+}
+.tabular {
+  font-variant-numeric: tabular-nums; /* digits of equal width: counters do not shift as they change */
+}
+
+/* Keyboard focus is always visible, and only for the keyboard. */
+:focus-visible {
+  outline: 2px solid rgb(var(--primary));
+  outline-offset: 2px;
+}
+
+/* Depth from layered shadows, not borders: a hairline ring, a close shadow and a soft far one. */
+.lifted {
+  box-shadow: 0 0 0 1px rgb(var(--ink) / 0.06), 0 1px 2px rgb(var(--ink) / 0.05), 0 8px 24px -8px rgb(var(--ink) / 0.10);
+}
+@media (hover: hover) {
+  .lifted-hover:hover {
+    box-shadow: 0 0 0 1px rgb(var(--ink) / 0.10), 0 2px 4px rgb(var(--ink) / 0.06), 0 16px 36px -10px rgb(var(--ink) / 0.18);
+  }
+}
+
+/* A 1px outline on images and drawings, offset inward: black at 8% in the light theme, white at 8% in the dark one. */
+.img-outline {
+  outline: 1px solid rgb(0 0 0 / 0.08);
+  outline-offset: -1px;
+}
+.dark .img-outline {
+  outline-color: rgb(255 255 255 / 0.08);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Buttons dip slightly when pressed. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    transition-property: scale, background-color, color, box-shadow, border-color, opacity;
+    transition-duration: 160ms;
+    transition-timing-function: ease-out;
+  }
+  button:not(:disabled):active,
+  [role='button']:not([aria-disabled='true']):active {
+    scale: 0.97;
+  }
+  /* Landing-page content arrives in small groups, a beat apart. */
+  @keyframes arrive {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+      filter: blur(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      filter: none;
+    }
+  }
+  .arrive {
+    animation: arrive 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: calc(var(--group, 0) * 70ms);
+  }
+}
+
+/* Switching between the light and dark theme changes everything at once: no transitions while it happens. */
+.no-theme-transition,
+.no-theme-transition *,
+.no-theme-transition *::before,
+.no-theme-transition *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

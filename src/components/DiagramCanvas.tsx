@@ -28,6 +28,7 @@ import { NoteNode } from './NoteNode';
 import { GroupBox } from './GroupBox';
 import { computeGroupBoxes, groupNodeId, groupPathOfNodeId, isGroupNodeId, regroupAfterDrag, reparentAfterGroupDrag, type PlacedNode } from '../diagram/groups';
 import { isInGroup } from '../contracts';
+import { playSound } from '../sound/uiSound';
 import { NO_GUIDES, snapBox, type Guides } from '../diagram/snap';
 import { isNoteNodeId, noteActions, noteIdOf, noteNodeId } from '../diagram/notes';
 import type { Note } from '../contracts';
@@ -159,6 +160,7 @@ export const DiagramCanvas: React.FC = () => {
   const zoom = useStore((s) => s.transform[2]);
   const [guides, setGuides] = useState<Guides>(NO_GUIDES);
   const altDown = useRef(false);
+  const guideCount = useRef(0);
   useEffect(() => {
     const set = (e: KeyboardEvent) => void (altDown.current = e.altKey);
     window.addEventListener('keydown', set);
@@ -179,6 +181,8 @@ export const DiagramCanvas: React.FC = () => {
           const others = nodesRef.current.filter((n) => n.id !== move.id && !isNoteNodeId(n.id) && !isGroupNodeId(n.id)).map((n) => ({ ...n.position, ...sizeOf(n) }));
           const r = snapBox({ ...move.position!, ...sizeOf(moving) }, others, 8 / zoom);
           move.position = { x: r.x, y: r.y };
+          if (r.guides.vertical.length + r.guides.horizontal.length > 0 && guideCount.current === 0) playSound('tick'); // only as it locks on
+          guideCount.current = r.guides.vertical.length + r.guides.horizontal.length;
           setGuides(r.guides);
         }
       } else if (moves.length !== 1 || !snap) {
@@ -219,6 +223,7 @@ export const DiagramCanvas: React.FC = () => {
     (_event: unknown, node: Node, dragged: Node[]) => {
       dragging.current = false;
       setGuides(NO_GUIDES);
+      guideCount.current = 0;
       const store = useDiagramStore.getState();
       const g = groupDrag.current;
       groupDrag.current = null;

@@ -1,3 +1,4 @@
+import { playSound } from '../sound/uiSound';
 import { useDiagramStore } from '../diagram/store';
 import { exportDiagram, type CanvasHandle, type ExportFormat } from './exportDiagram';
 
@@ -7,8 +8,10 @@ export async function exportCurrent(format: ExportFormat, canvas: CanvasHandle):
   if (!doc.diagram) return 'Open a diagram first.';
   try {
     await exportDiagram({ name: doc.diagram.name, version: doc.diagram.version, graph: doc.graph, presentation: doc.presentation }, format, canvas);
+    playSound('check');
     return null;
   } catch (e) {
+    playSound('deny');
     return e instanceof Error ? e.message : 'The export did not work.';
   }
 }

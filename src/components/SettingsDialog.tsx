@@ -5,6 +5,7 @@ import { useAuthStore } from '../auth/auth';
 import { passwordRules } from '../auth/passwordPolicy';
 import { useTheme, type ThemeChoice } from '../theme/theme';
 import { useSpeechSettings, type ReplyVoice } from '../voice/speech';
+import { useSound } from '../sound/uiSound';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { Avatar } from '../shell/TopBar';
 import { useUi } from '../shell/uiStore';
@@ -240,9 +241,18 @@ const VOICES: Array<{ id: ReplyVoice | 'auto'; label: string }> = [
 const Preferences: React.FC = () => {
   const saved = useSpeechSettings((s) => s.saved);
   const choose = useSpeechSettings((s) => s.choose);
+  const sounds = useSound((s) => s.enabled);
+  const setSounds = useSound((s) => s.setEnabled);
   const current = saved === 'browser' || saved === 'off' ? saved : 'auto';
   return (
-    <Row title="Spoken replies" hint="How Tinker reads its answers aloud when you ask it to.">
+    <>
+    <Row title="Interface sounds" hint="Soft taps and tones as you work: a pop when something is added, a thump when it goes, a tick when a component lines up.">
+      <label className="flex items-center gap-2.5 text-[13.5px] text-ink cursor-pointer">
+        <input type="checkbox" checked={sounds} onChange={(e) => setSounds(e.target.checked)} />
+        Play interface sounds
+      </label>
+    </Row>
+    <Row title="Spoken replies" hint="How tinker reads its answers aloud when you ask it to.">
       <div className="space-y-1.5" role="radiogroup" aria-label="Spoken replies">
         {VOICES.map((v) => (
           <label key={v.id} className="flex items-center gap-2.5 text-[13.5px] text-ink cursor-pointer">
@@ -252,6 +262,7 @@ const Preferences: React.FC = () => {
         ))}
       </div>
     </Row>
+    </>
   );
 };
 
