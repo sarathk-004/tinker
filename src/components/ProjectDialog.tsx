@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, Trash2, X } from 'lucide-react';
 import { LIMITS, type ProjectCover, type ProjectSummary } from '../contracts';
-import { COVER_PRESETS } from '../catalog/covers';
-import { PresetArt } from './ProjectCoverArt';
+import { CoverPicker } from './CoverPicker';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 
 const FIELD = 'w-full px-3 rounded-lg border border-line bg-canvas text-[13.5px] text-ink placeholder:text-muted focus:outline-none focus:border-primary';
@@ -65,18 +64,7 @@ export const ProjectDialog: React.FC<{ project?: ProjectSummary; onClose: () => 
         {project && (
           <>
             <label className="block text-[12.5px] font-medium mt-3 mb-1.5">Cover</label>
-            <div role="radiogroup" aria-label="Cover" className="grid grid-cols-5 gap-2">
-              {([[null, 'Automatic'], ['preview', 'Latest diagram']] as const).map(([value, label]) => (
-                <button key={label} type="button" role="radio" aria-checked={cover === value} onClick={() => setCover(value)} className={`h-14 rounded-lg border text-[11px] leading-tight px-1 ${cover === value ? 'border-primary bg-canvas text-ink font-medium' : 'border-line text-body hover:bg-canvas'}`}>
-                  {label}
-                </button>
-              ))}
-              {COVER_PRESETS.map((p) => (
-                <button key={p.id} type="button" role="radio" aria-checked={cover === p.id} aria-label={p.label} title={p.label} onClick={() => setCover(p.id)} className={`h-14 rounded-lg border overflow-hidden ${cover === p.id ? 'border-primary ring-2 ring-primary/40' : 'border-line hover:border-line-strong'}`}>
-                  <PresetArt preset={p} className="w-full h-full" />
-                </button>
-              ))}
-            </div>
+            <CoverPicker value={cover} onChange={setCover} allowPlain />
           </>
         )}
         {error && (

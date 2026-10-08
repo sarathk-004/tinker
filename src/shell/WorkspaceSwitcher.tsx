@@ -75,7 +75,7 @@ export const WorkspaceSwitcher: React.FC = () => {
           </div>
           <div className="border-t border-fill mt-1 pt-1">
             <button onClick={() => { close(); useUi.getState().set({ view: 'dashboard' }); }} className={MENU_ITEM}>
-              <LayoutGrid className="w-4 h-4 text-body" /> All workspaces
+              <LayoutGrid className="w-4 h-4 text-body" /> Dashboard
             </button>
             <button onClick={() => { close(); useUi.getState().set({ workspaceSettingsId: workspace.id }); }} className={MENU_ITEM}>
               <Settings className="w-4 h-4 text-body" /> Workspace settings

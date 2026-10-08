@@ -14,6 +14,7 @@ export interface DiagramRow {
   id: string;
   workspaceId: string;
   projectId: string;
+  icon: string | null;
   name: string;
   graph: Graph;
   presentation: Presentation;
@@ -25,6 +26,7 @@ interface RawRow {
   id: string;
   workspace_id: string;
   project_id: string;
+  icon: string | null;
   name: string;
   graph: unknown;
   presentation: unknown;
@@ -38,6 +40,7 @@ function toRow(raw: RawRow): DiagramRow {
     id: raw.id,
     workspaceId: raw.workspace_id,
     projectId: raw.project_id,
+    icon: raw.icon,
     name: raw.name,
     graph: graphSchema.parse(raw.graph),
     presentation: presentationSchema.parse(raw.presentation),
@@ -46,7 +49,7 @@ function toRow(raw: RawRow): DiagramRow {
   };
 }
 
-const COLUMNS = 'id, workspace_id, project_id, name, graph, presentation, version, updated_at';
+const COLUMNS = 'id, workspace_id, project_id, icon, name, graph, presentation, version, updated_at';
 
 export async function insertDiagram(db: Queryable, input: { workspaceId: string; projectId: string; name: string; createdBy: string }): Promise<DiagramRow> {
   const { rows } = await db.query<RawRow>(
@@ -70,8 +73,8 @@ export async function lockDiagramRow(db: Queryable, id: string): Promise<Diagram
 }
 
 export async function listDiagramSummaries(db: Queryable, workspaceId: string, limit = 200): Promise<DiagramSummary[]> {
-  const { rows } = await db.query<{ id: string; workspace_id: string; project_id: string; name: string; version: number; created_at: Date; updated_at: Date }>(
-    `SELECT id, workspace_id, project_id, name, version, created_at, updated_at
+  const { rows } = await db.query<{ id: string; workspace_id: string; project_id: string; icon: string | null; name: string; version: number; created_at: Date; updated_at: Date }>(
+    `SELECT id, workspace_id, project_id, icon, name, version, created_at, updated_at
        FROM diagrams WHERE workspace_id = $1 AND deleted_at IS NULL
       ORDER BY updated_at DESC, id LIMIT $2`,
     [workspaceId, limit],
@@ -80,6 +83,7 @@ export async function listDiagramSummaries(db: Queryable, workspaceId: string, l
     id: r.id,
     workspaceId: r.workspace_id,
     projectId: r.project_id,
+    icon: r.icon,
     name: r.name,
     version: r.version,
     createdAt: r.created_at.toISOString(),

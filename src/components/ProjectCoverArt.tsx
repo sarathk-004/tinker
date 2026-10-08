@@ -22,10 +22,12 @@ export function presetFor(id: string, cover: ProjectCover | null): CoverPreset |
  */
 export const CoverArt: React.FC<{ projectId: string; cover: ProjectCover | null; preview?: DiagramCard['preview'] | null; className?: string; bare?: boolean }> = ({ projectId, cover, preview, className = '', bare = false }) => {
   const preset = presetFor(projectId, cover);
+  // A cover someone chose is shown as it is. Only an automatic cover (or Plain) carries a drawing of the diagram.
+  const chosen = cover !== null && cover !== 'preview';
   return (
     <div className={`img-outline relative overflow-hidden bg-canvas ${className}`}>
       {preset && <DitherGradient from={preset.from} to={preset.to} direction={preset.direction} cell={4} opacity={0.85} />}
-      {!bare && preview && preview.nodes.length > 0 && <DiagramThumb preview={preview} className="relative w-full h-full p-1.5" />}
+      {!bare && !chosen && preview && preview.nodes.length > 0 && <DiagramThumb preview={preview} className="relative w-full h-full p-1.5" />}
     </div>
   );
 };

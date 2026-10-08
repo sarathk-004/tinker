@@ -65,6 +65,7 @@ export const TopBar: React.FC = () => {
   const closeMenu = React.useCallback(() => setMenu(false), []);
   const menuRef = useDismiss(menu, closeMenu);
   const helpOpen = useUi((s) => s.helpOpen);
+  const view = useUi((s) => s.view);
   const closeHelp = React.useCallback(() => useUi.getState().set({ helpOpen: false }), []);
   const helpRef = useDismiss(helpOpen, closeHelp);
 
@@ -73,12 +74,16 @@ export const TopBar: React.FC = () => {
       <button onClick={() => useUi.getState().set({ navOpen: true })} aria-label="Open navigation" className="lg:hidden p-1.5 -ml-1 rounded-lg text-body hover:bg-canvas">
         <Menu className="w-5 h-5" />
       </button>
-      <button onClick={() => useUi.getState().set({ view: 'dashboard' })} title="All workspaces" aria-label="Tinker: all workspaces" className="flex items-center gap-2.5 flex-shrink-0 rounded-lg">
+      <button onClick={() => useUi.getState().set({ view: 'dashboard' })} title="Dashboard" aria-label="tinker: dashboard" className="flex items-center gap-2.5 flex-shrink-0 rounded-lg">
         <TinkerLogo size={26} />
         <span className="text-[20px] font-semibold tracking-[-0.03em] text-ink">tinker</span>
       </button>
-      <div className="hidden sm:block h-6 w-px bg-line" />
-      <WorkspaceSwitcher />
+      {view !== 'dashboard' && (
+        <>
+          <div className="hidden sm:block h-6 w-px bg-line" />
+          <WorkspaceSwitcher />
+        </>
+      )}
 
       <div className="flex-1" />
 

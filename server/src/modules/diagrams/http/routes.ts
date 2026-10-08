@@ -11,6 +11,7 @@ import {
   createProjectRequestSchema,
   createWorkspaceRequestSchema,
   moveDiagramRequestSchema,
+  setDiagramIconRequestSchema,
   updateProjectRequestSchema,
   deleteWorkspaceRequestSchema,
   removeInviteRequestSchema,
@@ -35,7 +36,7 @@ import { AppError, parseOrThrow } from '../../../infrastructure/http/errors.ts';
 import type { RateLimiter } from '../../../infrastructure/http/rate-limiter.ts';
 import type { RunResult, TestHooks } from '../../../infrastructure/idempotency/mutation-requests.ts';
 import { listWorkspaces } from '../../workspaces/access.ts';
-import { createProject, deleteProject, listProjectDiagrams, listProjects, listRecentDiagrams, moveDiagram, updateProject } from '../../projects/projects.ts';
+import { createProject, deleteProject, listProjectDiagrams, listProjects, listRecentDiagrams, moveDiagram, setDiagramIcon, updateProject } from '../../projects/projects.ts';
 import { createWorkspace } from '../../workspaces/workspace-service.ts';
 import { addMember, changeMemberRole, deleteWorkspace, getWorkspaceDetail, removeInvite, removeMember, updateWorkspace } from '../../workspaces/workspace-admin.ts';
 import { avatarUpdatedAt, deleteAvatar, getAvatar, putAvatar } from '../../profile/avatar.ts';
@@ -245,6 +246,13 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
       return { diagrams: await listProjectDiagrams(pool, request.auth!.userId, projectId) };
     });
     app.get(`${API_PREFIX}/diagrams-recent`, async (request) => ({ diagrams: await listRecentDiagrams(pool, request.auth!.userId) }));
+    app.post(`${API_PREFIX}/diagrams/:diagramId/icon`, async (request) => {
+      const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
+      const body = parseOrThrow(setDiagramIconRequestSchema, request.body, 'INVALID_REQUEST', 'Choose an icon from the list.');
+      adminLimiter.check(request.auth!.userId);
+      await setDiagramIcon(pool, request.auth!.userId, diagramId, body.icon);
+      return { updated: true as const };
+    });
     app.post(`${API_PREFIX}/diagrams/:diagramId/move`, async (request) => {
       const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
       const body = parseOrThrow(moveDiagramRequestSchema, request.body, 'INVALID_REQUEST', 'Choose a project.');

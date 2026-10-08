@@ -29,10 +29,15 @@ export const diagramDocumentSchema = z
   });
 export type DiagramDocument = z.infer<typeof diagramDocumentSchema>;
 
+/** A diagram icon: a name from the app's icon list and a colour, joined by a dot ("Rocket.violet"). The list lives in the web app. */
+export const diagramIconSchema = z.string().regex(/^[A-Za-z0-9]{2,32}\.[a-z]{3,12}$/, 'not an icon');
+export const setDiagramIconRequestSchema = z.strictObject({ icon: diagramIconSchema.nullable() });
+
 export const diagramSummarySchema = z.strictObject({
   id: uuidSchema,
   workspaceId: uuidSchema,
   projectId: uuidSchema,
+  icon: diagramIconSchema.nullable(),
   name: diagramNameSchema,
   version: versionSchema,
   createdAt: z.iso.datetime(),
@@ -83,6 +88,11 @@ export type HealthResponse = z.infer<typeof healthResponseSchema>;
 export const workspaceRoleSchema = z.enum(['OWNER', 'EDITOR', 'VIEWER']);
 export type WorkspaceRole = z.infer<typeof workspaceRoleSchema>;
 
+/** The covers a project can have: the drawing of its latest diagram, or one of the dithered covers the app draws itself. */
+export const PROJECT_COVERS = ['preview', 'dusk', 'ember', 'meadow', 'rose', 'ocean', 'sunrise', 'slate', 'mint'] as const;
+export const projectCoverSchema = z.enum(PROJECT_COVERS);
+export type ProjectCover = z.infer<typeof projectCoverSchema>;
+
 export const workspaceVisibilitySchema = z.enum(['PRIVATE', 'PUBLIC']);
 export type WorkspaceVisibility = z.infer<typeof workspaceVisibilitySchema>;
 
@@ -98,6 +108,8 @@ export const workspaceSummarySchema = z.strictObject({
   diagramCount: z.number().int().min(0),
   memberCount: z.number().int().min(1),
   projectCount: z.number().int().min(0),
+  /** null: automatic (a dithered cover picked from the workspace's id). */
+  cover: projectCoverSchema.nullable(),
   updatedAt: z.iso.datetime(),
 });
 export type WorkspaceSummary = z.infer<typeof workspaceSummarySchema>;
@@ -119,6 +131,7 @@ export const updateWorkspaceRequestSchema = z
     name: z.string().trim().min(1).max(LIMITS.maxWorkspaceNameLength).optional(),
     description: z.string().trim().max(LIMITS.maxWorkspaceDescriptionLength).nullable().optional(),
     visibility: workspaceVisibilitySchema.optional(),
+    cover: projectCoverSchema.nullable().optional(),
   })
   .refine((b) => Object.keys(b).length > 0, { message: 'nothing to change' });
 export type UpdateWorkspaceRequest = z.infer<typeof updateWorkspaceRequestSchema>;
@@ -135,11 +148,6 @@ export const removedResponseSchema = z.strictObject({ removed: z.literal(true) }
 export const addMemberResponseSchema = z.strictObject({ status: z.enum(['ADDED', 'INVITED']) });
 export const changeMemberRoleRequestSchema = z.strictObject({ role: z.enum(['EDITOR', 'VIEWER']) });
 export const removeInviteRequestSchema = z.strictObject({ email: z.string().trim().toLowerCase().max(320) });
-
-/** The covers a project can have: the drawing of its latest diagram, or one of the dithered covers the app draws itself. */
-export const PROJECT_COVERS = ['preview', 'dusk', 'ember', 'meadow', 'rose', 'ocean', 'sunrise', 'slate', 'mint'] as const;
-export const projectCoverSchema = z.enum(PROJECT_COVERS);
-export type ProjectCover = z.infer<typeof projectCoverSchema>;
 
 /** A project groups related diagrams inside a workspace (workspace -> project -> diagram). */
 export const projectSummarySchema = z.strictObject({
@@ -180,6 +188,7 @@ export const diagramCardSchema = z.strictObject({
   projectName: z.string(),
   /** The cover chosen for the project this diagram is in (null: automatic). */
   projectCover: projectCoverSchema.nullable(),
+  icon: diagramIconSchema.nullable(),
   name: z.string(),
   nodeCount: z.number().int().min(0),
   edgeCount: z.number().int().min(0),
@@ -233,6 +242,7 @@ export const diagramDetailSchema = z
     diagramId: uuidSchema,
     workspaceId: uuidSchema,
     projectId: uuidSchema,
+    icon: diagramIconSchema.nullable(),
     name: diagramNameSchema,
     version: versionSchema,
     graph: graphSchema,

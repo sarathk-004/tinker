@@ -78,6 +78,8 @@ interface WorkspaceState {
   openProjectLatest(id: string): Promise<void>;
   deleteProject(id: string): Promise<string | null>;
   moveDiagram(diagramId: string, projectId: string): Promise<string | null>;
+  /** Set (or clear, with null) a diagram's icon. Shown at once; put back if the server says no. */
+  setDiagramIcon(diagramId: string, icon: string | null): Promise<string | null>;
   /** Go to the editor in this workspace (from the dashboard or a link). */
   openWorkspace(id: string): Promise<void>;
   /** Re-read the list of workspaces (after settings, members or a delete changed them). */
@@ -291,6 +293,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         void get().refreshWorkspaces();
         return null;
       } catch (e) {
+        return describe(e);
+      }
+    },
+
+    async setDiagramIcon(diagramId, icon) {
+      const before = get().diagrams.find((d) => d.id === diagramId)?.icon ?? null;
+      const apply = (value: string | null) => {
+        set({ diagrams: get().diagrams.map((d) => (d.id === diagramId ? { ...d, icon: value } : d)) });
+        if (session.getState().diagram?.id === diagramId) session.setIcon(value);
+      };
+      apply(icon);
+      try {
+        await api.setDiagramIcon(diagramId, icon);
+        return null;
+      } catch (e) {
+        apply(before);
         return describe(e);
       }
     },

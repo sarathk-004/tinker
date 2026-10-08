@@ -1,4 +1,4 @@
-import type { WorkspaceRole, WorkspaceSummary } from '@tinker/shared';
+import type { ProjectCover, WorkspaceRole, WorkspaceSummary } from '@tinker/shared';
 import type { Queryable } from '../../infrastructure/database/pool.ts';
 import { AppError } from '../../infrastructure/http/errors.ts';
 
@@ -22,6 +22,7 @@ interface SummaryRow {
   diagram_count: number;
   member_count: number;
   project_count: number;
+  cover: ProjectCover | null;
   updated_at: Date;
 }
 
@@ -35,12 +36,13 @@ const toSummary = (r: SummaryRow): WorkspaceSummary => ({
   diagramCount: r.diagram_count,
   memberCount: r.member_count,
   projectCount: r.project_count,
+  cover: r.cover,
   updatedAt: r.updated_at.toISOString(),
 });
 
 /** What the dashboard shows per workspace: the person's role, how many diagrams and members, and when anything last changed. */
 const SUMMARY_SELECT = `
-  w.id, w.name, w.description, w.visibility, (w.personal_for_user_id IS NOT NULL) AS personal,
+  w.id, w.name, w.description, w.visibility, w.cover, (w.personal_for_user_id IS NOT NULL) AS personal,
   (SELECT count(*)::int FROM diagrams d WHERE d.workspace_id = w.id AND d.deleted_at IS NULL) AS diagram_count,
   (SELECT count(*)::int FROM workspace_memberships mm WHERE mm.workspace_id = w.id) AS member_count,
   (SELECT count(*)::int FROM projects pp WHERE pp.workspace_id = w.id AND pp.deleted_at IS NULL) AS project_count,

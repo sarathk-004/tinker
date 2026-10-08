@@ -7,7 +7,7 @@ import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { exportCurrent } from './exportCurrent';
 import type { ExportFormat } from './exportDiagram';
 import { MENU_ITEM, MENU_PANEL, useDismiss } from './Popover';
-import { CoverArt } from '../components/ProjectCoverArt';
+import { DiagramIcon, IconPicker } from '../components/DiagramIcon';
 import { useUi } from './uiStore';
 
 /** Saved / Saving / Not saved / Changed elsewhere: the one place the user learns whether their work is safe. */
@@ -90,6 +90,7 @@ export const CanvasHeader: React.FC = () => {
   const project = projects.find((p) => p.id === diagram?.projectId) ?? null;
   const versionsOpen = useUi((s) => s.versionsOpen);
   const [editing, setEditing] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [draft, setDraft] = useState('');
 
   const commit = () => {
@@ -116,7 +117,14 @@ export const CanvasHeader: React.FC = () => {
           <span className="truncate max-w-[260px]">{diagram?.name ?? 'No diagram'}</span>
         </div>
         <div className="flex items-center gap-3 min-w-0">
-          {project && <CoverArt projectId={project.id} cover={project.cover} preview={project.latestDiagram?.preview ?? null} bare className="w-9 h-9 rounded-[10px] flex-shrink-0" />}
+          {diagram && (
+            <div className="relative flex-shrink-0">
+              <button onClick={() => setPicking((o) => !o)} aria-haspopup="dialog" aria-expanded={picking} aria-label="Change the diagram icon" title="Change icon" className="rounded-[11px] hover:scale-105 transition-transform">
+                <DiagramIcon icon={diagram.icon} size={38} />
+              </button>
+              {picking && <IconPicker diagramId={diagram.id} icon={diagram.icon} canEdit={workspace?.role !== 'VIEWER'} onClose={() => setPicking(false)} />}
+            </div>
+          )}
           {editing ? (
             <input
               autoFocus

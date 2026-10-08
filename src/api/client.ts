@@ -275,6 +275,7 @@ export function createApiClient(options: ApiClientOptions) {
     deleteProject: (projectId: string) => request('DELETE', `/v1/projects/${projectId}`, undefined, undefined, deletedResponseSchema).then((r) => r.data),
     projectDiagrams: (projectId: string) => request('GET', `/v1/projects/${projectId}/diagrams`, undefined, undefined, diagramCardsResponseSchema).then((r) => r.data.diagrams as DiagramCard[]),
     recentDiagrams: () => request('GET', '/v1/diagrams-recent', undefined, undefined, diagramCardsResponseSchema).then((r) => r.data.diagrams as DiagramCard[]),
+    setDiagramIcon: (diagramId: string, icon: string | null) => request('POST', `/v1/diagrams/${diagramId}/icon`, { icon }, undefined, updatedResponseSchema).then((r) => r.data),
     moveDiagram: (diagramId: string, projectId: string) => request('POST', `/v1/diagrams/${diagramId}/move`, { projectId }, undefined, updatedResponseSchema).then((r) => r.data),
     listDiagrams: (workspaceId: string) =>
       request('GET', `/v1/workspaces/${workspaceId}/diagrams`, undefined, undefined, diagramListResponseSchema).then((r) => r.data as DiagramListResponse),

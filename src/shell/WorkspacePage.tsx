@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Copy, Globe, LayoutGrid, Loader2, Lock, Plus, Settings, Users } from 'lucide-react';
 import type { ProjectSummary } from '../contracts';
-import { autoPreset } from '../catalog/covers';
 import { DitherGradient } from '../components/dither-kit/gradient';
-import { ProjectCoverArt } from '../components/ProjectCoverArt';
+import { ProjectCoverArt, presetFor } from '../components/ProjectCoverArt';
 import { TiltCard } from '../components/TiltCard';
 import { ProjectDialog } from '../components/ProjectDialog';
 import { workspaceLink } from '../components/WorkspaceSettingsDialog';
@@ -64,11 +63,11 @@ export const WorkspacePage: React.FC = () => {
   if (!workspace) return null;
   const canEdit = workspace.role !== 'VIEWER';
   const owner = workspace.role === 'OWNER';
-  const preset = autoPreset(workspace.id);
+  const preset = presetFor(workspace.id, workspace.cover)!;
 
   return (
     <PageFrame>
-      <Crumbs items={[{ label: 'All workspaces', go: () => useUi.getState().set({ view: 'dashboard' }) }, { label: workspace.name }]} />
+      <Crumbs items={[{ label: 'Dashboard', go: () => useUi.getState().set({ view: 'dashboard' }) }, { label: workspace.name }]} />
       <div className="arrive relative overflow-hidden rounded-[28px] bg-surface lifted px-6 sm:px-8 py-7" style={{ ['--group' as string]: 0 }}>
         <DitherGradient from={preset.from} to={preset.to} direction={preset.direction} cell={4} opacity={0.55} className="[mask-image:linear-gradient(to_left,black,transparent_65%)]" />
         <div className="relative flex flex-wrap items-start justify-between gap-4">

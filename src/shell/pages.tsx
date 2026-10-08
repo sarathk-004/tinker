@@ -2,13 +2,14 @@ import React from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { DiagramCard } from '../contracts';
 import { CoverArt } from '../components/ProjectCoverArt';
+import { DiagramIcon } from '../components/DiagramIcon';
 import { timeAgo } from '../components/VersionsPanel';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 
 /** The landing pages sit on a cutting-mat grid. */
-export const PageFrame: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+export const PageFrame: React.FC<{ children: React.ReactNode; wide?: boolean }> = ({ children, wide = false }) => (
   <main id="main" tabIndex={-1} className="flex-1 min-h-0 overflow-y-auto cutting-mat outline-none">
-    <div className="mx-auto w-full max-w-6xl px-5 sm:px-8 py-8">{children}</div>
+    <div className={`mx-auto w-full px-5 sm:px-8 py-8 ${wide ? 'max-w-[96rem]' : 'max-w-6xl'}`}>{children}</div>
   </main>
 );
 
@@ -17,7 +18,7 @@ export interface Crumb {
   go?: () => void;
 }
 
-/** "All workspaces > Payments > Checkout": every part but the last is a way back. */
+/** "Dashboard > Payments > Checkout": every part but the last is a way back. */
 export const Crumbs: React.FC<{ items: Crumb[] }> = ({ items }) => (
   <nav aria-label="Where you are" className="flex flex-wrap items-center gap-1 text-[13px] text-muted mb-3">
     {items.map((c, i) => (
@@ -56,7 +57,10 @@ export const DiagramCardView: React.FC<{ card: DiagramCard; showPath?: boolean; 
     <button onClick={() => void openCard(card)} data-sound="lift" className="w-full text-left rounded-[20px]" aria-label={`Open ${card.name}`}>
       <CoverArt projectId={card.projectId} cover={card.projectCover} preview={card.preview} className="h-32 m-2 mb-0 rounded-xl" />
       <div className="px-4 pt-3 pb-3.5">
-        <h3 className="text-[14.5px] font-semibold text-ink truncate pr-8">{card.name}</h3>
+        <div className="flex items-center gap-2 min-w-0">
+          <DiagramIcon icon={card.icon} size={24} />
+          <h3 className="text-[14.5px] font-semibold text-ink truncate">{card.name}</h3>
+        </div>
         {showPath && (
           <p className="text-[12px] text-muted truncate">
             {card.workspaceName} › {card.projectName}
@@ -69,4 +73,21 @@ export const DiagramCardView: React.FC<{ card: DiagramCard; showPath?: boolean; 
     </button>
     {extra}
   </div>
+);
+
+/** A diagram as a compact row (cover, icon, name, where it lives, when it changed): for the stack of recents. */
+export const DiagramRow: React.FC<{ card: DiagramCard }> = ({ card }) => (
+  <button onClick={() => void openCard(card)} data-sound="lift" aria-label={`Open ${card.name}`} className="group w-full text-left rounded-2xl bg-surface lifted lifted-hover transition-shadow p-2 flex items-center gap-3">
+    <CoverArt projectId={card.projectId} cover={card.projectCover} preview={card.preview} className="w-[4.5rem] h-14 rounded-[10px] flex-shrink-0" />
+    <span className="min-w-0 flex-1">
+      <span className="flex items-center gap-1.5 min-w-0">
+        <DiagramIcon icon={card.icon} size={20} />
+        <span className="text-[13.5px] font-semibold text-ink truncate">{card.name}</span>
+      </span>
+      <span className="block mt-0.5 text-[11.5px] text-muted truncate">
+        {card.workspaceName} › {card.projectName}
+      </span>
+      <span className="tabular block text-[11.5px] text-muted">{timeAgo(card.updatedAt)}</span>
+    </span>
+  </button>
 );

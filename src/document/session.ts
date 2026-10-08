@@ -39,6 +39,7 @@ export interface DiagramMeta {
   id: string;
   workspaceId: string;
   projectId: string;
+  icon: string | null;
   name: string;
   version: number;
   updatedAt: string;
@@ -217,7 +218,7 @@ export function createDocumentSession(deps: SessionDeps) {
     notice = null;
     setStatus('idle');
     const loaded = await api.loadDiagram(diagramId);
-    diagram = { id: loaded.diagramId, workspaceId: loaded.workspaceId, projectId: loaded.projectId, name: loaded.name, version: loaded.version, updatedAt: loaded.updatedAt };
+    diagram = { id: loaded.diagramId, workspaceId: loaded.workspaceId, projectId: loaded.projectId, icon: loaded.icon, name: loaded.name, version: loaded.version, updatedAt: loaded.updatedAt };
     graph = loaded.graph;
     ackPresentation = loaded.presentation;
     emit();
@@ -234,7 +235,7 @@ export function createDocumentSession(deps: SessionDeps) {
     conflict = null;
     notice = null;
     setStatus('idle');
-    diagram = { id: detail.diagramId, workspaceId: detail.workspaceId, projectId: detail.projectId, name: detail.name, version: detail.version, updatedAt: detail.updatedAt };
+    diagram = { id: detail.diagramId, workspaceId: detail.workspaceId, projectId: detail.projectId, icon: detail.icon, name: detail.name, version: detail.version, updatedAt: detail.updatedAt };
     graph = detail.graph;
     ackPresentation = detail.presentation;
     emit();
@@ -649,6 +650,13 @@ export function createDocumentSession(deps: SessionDeps) {
     return true;
   }
 
+  /** The diagram's icon changed (a filing detail kept apart from the document): show it without touching the version. */
+  function setIcon(icon: string | null) {
+    if (!diagram) return;
+    diagram = { ...diagram, icon };
+    emit();
+  }
+
   function clearNotice() {
     notice = null;
     emit();
@@ -675,6 +683,7 @@ export function createDocumentSession(deps: SessionDeps) {
     reapplyDraft,
     refreshIfIdle,
     clearNotice,
+    setIcon,
     /** For the "leave page?" guard. */
     hasUnsavedWork: () => pendingCount() > 0 || status === 'failed' || status === 'conflict',
   };

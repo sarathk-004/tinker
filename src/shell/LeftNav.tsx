@@ -1,7 +1,8 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, FileText, History, LayoutGrid, Plus, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, History, LayoutGrid, Plus, Trash2, X } from 'lucide-react';
 import { useDiagramStore } from '../diagram/store';
 import { CoverArt } from '../components/ProjectCoverArt';
+import { DiagramIcon } from '../components/DiagramIcon';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { VersionsPanel } from '../components/VersionsPanel';
 import { AdvisorPanel } from './AdvisorPanel';
@@ -56,7 +57,7 @@ export const LeftNav: React.FC<{ overlay?: boolean }> = ({ overlay = false }) =>
                   title={d.name}
                   className={`w-full flex items-center gap-2 h-8 px-2.5 rounded-md text-[13.5px] text-left transition-colors ${active ? 'text-primary font-medium' : 'text-body hover:text-ink hover:bg-canvas'}`}
                 >
-                  <FileText className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
+                  <DiagramIcon icon={d.icon} size={22} />
                   <span className="truncate">{d.name}</span>
                 </button>
                 {active && (

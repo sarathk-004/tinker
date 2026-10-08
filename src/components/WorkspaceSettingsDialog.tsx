@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Copy, Globe, Loader2, Lock, Trash2, X } from 'lucide-react';
 import { ApiError } from '../api/client';
 import { LIMITS, type WorkspaceDetail } from '../contracts';
+import { CoverPicker } from './CoverPicker';
 import { api } from '../document/instance';
 import { useUi } from '../shell/uiStore';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
@@ -93,6 +94,10 @@ const General: React.FC<{ detail: WorkspaceDetail; onChange: (d: WorkspaceDetail
             {message.text}
           </p>
         )}
+      </Section>
+
+      <Section title="Cover" hint="Shown on the dashboard card and the top of the workspace page.">
+        <CoverPicker value={detail.cover} onChange={(cover) => void save({ cover }, 'Cover saved.')} disabled={!owner || saving} />
       </Section>
 
       <Section title="Who can see it" hint="People you add below can always open it. This decides what everyone else sees.">

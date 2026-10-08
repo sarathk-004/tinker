@@ -128,4 +128,26 @@ describe('projects: workspace -> project -> diagram', () => {
     expect(projectSummarySchema.parse((await call(h, owner, 'PATCH', `/v1/projects/${general!.id}`, { cover: null })).body).cover).toBeNull();
     expect((await call(h, owner, 'PATCH', `/v1/projects/${general!.id}`, { cover: 'not-a-cover' })).status).toBe(400);
   });
+
+  it('a diagram has an icon that can be set, changed and cleared, and a workspace has a cover', async () => {
+    const w = await workspace('Icons');
+    const d = diagramDetailSchema.parse((await newDiagram(w.id, 'Iconic')).body);
+    expect(d.icon).toBeNull();
+    expect((await call(h, owner, 'POST', `/v1/diagrams/${d.diagramId}/icon`, { icon: 'Rocket.violet' })).status).toBe(200);
+    const loaded = diagramDetailSchema.parse((await call(h, owner, 'GET', `/v1/diagrams/${d.diagramId}`)).body);
+    expect(loaded).toMatchObject({ icon: 'Rocket.violet', version: d.version }); // an icon is not a new version
+    const [general] = await projects(w.id);
+    const cards = diagramCardsResponseSchema.parse((await call(h, owner, 'GET', `/v1/projects/${general!.id}/diagrams`)).body);
+    expect(cards.diagrams[0]!.icon).toBe('Rocket.violet');
+    expect((await call(h, owner, 'POST', `/v1/diagrams/${d.diagramId}/icon`, { icon: 'not an icon' })).status).toBe(400);
+    expect((await call(h, owner, 'POST', `/v1/diagrams/${d.diagramId}/icon`, { icon: null })).status).toBe(200);
+    expect(diagramDetailSchema.parse((await call(h, owner, 'GET', `/v1/diagrams/${d.diagramId}`)).body).icon).toBeNull();
+    const stranger = await h.newUser('icon-stranger');
+    expect((await call(h, stranger, 'POST', `/v1/diagrams/${d.diagramId}/icon`, { icon: 'Rocket.blue' })).status).toBe(404);
+
+    const set = await call(h, owner, 'PATCH', `/v1/workspaces/${w.id}`, { cover: 'ocean' });
+    expect(set.body.cover).toBe('ocean');
+    expect((await call(h, owner, 'PATCH', `/v1/workspaces/${w.id}`, { cover: 'nope' })).status).toBe(400);
+    expect(meResponseSchema.parse((await call(h, owner, 'GET', '/v1/me')).body).workspaces.find((x) => x.id === w.id)!.cover).toBe('ocean');
+  });
 });

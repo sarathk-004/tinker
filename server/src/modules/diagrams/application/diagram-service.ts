@@ -44,6 +44,7 @@ export const detail = (row: DiagramRow): DiagramDetail => ({
   diagramId: row.id,
   workspaceId: row.workspaceId,
   projectId: row.projectId,
+  icon: row.icon,
   name: row.name,
   version: row.version,
   graph: row.graph,

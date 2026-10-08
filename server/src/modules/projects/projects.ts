@@ -116,6 +116,17 @@ export async function deleteProject(pool: Pool, userId: string, projectId: strin
   });
 }
 
+/** Set a diagram's icon (or clear it). A filing detail like moving: no new version, no change to its history. */
+export async function setDiagramIcon(pool: Pool, userId: string, diagramId: string, icon: string | null): Promise<void> {
+  await withTransaction(pool, async (tx) => {
+    const { rows } = await tx.query<{ workspace_id: string }>(`SELECT workspace_id FROM diagrams WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, [diagramId]);
+    const row = rows[0];
+    if (!row) throw new AppError('DIAGRAM_NOT_FOUND', 'Diagram not found.');
+    await authorizeWorkspace(tx, userId, row.workspace_id, 'modify');
+    await tx.query(`UPDATE diagrams SET icon = $2 WHERE id = $1`, [diagramId, icon]);
+  });
+}
+
 /** Move a diagram to another project of the same workspace. It is a filing change: the diagram's version and history are untouched. */
 export async function moveDiagram(pool: Pool, userId: string, diagramId: string, projectId: string): Promise<void> {
   await withTransaction(pool, async (tx) => {
@@ -139,6 +150,7 @@ interface CardRow {
   workspace_name: string;
   project_name: string;
   project_cover: ProjectCover | null;
+  icon: string | null;
   name: string;
   graph: unknown;
   presentation: unknown;
@@ -169,6 +181,7 @@ function toCard(r: CardRow): DiagramCard {
     workspaceName: r.workspace_name,
     projectName: r.project_name,
     projectCover: r.project_cover,
+    icon: r.icon,
     name: r.name,
     nodeCount: graph.nodes.length,
     edgeCount: graph.edges.length,
@@ -177,7 +190,7 @@ function toCard(r: CardRow): DiagramCard {
   };
 }
 
-const CARD_SELECT = `d.id, d.workspace_id, d.project_id, w.name AS workspace_name, p.name AS project_name, p.cover AS project_cover, d.name, d.graph, d.presentation, d.updated_at
+const CARD_SELECT = `d.id, d.workspace_id, d.project_id, w.name AS workspace_name, p.name AS project_name, p.cover AS project_cover, d.icon, d.name, d.graph, d.presentation, d.updated_at
   FROM diagrams d JOIN workspaces w ON w.id = d.workspace_id AND w.deleted_at IS NULL JOIN projects p ON p.id = d.project_id`;
 
 export async function listProjectDiagrams(pool: Pool, userId: string, projectId: string, limit = 100): Promise<DiagramCard[]> {

@@ -46,9 +46,10 @@ export async function updateWorkspace(pool: Pool, actor: Actor, workspaceId: str
           SET name = COALESCE($2, name),
               description = CASE WHEN $3::boolean THEN $4 ELSE description END,
               visibility = COALESCE($5, visibility),
+              cover = CASE WHEN $6::boolean THEN $7 ELSE cover END,
               updated_at = now()
         WHERE id = $1`,
-      [workspaceId, input.name ?? null, input.description !== undefined, input.description || null, input.visibility ?? null],
+      [workspaceId, input.name ?? null, input.description !== undefined, input.description || null, input.visibility ?? null, input.cover !== undefined, input.cover ?? null],
     );
   });
   return getWorkspaceDetail(pool, actor.userId, workspaceId);

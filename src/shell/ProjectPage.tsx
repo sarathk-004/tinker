@@ -76,7 +76,7 @@ export const ProjectPage: React.FC = () => {
     <PageFrame>
       <Crumbs
         items={[
-          { label: 'All workspaces', go: () => useUi.getState().set({ view: 'dashboard' }) },
+          { label: 'Dashboard', go: () => useUi.getState().set({ view: 'dashboard' }) },
           { label: workspace.name, go: () => useUi.getState().set({ view: 'workspace' }) },
           { label: project.name },
         ]}

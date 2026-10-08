@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { FolderKanban, Globe, Layers, Loader2, Lock, Plus, Search, Settings, Sparkles, Users } from 'lucide-react';
+import { FolderKanban, Globe, Keyboard, Layers, Loader2, Lock, Plus, Search, Settings, Sparkles, Users } from 'lucide-react';
 import { LIMITS, type DiagramCard, type WorkspaceSummary } from '../contracts';
-import { autoPreset } from '../catalog/covers';
 import { api } from '../document/instance';
 import { DitherGradient } from '../components/dither-kit/gradient';
-import { PresetArt } from '../components/ProjectCoverArt';
+import { PresetArt, presetFor } from '../components/ProjectCoverArt';
 import { RollingNumber } from '../components/RollingNumber';
 import { TiltCard } from '../components/TiltCard';
 import { timeAgo } from '../components/VersionsPanel';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
-import { DiagramCardView, PageFrame, SectionTitle } from './pages';
+import { DiagramRow, PageFrame, SectionTitle } from './pages';
 import { allowanceText } from './Composer';
 import { useUi } from './uiStore';
 
@@ -35,7 +34,7 @@ export const WorkspaceCard: React.FC<{ workspace: WorkspaceSummary; current: boo
       <div className={`group relative rounded-[20px] bg-surface lifted lifted-hover transition-shadow ${current ? 'ring-2 ring-primary/40' : ''}`}>
         <button onClick={() => void open()} data-sound="lift" className="block w-full text-left rounded-[20px] p-2 pb-0" aria-label={`Open ${w.name}`}>
           <div className="relative">
-            <PresetArt preset={autoPreset(w.id)} className="img-outline h-24 rounded-xl" />
+            <PresetArt preset={presetFor(w.id, w.cover)!} className="img-outline h-24 rounded-xl" />
             <span aria-hidden className="absolute left-3 bottom-3 w-9 h-9 rounded-[10px] bg-surface lifted flex items-center justify-center font-mono text-[15px] font-semibold text-ink">
               {w.name.trim().charAt(0).toUpperCase() || '?'}
             </span>
@@ -164,18 +163,25 @@ const Stat: React.FC<{ tone: Tone; icon: React.ReactNode; value: number; label: 
   </div>
 );
 
-/** A few single-key shortcuts, so the quick way is not a secret. */
+/** The single-key shortcuts, as a short vertical list, so the quick way is not a secret. */
 const TipsCard: React.FC = () => (
-  <div className="rounded-[20px] bg-surface lifted px-4 py-3.5 flex items-center gap-3 min-h-[4.5rem]">
-    <span className="w-10 h-10 rounded-xl bg-violet-tint text-violet flex items-center justify-center flex-shrink-0" aria-hidden>
-      <Settings className="w-[18px] h-[18px]" />
-    </span>
-    <span className="min-w-0">
-      <span className="block text-[14px] font-medium text-ink">Quick keys in the editor</span>
-      <span className="block text-[12px] text-muted">
-        <kbd className="font-mono">C</kbd> components · <kbd className="font-mono">R</kbd> rename · <kbd className="font-mono">T</kbd> text · <kbd className="font-mono">K</kbd> fit the view · <kbd className="font-mono">?</kbd> all keys
+  <div className="rounded-[20px] bg-surface lifted p-4">
+    <div className="flex items-center gap-2.5">
+      <span className="w-9 h-9 rounded-xl bg-violet-tint text-violet flex items-center justify-center flex-shrink-0" aria-hidden>
+        <Keyboard className="w-[18px] h-[18px]" />
       </span>
-    </span>
+      <span className="text-[14px] font-medium text-ink">Quick keys</span>
+    </div>
+    <dl className="mt-3 space-y-1.5">
+      {([['C', 'Components'], ['R', 'Rename'], ['T', 'Add text'], ['K', 'Fit the view'], ['/', 'Message box'], ['?', 'All keys']] as const).map(([key, what]) => (
+        <div key={key} className="flex items-center justify-between gap-3 text-[12.5px]">
+          <dt className="text-body">{what}</dt>
+          <dd>
+            <kbd className="inline-flex min-w-[1.6rem] justify-center px-1.5 py-0.5 rounded-md bg-canvas font-mono text-[11px] text-ink shadow-[inset_0_0_0_1px_rgb(var(--ink)/0.08)]">{key}</kbd>
+          </dd>
+        </div>
+      ))}
+    </dl>
   </div>
 );
 
@@ -185,7 +191,7 @@ const AllowanceCard: React.FC = () => {
   const allowance = allowanceText(quota);
   const used = quota && quota.ai.limit > 0 ? Math.min(1, quota.ai.used / quota.ai.limit) : 0;
   return (
-    <div className="rounded-[20px] bg-surface lifted px-4 py-3.5 flex items-center gap-3 min-h-[4.5rem]" role="status">
+    <div className="rounded-[20px] bg-surface lifted p-4 flex items-center gap-3" role="status">
       <span className="w-10 h-10 rounded-xl bg-primary-tint text-primary flex items-center justify-center flex-shrink-0" aria-hidden>
         <Sparkles className="w-[18px] h-[18px]" />
       </span>
@@ -235,84 +241,82 @@ export const Dashboard: React.FC = () => {
   const sum = (pick: (w: WorkspaceSummary) => number) => workspaces.reduce((n, w) => n + pick(w), 0);
 
   return (
-    <PageFrame>
-      <section className="arrive relative overflow-hidden rounded-[28px] bg-surface lifted px-6 sm:px-9 py-8 sm:py-10" style={group(0)}>
-        <DitherGradient from="orange" to="transparent" direction="up" cell={4} opacity={0.5} className="[mask-image:linear-gradient(to_left,black,transparent_70%)]" />
-        <div className="relative max-w-xl">
-          <p className="font-mono text-[10.5px] uppercase tracking-[0.1em] text-primary">Your workspace</p>
-          <h1 className="mt-2 text-[34px] leading-[1.08] font-semibold tracking-[-0.035em] text-ink">{first ? `Welcome back, ${first}` : 'Welcome back'}</h1>
-          <p className="pretty mt-2.5 text-[15px] leading-relaxed text-body">Pick up where you left off, or describe a new system and watch it take shape.</p>
-          <div className="mt-6 flex flex-wrap gap-2.5">
-            <button onClick={() => void startDiagram()} disabled={!personal} className="h-11 pl-3.5 pr-4 rounded-xl bg-primary hover:bg-primary-hover disabled:opacity-50 text-white text-[14px] font-medium flex items-center gap-2 shadow-[0_1px_2px_rgb(0_0_0/0.12),inset_0_1px_0_rgb(255_255_255/0.18)]">
-              <Plus className="w-4 h-4" aria-hidden /> New diagram
-            </button>
-            <button onClick={() => useUi.getState().set({ paletteOpen: true })} className="h-11 pl-3.5 pr-4 rounded-xl bg-surface lifted text-ink text-[14px] font-medium flex items-center gap-2">
-              <Search className="w-4 h-4 text-body" aria-hidden /> Search everything
-              <kbd className="ml-1 font-mono text-[10.5px] text-muted">Ctrl K</kbd>
-            </button>
+    <PageFrame wide>
+      <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)_19rem] items-start">
+        <aside aria-label="Today" className="arrive order-2 lg:order-1 space-y-3 lg:sticky lg:top-0" style={group(2)}>
+          <AllowanceCard />
+          <TipsCard />
+        </aside>
+
+        <div className="order-1 lg:order-2 min-w-0">
+          <section className="arrive relative overflow-hidden rounded-[28px] bg-surface lifted px-6 sm:px-9 py-8 sm:py-10" style={group(0)}>
+            <DitherGradient from="orange" to="transparent" direction="up" cell={4} opacity={0.5} className="[mask-image:linear-gradient(to_left,black,transparent_70%)]" />
+            <div className="relative max-w-xl">
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.1em] text-primary">Dashboard</p>
+              <h1 className="mt-2 text-[34px] leading-[1.08] font-semibold tracking-[-0.035em] text-ink">{first ? `Welcome back, ${first}` : 'Welcome back'}</h1>
+              <p className="pretty mt-2.5 text-[15px] leading-relaxed text-body">Pick up where you left off, or describe a new system and watch it take shape.</p>
+              <div className="mt-6 flex flex-wrap gap-2.5">
+                <button onClick={() => void startDiagram()} disabled={!personal} className="h-11 pl-3.5 pr-4 rounded-xl bg-primary hover:bg-primary-hover disabled:opacity-50 text-white text-[14px] font-medium flex items-center gap-2 shadow-[0_1px_2px_rgb(0_0_0/0.12),inset_0_1px_0_rgb(255_255_255/0.18)]">
+                  <Plus className="w-4 h-4" aria-hidden /> New diagram
+                </button>
+                <button onClick={() => useUi.getState().set({ paletteOpen: true })} className="h-11 pl-3.5 pr-4 rounded-xl bg-surface lifted text-ink text-[14px] font-medium flex items-center gap-2">
+                  <Search className="w-4 h-4 text-body" aria-hidden /> Search everything
+                  <kbd className="ml-1 font-mono text-[10.5px] text-muted">Ctrl K</kbd>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <div className="arrive mt-4 grid grid-cols-2 xl:grid-cols-4 gap-3" style={group(1)}>
+            <Stat tone="primary" icon={<Layers className="w-[22px] h-[22px]" />} value={workspaces.length} label="Workspaces" />
+            <Stat tone="blue" icon={<FolderKanban className="w-[22px] h-[22px]" />} value={sum((w) => w.projectCount)} label="Projects" />
+            <Stat tone="violet" icon={<Sparkles className="w-[22px] h-[22px]" />} value={sum((w) => w.diagramCount)} label="Diagrams" />
+            <Stat tone="amber" icon={<Users className="w-[22px] h-[22px]" />} value={sum((w) => w.memberCount)} label="People" />
           </div>
+
+          <section className="arrive mt-10" style={group(3)}>
+            <SectionTitle>Your workspaces</SectionTitle>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {mine.map((w) => (
+                <WorkspaceCard key={w.id} workspace={w} current={w.id === current?.id} />
+              ))}
+              <NewWorkspaceCard />
+            </div>
+          </section>
+
+          {shared.length > 0 && (
+            <section className="arrive mt-10" style={group(4)}>
+              <SectionTitle>Shared with you</SectionTitle>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {shared.map((w) => (
+                  <WorkspaceCard key={w.id} workspace={w} current={w.id === current?.id} />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
-      </section>
 
-      <div className="arrive mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3" style={group(1)}>
-        <Stat tone="primary" icon={<Layers className="w-[22px] h-[22px]" />} value={workspaces.length} label="Workspaces" />
-        <Stat tone="blue" icon={<FolderKanban className="w-[22px] h-[22px]" />} value={sum((w) => w.projectCount)} label="Projects" />
-        <Stat tone="violet" icon={<Sparkles className="w-[22px] h-[22px]" />} value={sum((w) => w.diagramCount)} label="Diagrams" />
-        <Stat tone="amber" icon={<Users className="w-[22px] h-[22px]" />} value={sum((w) => w.memberCount)} label="People across them" />
-      </div>
-
-      <section className="arrive mt-10" style={group(2)}>
-        <SectionTitle>Continue where you left off</SectionTitle>
-        {recent === null && (
-          <div className="py-8 flex justify-center text-muted" role="status" aria-label="Loading your recent diagrams">
-            <Loader2 className="w-5 h-5 animate-spin" />
-          </div>
-        )}
-        {recent?.length === 0 && (
-          <div className="rounded-[20px] bg-surface lifted px-4 py-10 text-center">
-            <p className="text-[14px] font-medium text-ink">Nothing here yet</p>
-            <p className="mt-1 text-[13px] text-muted">The diagrams you work on appear here, with their covers.</p>
-            <button onClick={() => void startDiagram()} className="mt-4 h-10 px-4 rounded-xl bg-primary hover:bg-primary-hover text-white text-[13.5px] font-medium">
-              Start your first diagram
-            </button>
-          </div>
-        )}
-        {recent && recent.length > 0 && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {recent.slice(0, 4).map((c) => (
-              <TiltCard key={c.id} className="rounded-[20px]">
-                <DiagramCardView card={c} showPath />
-              </TiltCard>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <div className="arrive mt-10 grid gap-3 sm:grid-cols-2" style={group(3)}>
-        <AllowanceCard />
-        <TipsCard />
-      </div>
-
-      <section className="arrive mt-10" style={group(4)}>
-        <SectionTitle>Your workspaces</SectionTitle>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {mine.map((w) => (
-            <WorkspaceCard key={w.id} workspace={w} current={w.id === current?.id} />
+        <aside aria-label="Recents" className="arrive order-3 space-y-3 lg:sticky lg:top-0" style={group(2)}>
+          <SectionTitle>Recents</SectionTitle>
+          {recent === null && (
+            <div className="py-8 flex justify-center text-muted" role="status" aria-label="Loading your recent diagrams">
+              <Loader2 className="w-5 h-5 animate-spin" />
+            </div>
+          )}
+          {recent?.length === 0 && (
+            <div className="rounded-[20px] bg-surface lifted px-4 py-8 text-center">
+              <p className="text-[14px] font-medium text-ink">Nothing here yet</p>
+              <p className="mt-1 text-[12.5px] text-muted">The last diagrams you open appear here.</p>
+              <button onClick={() => void startDiagram()} className="mt-4 h-10 px-4 rounded-xl bg-primary hover:bg-primary-hover text-white text-[13.5px] font-medium">
+                Start your first diagram
+              </button>
+            </div>
+          )}
+          {recent?.slice(0, 3).map((c) => (
+            <DiagramRow key={c.id} card={c} />
           ))}
-          <NewWorkspaceCard />
-        </div>
-      </section>
-
-      {shared.length > 0 && (
-        <section className="arrive mt-10" style={group(5)}>
-          <SectionTitle>Shared with you</SectionTitle>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {shared.map((w) => (
-              <WorkspaceCard key={w.id} workspace={w} current={w.id === current?.id} />
-            ))}
-          </div>
-        </section>
-      )}
+        </aside>
+      </div>
     </PageFrame>
   );
 };
