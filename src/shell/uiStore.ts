@@ -2,8 +2,8 @@ import { create } from 'zustand';
 
 export type Tool = 'pan' | 'select' | 'text';
 export type RightTab = 'chat' | 'components';
-/** The page: the dashboard of all workspaces (the landing page), or the editor of the open diagram. */
-export type View = 'dashboard' | 'editor';
+/** The page: all workspaces (landing), one workspace's projects, one project's diagrams, or the editor of the open diagram. */
+export type View = 'dashboard' | 'workspace' | 'project' | 'editor';
 
 /** View-only state of the shell (never saved, never sent to the server). */
 interface UiState {
@@ -30,6 +30,8 @@ interface UiState {
   /** The connection whose text is being typed. */
   editingEdgeId: string | null;
   helpOpen: boolean;
+  /** The popup listing earlier chats about this diagram. */
+  historyOpen: boolean;
   settingsOpen: boolean;
   set(patch: Partial<Omit<UiState, 'set'>>): void;
 }
@@ -49,6 +51,7 @@ export const useUi = create<UiState>((set) => ({
   selectedGroupPath: null,
   editingEdgeId: null,
   helpOpen: false,
+  historyOpen: false,
   settingsOpen: false,
   set: (patch) => set(patch),
 }));

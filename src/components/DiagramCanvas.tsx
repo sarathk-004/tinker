@@ -81,7 +81,7 @@ export const DiagramCanvas: React.FC = () => {
       edges.map((e) => {
         if (!e.selected) return e;
         const paint = (m: Edge['markerEnd']) => (m && typeof m === 'object' ? { ...m, color: primary } : m);
-        return { ...e, animated: false, style: { ...e.style, stroke: primary, strokeWidth: 2.5, opacity: 1 }, markerEnd: paint(e.markerEnd), markerStart: paint(e.markerStart), zIndex: 10 };
+        return { ...e, animated: false, style: { ...e.style, stroke: primary, strokeWidth: 2.5, opacity: 1 }, markerEnd: paint(e.markerEnd), markerStart: paint(e.markerStart) };
       }),
     [edges, primary, theme],
   );

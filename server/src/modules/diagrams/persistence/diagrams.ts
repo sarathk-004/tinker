@@ -13,6 +13,7 @@ import type { Queryable } from '../../../infrastructure/database/pool.ts';
 export interface DiagramRow {
   id: string;
   workspaceId: string;
+  projectId: string;
   name: string;
   graph: Graph;
   presentation: Presentation;
@@ -23,6 +24,7 @@ export interface DiagramRow {
 interface RawRow {
   id: string;
   workspace_id: string;
+  project_id: string;
   name: string;
   graph: unknown;
   presentation: unknown;
@@ -35,6 +37,7 @@ function toRow(raw: RawRow): DiagramRow {
   return {
     id: raw.id,
     workspaceId: raw.workspace_id,
+    projectId: raw.project_id,
     name: raw.name,
     graph: graphSchema.parse(raw.graph),
     presentation: presentationSchema.parse(raw.presentation),
@@ -43,14 +46,14 @@ function toRow(raw: RawRow): DiagramRow {
   };
 }
 
-const COLUMNS = 'id, workspace_id, name, graph, presentation, version, updated_at';
+const COLUMNS = 'id, workspace_id, project_id, name, graph, presentation, version, updated_at';
 
-export async function insertDiagram(db: Queryable, input: { workspaceId: string; name: string; createdBy: string }): Promise<DiagramRow> {
+export async function insertDiagram(db: Queryable, input: { workspaceId: string; projectId: string; name: string; createdBy: string }): Promise<DiagramRow> {
   const { rows } = await db.query<RawRow>(
-    `INSERT INTO diagrams (workspace_id, name, graph, presentation, created_by)
-     VALUES ($1, $2, $3::jsonb, $4::jsonb, $5)
+    `INSERT INTO diagrams (workspace_id, project_id, name, graph, presentation, created_by)
+     VALUES ($1, $6, $2, $3::jsonb, $4::jsonb, $5)
      RETURNING ${COLUMNS}`,
-    [input.workspaceId, input.name, JSON.stringify(emptyGraph()), JSON.stringify(emptyPresentation()), input.createdBy],
+    [input.workspaceId, input.name, JSON.stringify(emptyGraph()), JSON.stringify(emptyPresentation()), input.createdBy, input.projectId],
   );
   return toRow(rows[0]!);
 }
@@ -67,8 +70,8 @@ export async function lockDiagramRow(db: Queryable, id: string): Promise<Diagram
 }
 
 export async function listDiagramSummaries(db: Queryable, workspaceId: string, limit = 200): Promise<DiagramSummary[]> {
-  const { rows } = await db.query<{ id: string; workspace_id: string; name: string; version: number; created_at: Date; updated_at: Date }>(
-    `SELECT id, workspace_id, name, version, created_at, updated_at
+  const { rows } = await db.query<{ id: string; workspace_id: string; project_id: string; name: string; version: number; created_at: Date; updated_at: Date }>(
+    `SELECT id, workspace_id, project_id, name, version, created_at, updated_at
        FROM diagrams WHERE workspace_id = $1 AND deleted_at IS NULL
       ORDER BY updated_at DESC, id LIMIT $2`,
     [workspaceId, limit],
@@ -76,6 +79,7 @@ export async function listDiagramSummaries(db: Queryable, workspaceId: string, l
   return rows.map((r) => ({
     id: r.id,
     workspaceId: r.workspace_id,
+    projectId: r.project_id,
     name: r.name,
     version: r.version,
     createdAt: r.created_at.toISOString(),

@@ -157,6 +157,11 @@ export const purgeDeletedDiagrams: JobHandler = async (_payload, { pool, policy,
         AND NOT EXISTS (SELECT 1 FROM diagrams d WHERE d.workspace_id = w.id)`,
     [policy.deletedDiagramDays],
   );
+  // Deleted projects with no diagrams left (a deleted workspace's go with it).
+  await pool.query(
+    `DELETE FROM projects p WHERE p.deleted_at IS NOT NULL AND p.deleted_at < now() - make_interval(days => $1) AND NOT EXISTS (SELECT 1 FROM diagrams d WHERE d.project_id = p.id)`,
+    [policy.deletedDiagramDays],
+  );
   return { diagramsDue: due.rows.length, diagramsPurged: purged, workspacesPurged: gone.rowCount ?? 0 };
 };
 

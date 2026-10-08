@@ -24,7 +24,7 @@ function fakeServer() {
     revs: new Map<number, { graph: Graph; presentation: Presentation }>(),
   };
   s.revs.set(1, { graph: s.graph, presentation: s.presentation });
-  const detail = (): DiagramDetail => ({ diagramId: DIAGRAM, workspaceId: uid(9), name: s.name, version: s.version, graph: s.graph, presentation: s.presentation, updatedAt: '2026-01-01T00:00:00.000Z' });
+  const detail = (): DiagramDetail => ({ diagramId: DIAGRAM, workspaceId: uid(9), projectId: uid(8), name: s.name, version: s.version, graph: s.graph, presentation: s.presentation, updatedAt: '2026-01-01T00:00:00.000Z' });
 
   function apply(spec: MutationSpec): CommandResponse | DiagramDetail | AiCommandResponse {
     const body = spec.body as { expectedVersion: number; command?: DiagramCommand; name?: string; nodePositions?: Record<string, { x: number; y: number }>; viewport?: Presentation['viewport'] };
@@ -392,7 +392,7 @@ describe('document session: lifecycle', () => {
     await session.command(add('A'), 'A');
     await session.command(add('B'), 'B');
     const staleDoc = { diagramId: DIAGRAM, version: 2, appliedCommand: { type: 'ADD_NODE' as const }, graph: { schemaVersion: 1 as const, nodes: [], edges: [] }, presentation: { nodePositions: {}, viewport: { x: 0, y: 0, zoom: 1 } }, replayed: true };
-    const apiWithStale: SessionApi = { ...s && { loadDiagram: async () => ({ diagramId: DIAGRAM, workspaceId: uid(9), name: 'x', version: 3, graph: session.getState().graph, presentation: session.getState().presentation, updatedAt: '' }) }, mutate: { command: async () => ({ data: staleDoc, replayed: true }), ai: async () => { throw new Error('unused'); }, detail: async () => { throw new Error('unused'); } } };
+    const apiWithStale: SessionApi = { ...s && { loadDiagram: async () => ({ diagramId: DIAGRAM, workspaceId: uid(9), projectId: uid(8), name: 'x', version: 3, graph: session.getState().graph, presentation: session.getState().presentation, updatedAt: '' }) }, mutate: { command: async () => ({ data: staleDoc, replayed: true }), ai: async () => { throw new Error('unused'); }, detail: async () => { throw new Error('unused'); } } };
     const s2 = createDocumentSession({ api: apiWithStale, newKey: () => 'key-stale-0001' });
     await s2.open(DIAGRAM);
     const before = s2.getState().graph.nodes.length;

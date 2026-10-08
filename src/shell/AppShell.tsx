@@ -4,6 +4,9 @@ import { AiKeyDialog } from '../components/AiKeyDialog';
 import { SettingsDialog } from '../components/SettingsDialog';
 import { WorkspaceSettingsDialog } from '../components/WorkspaceSettingsDialog';
 import { Dashboard } from './Dashboard';
+import { ProjectPage } from './ProjectPage';
+import { WorkspacePage } from './WorkspacePage';
+import { ChatHistoryDialog } from '../components/ChatHistoryDialog';
 import { Eye } from 'lucide-react';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { DiagramCanvas } from '../components/DiagramCanvas';
@@ -63,9 +66,14 @@ const ShellBody: React.FC = () => {
         <AiKeyDialog />
         <SettingsDialog />
         <WorkspaceSettingsDialog />
+        <ChatHistoryDialog />
 
         {view === 'dashboard' ? (
           <Dashboard />
+        ) : view === 'workspace' ? (
+          <WorkspacePage />
+        ) : view === 'project' ? (
+          <ProjectPage />
         ) : (
         <div className="flex flex-1 min-h-0 w-full overflow-hidden relative">
           <div className="hidden lg:block h-full flex-shrink-0">

@@ -51,3 +51,15 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgb(var(--line-strong));
 }
+
+/* A cutting mat: fine grid lines every 24 px and stronger ones every 120 px, in the theme's own line colours. Used on the landing pages. */
+.cutting-mat {
+  background-color: rgb(var(--canvas));
+  background-image:
+    linear-gradient(rgb(var(--line-strong) / 0.55) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--line-strong) / 0.55) 1px, transparent 1px),
+    linear-gradient(rgb(var(--line) / 0.9) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--line) / 0.9) 1px, transparent 1px);
+  background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+  background-position: -1px -1px, -1px -1px, -1px -1px, -1px -1px;
+}

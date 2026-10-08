@@ -8,7 +8,10 @@ import {
   createDiagramRequestSchema,
   addMemberRequestSchema,
   changeMemberRoleRequestSchema,
+  createProjectRequestSchema,
   createWorkspaceRequestSchema,
+  moveDiagramRequestSchema,
+  updateProjectRequestSchema,
   deleteWorkspaceRequestSchema,
   removeInviteRequestSchema,
   updateWorkspaceRequestSchema,
@@ -32,6 +35,7 @@ import { AppError, parseOrThrow } from '../../../infrastructure/http/errors.ts';
 import type { RateLimiter } from '../../../infrastructure/http/rate-limiter.ts';
 import type { RunResult, TestHooks } from '../../../infrastructure/idempotency/mutation-requests.ts';
 import { listWorkspaces } from '../../workspaces/access.ts';
+import { createProject, deleteProject, listProjectDiagrams, listProjects, listRecentDiagrams, moveDiagram, updateProject } from '../../projects/projects.ts';
 import { createWorkspace } from '../../workspaces/workspace-service.ts';
 import { addMember, changeMemberRole, deleteWorkspace, getWorkspaceDetail, removeInvite, removeMember, updateWorkspace } from '../../workspaces/workspace-admin.ts';
 import { avatarUpdatedAt, deleteAvatar, getAvatar, putAvatar } from '../../profile/avatar.ts';
@@ -209,6 +213,44 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
       adminLimiter.check(request.auth!.userId);
       await removeInvite(pool, actorOf(request), workspaceId, body.email);
       return { removed: true as const };
+    });
+
+    // Projects: workspace -> project -> diagram.
+    const projectParams = z.object({ projectId: uuidSchema });
+    app.get(`${API_PREFIX}/workspaces/:workspaceId/projects`, async (request) => {
+      const { workspaceId } = parseOrThrow(workspaceParams, request.params, 'INVALID_REQUEST', 'Invalid workspace id.');
+      return { projects: await listProjects(pool, request.auth!.userId, workspaceId) };
+    });
+    app.post(`${API_PREFIX}/workspaces/:workspaceId/projects`, async (request, reply) => {
+      const { workspaceId } = parseOrThrow(workspaceParams, request.params, 'INVALID_REQUEST', 'Invalid workspace id.');
+      const body = parseOrThrow(createProjectRequestSchema, request.body, 'INVALID_REQUEST', 'Give the project a name (1 to 120 characters).');
+      adminLimiter.check(request.auth!.userId);
+      reply.status(201);
+      return createProject(pool, request.auth!.userId, workspaceId, body);
+    });
+    app.patch(`${API_PREFIX}/projects/:projectId`, async (request) => {
+      const { projectId } = parseOrThrow(projectParams, request.params, 'INVALID_REQUEST', 'Invalid project id.');
+      const body = parseOrThrow(updateProjectRequestSchema, request.body, 'INVALID_REQUEST', 'Those settings are not valid.');
+      adminLimiter.check(request.auth!.userId);
+      return updateProject(pool, request.auth!.userId, projectId, body);
+    });
+    app.delete(`${API_PREFIX}/projects/:projectId`, async (request) => {
+      const { projectId } = parseOrThrow(projectParams, request.params, 'INVALID_REQUEST', 'Invalid project id.');
+      adminLimiter.check(request.auth!.userId);
+      await deleteProject(pool, request.auth!.userId, projectId);
+      return { deleted: true as const };
+    });
+    app.get(`${API_PREFIX}/projects/:projectId/diagrams`, async (request) => {
+      const { projectId } = parseOrThrow(projectParams, request.params, 'INVALID_REQUEST', 'Invalid project id.');
+      return { diagrams: await listProjectDiagrams(pool, request.auth!.userId, projectId) };
+    });
+    app.get(`${API_PREFIX}/diagrams-recent`, async (request) => ({ diagrams: await listRecentDiagrams(pool, request.auth!.userId) }));
+    app.post(`${API_PREFIX}/diagrams/:diagramId/move`, async (request) => {
+      const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
+      const body = parseOrThrow(moveDiagramRequestSchema, request.body, 'INVALID_REQUEST', 'Choose a project.');
+      adminLimiter.check(request.auth!.userId);
+      await moveDiagram(pool, request.auth!.userId, diagramId, body.projectId);
+      return { updated: true as const };
     });
 
     app.get(`${API_PREFIX}/workspaces/:workspaceId/diagrams`, async (request) => {

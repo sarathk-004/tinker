@@ -67,6 +67,7 @@ export async function deleteWorkspace(pool: Pool, actor: Actor, workspaceId: str
     if (ws.personal) throw new AppError('DOMAIN_VALIDATION_FAILED', 'Your personal workspace cannot be deleted.', { reason: 'PERSONAL_WORKSPACE' });
     if (confirmName.trim() !== ws.name) throw new AppError('DOMAIN_VALIDATION_FAILED', 'Type the workspace name exactly to delete it.', { reason: 'NAME_MISMATCH' });
     await tx.query(`UPDATE diagrams SET deleted_at = COALESCE(deleted_at, now()) WHERE workspace_id = $1`, [workspaceId]);
+    await tx.query(`UPDATE projects SET deleted_at = COALESCE(deleted_at, now()) WHERE workspace_id = $1`, [workspaceId]);
     await tx.query(`DELETE FROM workspace_invites WHERE workspace_id = $1`, [workspaceId]);
     await tx.query(`UPDATE workspaces SET deleted_at = now(), updated_at = now() WHERE id = $1`, [workspaceId]);
   });

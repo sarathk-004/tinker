@@ -24,7 +24,8 @@ export async function createWorkspace(deps: ServiceDeps, actor: Actor, key: stri
       const created = await tx.query<{ id: string; name: string }>(`INSERT INTO workspaces (name, created_by) VALUES ($1, $2) RETURNING id, name`, [input.name, actor.userId]);
       const workspace = created.rows[0]!;
       await tx.query(`INSERT INTO workspace_memberships (workspace_id, user_id, role) VALUES ($1, $2, 'OWNER')`, [workspace.id, actor.userId]);
-      const body: WorkspaceSummary = { id: workspace.id, name: workspace.name, role: 'OWNER', personal: false, description: null, visibility: 'PRIVATE', diagramCount: 0, memberCount: 1, updatedAt: new Date().toISOString() };
+      await tx.query(`INSERT INTO projects (workspace_id, name, created_by) VALUES ($1, 'General', $2)`, [workspace.id, actor.userId]);
+      const body: WorkspaceSummary = { id: workspace.id, name: workspace.name, role: 'OWNER', personal: false, description: null, visibility: 'PRIVATE', diagramCount: 0, memberCount: 1, projectCount: 1, updatedAt: new Date().toISOString() };
       return { status: 201, body };
     },
     deps.hooks,

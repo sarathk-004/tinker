@@ -85,6 +85,8 @@ const ExportMenu: React.FC = () => {
 export const CanvasHeader: React.FC = () => {
   const diagram = useDiagramStore((s) => s.doc.diagram);
   const workspace = useWorkspaceStore((s) => s.workspace);
+  const projects = useWorkspaceStore((s) => s.projects);
+  const project = projects.find((p) => p.id === diagram?.projectId) ?? null;
   const versionsOpen = useUi((s) => s.versionsOpen);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -98,7 +100,17 @@ export const CanvasHeader: React.FC = () => {
     <div className="flex items-end justify-between gap-4 px-6 pt-4 pb-3 flex-shrink-0 bg-surface">
       <div className="min-w-0">
         <div className="flex items-center gap-1.5 text-[12.5px] text-muted mb-0.5">
-          <span className="truncate max-w-[200px]">{workspace?.name ?? 'Workspace'}</span>
+          <button onClick={() => useUi.getState().set({ view: 'workspace' })} className="truncate max-w-[200px] hover:text-ink hover:underline">
+            {workspace?.name ?? 'Workspace'}
+          </button>
+          {project && (
+            <>
+              <ChevronRight className="w-3 h-3 flex-shrink-0" />
+              <button onClick={() => void useWorkspaceStore.getState().openProject(project.id)} className="truncate max-w-[200px] hover:text-ink hover:underline">
+                {project.name}
+              </button>
+            </>
+          )}
           <ChevronRight className="w-3 h-3 flex-shrink-0" />
           <span className="truncate max-w-[260px]">{diagram?.name ?? 'No diagram'}</span>
         </div>

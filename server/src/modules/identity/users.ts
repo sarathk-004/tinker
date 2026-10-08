@@ -65,6 +65,12 @@ export async function ensureUser(pool: Pool, claims: TokenClaims): Promise<Inter
       );
       await tx.query(`DELETE FROM workspace_invites WHERE email = lower($1)`, [row.email]);
     }
+    await tx.query(
+      `INSERT INTO projects (workspace_id, name, created_by)
+       SELECT w.id, 'General', $1 FROM workspaces w
+        WHERE w.personal_for_user_id = $1 AND NOT EXISTS (SELECT 1 FROM projects p WHERE p.workspace_id = w.id)`,
+      [row.id],
+    );
     return { id: row.id, externalAuthId: claims.subject, email: row.email, displayName: row.display_name };
   });
 }

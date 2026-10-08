@@ -3,9 +3,6 @@ import { ArrowUpRight, Check, HelpCircle, History, Loader2, MoreHorizontal, Plus
 import { showOnDiagram, submitAiCommand } from '../ai/aiCommands';
 import { useConversationStore, type ConversationTurn } from '../ai/conversationStore';
 import { isReplyOption } from '../ai/replies';
-import { api } from '../document/instance';
-import type { ConversationSummary } from '../contracts';
-import { timeAgo } from '../components/VersionsPanel';
 import { useDiagramStore } from '../diagram/store';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { useSpeechSettings, effectiveVoice, stopSpeaking, type ReplyVoice } from '../voice/speech';
@@ -144,8 +141,8 @@ const examples = ['Put Redis between Orders and PostgreSQL', 'Add an API Gateway
 
 const EmptyState: React.FC<{ canType: boolean }> = ({ canType }) => (
   <div className="h-full flex flex-col items-center justify-center text-center px-6">
-    <span className="w-11 h-11 rounded-xl bg-soft border border-line flex items-center justify-center mb-3"><TinkerLogo size={26} /></span>
-    <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-ink">Tell Tinker what to build</h2>
+    <span className="w-11 h-11 rounded-xl bg-soft border border-line flex items-center justify-center mb-3"><TinkerLogo size={24} /></span>
+    <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-ink">Tinker it</h2>
     <p className="mt-1.5 text-[13.5px] leading-relaxed text-body max-w-[17rem]">Describe a change in plain words, or ask a question about the diagram. Every change is saved as a version you can go back to.</p>
     {canType && (
       <div className="mt-4 flex flex-col gap-2 w-full max-w-[19rem]">
@@ -206,62 +203,13 @@ const MoreMenu: React.FC = () => {
   );
 };
 
-/** "History": the person's earlier chats about this diagram. Opening one shows it and continues it. */
+/** "History": opens the popup with the person's earlier chats about this diagram. */
 const HistoryMenu: React.FC = () => {
-  const [open, setOpen] = React.useState(false);
-  const [chats, setChats] = React.useState<ConversationSummary[] | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
   const diagramId = useDiagramStore((s) => s.doc.diagram?.id ?? null);
-  const current = useConversationStore((s) => s.conversationId);
-  const close = React.useCallback(() => setOpen(false), []);
-  const ref = useDismiss(open, close);
-
-  const toggle = async () => {
-    const next = !open;
-    setOpen(next);
-    if (!next || !diagramId) return;
-    setError(null);
-    try {
-      setChats((await api.conversations(diagramId)).conversations);
-    } catch {
-      setError('Could not load your earlier chats.');
-    }
-  };
-
-  const openChat = async (id: string) => {
-    if (!diagramId) return;
-    setOpen(false);
-    try {
-      const chat = await api.openConversation(diagramId, id);
-      useConversationStore.getState().load(diagramId, { conversationId: chat.conversationId, messages: chat.messages });
-    } catch {
-      useConversationStore.getState().append([{ id: `local-${crypto.randomUUID()}`, timestamp: Date.now(), role: 'assistant', kind: 'error', text: 'That chat could not be opened.' }]);
-    }
-  };
-
   return (
-    <div ref={ref} className="relative">
-      <button onClick={() => void toggle()} disabled={!diagramId} aria-haspopup="menu" aria-expanded={open} className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[12.5px] font-medium text-body hover:bg-canvas hover:text-ink disabled:opacity-40">
-        <History className="w-4 h-4" /> History
-      </button>
-      {open && (
-        <div role="menu" className={`${MENU_PANEL} left-0 top-full mt-1 w-80 max-h-96 overflow-y-auto`}>
-          <div className={`px-2.5 pt-1.5 pb-1 ${MONO_LABEL}`}>Your chats about this diagram</div>
-          {error && <p className="px-2.5 py-2 text-[12.5px] text-danger">{error}</p>}
-          {!error && chats === null && <p className="px-2.5 py-3 text-[12.5px] text-muted flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</p>}
-          {chats?.length === 0 && <p className="px-2.5 py-3 text-[12.5px] text-muted">No earlier chats yet. They appear here as you talk to Tinker.</p>}
-          {chats?.map((c) => (
-            <button key={c.id} role="menuitem" onClick={() => void openChat(c.id)} className={`${MENU_ITEM} items-start ${c.id === current ? 'bg-primary-tint' : ''}`}>
-              <span className="flex-1 min-w-0">
-                <span className="block truncate font-medium">{c.title}</span>
-                <span className="block text-[11.5px] text-muted">{timeAgo(c.updatedAt)} · {c.messageCount} message{c.messageCount === 1 ? '' : 's'}</span>
-              </span>
-              {c.id === current && <Check className="w-4 h-4 text-primary mt-0.5" />}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <button onClick={() => useUi.getState().set({ historyOpen: true })} disabled={!diagramId} aria-haspopup="dialog" className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[12.5px] font-medium text-body hover:bg-canvas hover:text-ink disabled:opacity-40">
+      <History className="w-4 h-4" /> History
+    </button>
   );
 };
 

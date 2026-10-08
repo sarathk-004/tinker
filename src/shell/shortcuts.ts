@@ -53,7 +53,7 @@ export function useShortcuts(): void {
       if (!action) return;
       const store = useDiagramStore.getState();
       const ui = useUi.getState();
-      if (ui.view !== 'editor' || ui.settingsOpen || ui.workspaceSettingsId) return; // the dashboard and the dialogs have no canvas to act on
+      if (ui.view !== 'editor' || ui.settingsOpen || ui.historyOpen || ui.workspaceSettingsId) return; // the dashboard and the dialogs have no canvas to act on
       const hasDiagram = store.doc.diagram !== null;
       e.preventDefault();
       switch (action) {

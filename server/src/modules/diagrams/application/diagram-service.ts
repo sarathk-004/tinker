@@ -26,6 +26,7 @@ import {
   updateDocument,
   type DiagramRow,
 } from '../persistence/diagrams.ts';
+import { resolveProject } from '../../projects/projects.ts';
 
 export interface ServiceDeps {
   pool: Pool;
@@ -42,6 +43,7 @@ export interface Actor {
 export const detail = (row: DiagramRow): DiagramDetail => ({
   diagramId: row.id,
   workspaceId: row.workspaceId,
+  projectId: row.projectId,
   name: row.name,
   version: row.version,
   graph: row.graph,
@@ -71,14 +73,15 @@ export async function listDiagrams(deps: ServiceDeps, actor: Actor, workspaceId:
 
 // ---------- durable mutations (all idempotent) ----------
 
-export async function createDiagram(deps: ServiceDeps, actor: Actor, workspaceId: string, key: string, input: { name: string }): Promise<RunResult> {
+export async function createDiagram(deps: ServiceDeps, actor: Actor, workspaceId: string, key: string, input: { name: string; projectId?: string | undefined }): Promise<RunResult> {
   await authorizeWorkspace(deps.pool, actor.userId, workspaceId, 'modify');
   return runIdempotent(
     deps.pool,
     { actorId: actor.userId, key, method: 'POST', resource: `/v1/workspaces/${workspaceId}/diagrams`, body: input, diagramId: null },
     async (tx, mutationRequestId) => {
       await authorizeWorkspace(tx, actor.userId, workspaceId, 'modify');
-      const row = await insertDiagram(tx, { workspaceId, name: input.name, createdBy: actor.userId });
+      const projectId = await resolveProject(tx, workspaceId, input.projectId, actor.userId);
+      const row = await insertDiagram(tx, { workspaceId, projectId, name: input.name, createdBy: actor.userId });
       await attachDiagramToRequest(tx, mutationRequestId, row.id);
       // A baseline to go back to: without it the very first change could never be undone.
       await insertRevision(tx, { diagramId: row.id, version: row.version, graph: row.graph, presentation: row.presentation, reason: 'CHECKPOINT', createdBy: actor.userId });

@@ -19,6 +19,11 @@ import {
   updatedResponseSchema,
   removedResponseSchema,
   workspaceDetailSchema,
+  projectListResponseSchema,
+  projectSummarySchema,
+  diagramCardsResponseSchema,
+  type ProjectSummary,
+  type DiagramCard,
   type WorkspaceDetail,
   type UpdateWorkspaceRequest,
   type AddMemberRequest,
@@ -261,12 +266,21 @@ export function createApiClient(options: ApiClientOptions) {
     changeMemberRole: (id: string, userId: string, role: 'EDITOR' | 'VIEWER') => request('PATCH', `/v1/workspaces/${id}/members/${userId}`, { role }, undefined, updatedResponseSchema).then((r) => r.data),
     removeMember: (id: string, userId: string) => request('DELETE', `/v1/workspaces/${id}/members/${userId}`, undefined, undefined, removedResponseSchema).then((r) => r.data),
     removeInvite: (id: string, email: string) => request('POST', `/v1/workspaces/${id}/invites/remove`, { email }, undefined, removedResponseSchema).then((r) => r.data),
+    /** Workspace -> project -> diagram. */
+    projects: (workspaceId: string) => request('GET', `/v1/workspaces/${workspaceId}/projects`, undefined, undefined, projectListResponseSchema).then((r) => r.data.projects as ProjectSummary[]),
+    createProject: (workspaceId: string, name: string, description?: string) =>
+      request('POST', `/v1/workspaces/${workspaceId}/projects`, { name, ...(description ? { description } : {}) }, undefined, projectSummarySchema).then((r) => r.data as ProjectSummary),
+    updateProject: (projectId: string, patch: { name?: string; description?: string | null }) => request('PATCH', `/v1/projects/${projectId}`, patch, undefined, projectSummarySchema).then((r) => r.data as ProjectSummary),
+    deleteProject: (projectId: string) => request('DELETE', `/v1/projects/${projectId}`, undefined, undefined, deletedResponseSchema).then((r) => r.data),
+    projectDiagrams: (projectId: string) => request('GET', `/v1/projects/${projectId}/diagrams`, undefined, undefined, diagramCardsResponseSchema).then((r) => r.data.diagrams as DiagramCard[]),
+    recentDiagrams: () => request('GET', '/v1/diagrams-recent', undefined, undefined, diagramCardsResponseSchema).then((r) => r.data.diagrams as DiagramCard[]),
+    moveDiagram: (diagramId: string, projectId: string) => request('POST', `/v1/diagrams/${diagramId}/move`, { projectId }, undefined, updatedResponseSchema).then((r) => r.data),
     listDiagrams: (workspaceId: string) =>
       request('GET', `/v1/workspaces/${workspaceId}/diagrams`, undefined, undefined, diagramListResponseSchema).then((r) => r.data as DiagramListResponse),
     loadDiagram: (diagramId: string) => request('GET', `/v1/diagrams/${diagramId}`, undefined, undefined, diagramDetailSchema).then((r) => r.data as DiagramDetail),
     /** Durable writes. The caller owns the idempotency key and the body so a retry (here or later) is byte-identical. */
-    createDiagram: (workspaceId: string, name: string, idempotencyKey: string) =>
-      request('POST', `/v1/workspaces/${workspaceId}/diagrams`, { name }, idempotencyKey, diagramDetailSchema) as Promise<Replayable<DiagramDetail>>,
+    createDiagram: (workspaceId: string, name: string, idempotencyKey: string, projectId?: string) =>
+      request('POST', `/v1/workspaces/${workspaceId}/diagrams`, { name, ...(projectId ? { projectId } : {}) }, idempotencyKey, diagramDetailSchema) as Promise<Replayable<DiagramDetail>>,
     mutate: {
       command: (spec: MutationSpec) => request(spec.method, spec.path, spec.body, spec.idempotencyKey, commandResponseSchema) as Promise<Replayable<CommandResponse>>,
       detail: (spec: MutationSpec) => request(spec.method, spec.path, spec.body, spec.idempotencyKey, diagramDetailSchema) as Promise<Replayable<DiagramDetail>>,

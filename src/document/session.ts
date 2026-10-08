@@ -38,6 +38,7 @@ export type SaveStatus = 'idle' | 'saving' | 'failed' | 'conflict' | 'blocked';
 export interface DiagramMeta {
   id: string;
   workspaceId: string;
+  projectId: string;
   name: string;
   version: number;
   updatedAt: string;
@@ -216,7 +217,7 @@ export function createDocumentSession(deps: SessionDeps) {
     notice = null;
     setStatus('idle');
     const loaded = await api.loadDiagram(diagramId);
-    diagram = { id: loaded.diagramId, workspaceId: loaded.workspaceId, name: loaded.name, version: loaded.version, updatedAt: loaded.updatedAt };
+    diagram = { id: loaded.diagramId, workspaceId: loaded.workspaceId, projectId: loaded.projectId, name: loaded.name, version: loaded.version, updatedAt: loaded.updatedAt };
     graph = loaded.graph;
     ackPresentation = loaded.presentation;
     emit();
@@ -233,7 +234,7 @@ export function createDocumentSession(deps: SessionDeps) {
     conflict = null;
     notice = null;
     setStatus('idle');
-    diagram = { id: detail.diagramId, workspaceId: detail.workspaceId, name: detail.name, version: detail.version, updatedAt: detail.updatedAt };
+    diagram = { id: detail.diagramId, workspaceId: detail.workspaceId, projectId: detail.projectId, name: detail.name, version: detail.version, updatedAt: detail.updatedAt };
     graph = detail.graph;
     ackPresentation = detail.presentation;
     emit();

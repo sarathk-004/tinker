@@ -21,10 +21,14 @@ const NavRow: React.FC<{ icon: React.ReactNode; label: string; count?: number | 
 
 /** The left column: this workspace's diagrams, version history of the open diagram, and the architecture advisor. */
 export const LeftNav: React.FC<{ overlay?: boolean }> = ({ overlay = false }) => {
-  const diagrams = useWorkspaceStore((s) => s.diagrams);
+  const allDiagrams = useWorkspaceStore((s) => s.diagrams);
+  const projects = useWorkspaceStore((s) => s.projects);
   const currentId = useDiagramStore((s) => s.doc.diagram?.id);
   const current = useDiagramStore((s) => s.doc.diagram);
   const versionsOpen = useUi((s) => s.versionsOpen);
+  const projectId = current?.projectId;
+  const project = projects.find((p) => p.id === projectId);
+  const diagrams = projectId ? allDiagrams.filter((d) => d.projectId === projectId) : allDiagrams;
   const closeOverlay = () => overlay && useUi.getState().set({ navOpen: false });
 
   return (
@@ -36,7 +40,7 @@ export const LeftNav: React.FC<{ overlay?: boolean }> = ({ overlay = false }) =>
         </div>
       )}
       <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 pb-3">
-        <NavRow icon={<LayoutGrid className="w-[18px] h-[18px]" />} label="Diagrams" count={diagrams.length} active onClick={() => undefined} />
+        <NavRow icon={<LayoutGrid className="w-[18px] h-[18px]" />} label={project ? project.name : 'Diagrams'} count={diagrams.length} active onClick={() => project && void useWorkspaceStore.getState().openProject(project.id)} />
         <div className="mt-1 mb-2 ml-[22px] pl-3 border-l border-line space-y-0.5">
           {diagrams.map((d) => {
             const active = d.id === currentId;

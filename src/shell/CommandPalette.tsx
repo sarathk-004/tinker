@@ -49,7 +49,7 @@ export const CommandPalette: React.FC = () => {
         group: 'Diagrams',
         title: d.name,
         subtitle: d.id === currentId ? 'Open now' : `Updated ${timeAgo(d.updatedAt)}`,
-        run: () => void useWorkspaceStore.getState().openDiagram(d.id),
+        run: () => void useWorkspaceStore.getState().openDiagramInEditor(d.id),
       });
     }
     for (const n of nodes) {
@@ -69,11 +69,11 @@ export const CommandPalette: React.FC = () => {
     }
     for (const w of workspaces) {
       if (w.id === workspace?.id) continue;
-      list.push({ id: `w:${w.id}`, group: 'Workspaces', title: w.name, subtitle: w.personal ? 'Personal workspace' : 'Switch workspace', run: () => void useWorkspaceStore.getState().switchWorkspace(w.id) });
+      list.push({ id: `w:${w.id}`, group: 'Workspaces', title: w.name, subtitle: w.personal ? 'Personal workspace' : 'Switch workspace', run: () => void useWorkspaceStore.getState().openWorkspacePage(w.id) });
     }
     const hasDiagram = !!currentId;
     const actions: Array<[string, string, string, React.ReactNode, () => void, boolean]> = [
-      ['new', 'New diagram', 'Start an empty diagram in this workspace', <Plus key="a" className="w-4 h-4" />, () => void useWorkspaceStore.getState().createDiagram(), true],
+      ['new', 'New diagram', 'Start an empty diagram in this workspace', <Plus key="a" className="w-4 h-4" />, () => void useWorkspaceStore.getState().newDiagramInEditor(), true],
       ['undo', 'Undo', `${MOD_KEY} Z`, <Undo2 key="b" className="w-4 h-4" />, () => void useHistoryStore.getState().undo(), hasDiagram],
       ['redo', 'Redo', `${MOD_KEY} ⇧ Z`, <Redo2 key="c" className="w-4 h-4" />, () => void useHistoryStore.getState().redo(), hasDiagram],
       ['layout', 'Tidy the layout', 'Re-arrange every component (saved as a position update)', <LayoutGrid key="d" className="w-4 h-4" />, () => void useDiagramStore.getState().applyLayout(), hasDiagram && nodes.length > 0],

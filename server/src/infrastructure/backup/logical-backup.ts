@@ -11,7 +11,7 @@ import pg from 'pg';
 pg.types.setTypeParser(20, (v) => Number(v));
 
 /** Parents before children (foreign keys). `pgmigrations` is recreated by running the migrations. */
-export const TABLES = ['users', 'workspaces', 'workspace_memberships', 'workspace_invites', 'diagrams', 'diagram_revisions', 'conversations', 'conversation_messages', 'mutation_requests', 'command_executions', 'jobs'] as const;
+export const TABLES = ['users', 'workspaces', 'workspace_memberships', 'workspace_invites', 'projects', 'diagrams', 'diagram_revisions', 'conversations', 'conversation_messages', 'mutation_requests', 'command_executions', 'jobs'] as const;
 
 export interface Manifest {
   createdAt: string;

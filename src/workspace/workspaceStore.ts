@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { DiagramSummary, MeResponse, Quota, WorkspaceDetail, WorkspaceSummary } from '../contracts';
+import type { DiagramSummary, MeResponse, ProjectSummary, Quota, WorkspaceDetail, WorkspaceSummary } from '../contracts';
 import { useUi } from '../shell/uiStore';
 import { ApiError } from '../api/client';
 import { api, session } from '../document/instance';
@@ -50,6 +50,9 @@ interface WorkspaceState {
   /** Every workspace this person belongs to (the switcher lists them). */
   workspaces: WorkspaceSummary[];
   diagrams: DiagramSummary[];
+  /** The projects of the current workspace, and the one whose page or diagram is open. */
+  projects: ProjectSummary[];
+  project: ProjectSummary | null;
   /** Today's AI allowance (from /v1/me); refreshed after anything that can use it. */
   quota: Quota | null;
   /** What this server can do (from /v1/me): typed commands are offered only when a model is configured. */
@@ -58,7 +61,20 @@ interface WorkspaceState {
   bootstrap(): Promise<void>;
   refreshList(): Promise<void>;
   refreshQuota(): Promise<void>;
-  switchWorkspace(id: string): Promise<void>;
+  switchWorkspace(id: string, opts?: { open?: boolean }): Promise<void>;
+  loadProjects(): Promise<void>;
+  /** Show one workspace's page (its projects) without opening any diagram. */
+  openWorkspacePage(id: string): Promise<void>;
+  /** Show a project's page (its diagrams). */
+  openProject(id: string): Promise<void>;
+  /** Open a diagram in the editor. */
+  openDiagramInEditor(id: string): Promise<void>;
+  /** Start a diagram in a project (the open one by default) and go to the editor. */
+  newDiagramInEditor(projectId?: string, name?: string): Promise<void>;
+  createProject(name: string, description?: string): Promise<string | null>;
+  updateProject(id: string, patch: { name?: string; description?: string | null }): Promise<string | null>;
+  deleteProject(id: string): Promise<string | null>;
+  moveDiagram(diagramId: string, projectId: string): Promise<string | null>;
   /** Go to the editor in this workspace (from the dashboard or a link). */
   openWorkspace(id: string): Promise<void>;
   /** Re-read the list of workspaces (after settings, members or a delete changed them). */
@@ -70,7 +86,7 @@ interface WorkspaceState {
   /** Returns an error message to show, or null on success. */
   createWorkspace(name: string): Promise<string | null>;
   openDiagram(id: string): Promise<void>;
-  createDiagram(name?: string): Promise<void>;
+  createDiagram(name?: string, projectId?: string): Promise<void>;
   renameDiagram(name: string): Promise<void>;
   deleteCurrent(): Promise<void>;
   reset(): void;
@@ -115,6 +131,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     workspace: null,
     workspaces: [],
     diagrams: [],
+    projects: [],
+    project: null,
     quota: null,
     features: { aiCommands: false, aiModel: false, voice: false, speech: false, aiKey: { mode: 'server', source: 'NONE' } },
 
@@ -143,6 +161,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
         set({ user: me.user, workspace, workspaces, features: me.features, quota: me.quota });
         useSpeechSettings.setState({ serverCanSpeak: me.features.speech });
         await get().refreshList();
+        void get().loadProjects();
         const diagrams = get().diagrams;
         const wanted = recall(me.user.id);
         const target = diagrams.find((d) => d.id === wanted) ?? diagrams[0];
@@ -163,16 +182,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       }
     },
 
-    async switchWorkspace(id) {
+    async switchWorkspace(id, opts = {}) {
       const target = get().workspaces.find((w) => w.id === id);
       if (!target || target.id === get().workspace?.id) return;
       if (session.getState().diagram && !(await settleBeforeLeaving())) return;
       voice.dispose();
       session.close();
       useConversationStore.getState().reset();
-      set({ workspace: target, diagrams: [] });
+      set({ workspace: target, diagrams: [], projects: [], project: null });
       rememberWorkspace(get().user?.id, target.id);
       await get().refreshList();
+      void get().loadProjects();
+      if (opts.open === false) return;
       const diagrams = get().diagrams;
       const target0 = diagrams[0];
       if (target0) await get().openDiagram(target0.id);
@@ -180,8 +201,98 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
     },
 
     async openWorkspace(id) {
+      await get().openWorkspacePage(id);
+    },
+
+    async openWorkspacePage(id) {
+      useUi.getState().set({ view: 'workspace' });
+      await get().switchWorkspace(id, { open: false });
+      void get().loadProjects();
+    },
+
+    async loadProjects() {
+      const ws = get().workspace;
+      if (!ws) return;
+      try {
+        const projects = await api.projects(ws.id);
+        if (get().workspace?.id !== ws.id) return;
+        const open = get().project;
+        set({ projects, project: open ? (projects.find((p) => p.id === open.id) ?? null) : null });
+      } catch {
+        /* the page shows what it has; the next visit tries again */
+      }
+    },
+
+    async openProject(id) {
+      const found = get().projects.find((p) => p.id === id);
+      if (found) set({ project: found });
+      useUi.getState().set({ view: 'project' });
+    },
+
+    async openDiagramInEditor(id) {
+      await get().openDiagram(id);
+      const projectId = session.getState().diagram?.projectId;
+      const project = get().projects.find((p) => p.id === projectId);
+      if (project) set({ project });
       useUi.getState().set({ view: 'editor' });
-      await get().switchWorkspace(id);
+    },
+
+    async newDiagramInEditor(projectId, name) {
+      await get().createDiagram(name, projectId);
+      const created = session.getState().diagram?.projectId;
+      const project = get().projects.find((p) => p.id === created);
+      if (project) set({ project });
+      useUi.getState().set({ view: 'editor' });
+      void get().loadProjects();
+    },
+
+    async createProject(name, description) {
+      const ws = get().workspace;
+      const trimmed = name.trim();
+      if (!ws) return 'Open a workspace first.';
+      if (!trimmed) return 'Give the project a name.';
+      try {
+        await api.createProject(ws.id, trimmed, description?.trim() || undefined);
+        await get().loadProjects();
+        void get().refreshWorkspaces();
+        return null;
+      } catch (e) {
+        return describe(e);
+      }
+    },
+
+    async updateProject(id, patch) {
+      try {
+        await api.updateProject(id, patch);
+        await get().loadProjects();
+        return null;
+      } catch (e) {
+        return describe(e);
+      }
+    },
+
+    async deleteProject(id) {
+      try {
+        await api.deleteProject(id);
+        if (get().project?.id === id) set({ project: null });
+        await get().loadProjects();
+        await get().refreshList();
+        void get().refreshWorkspaces();
+        return null;
+      } catch (e) {
+        return describe(e);
+      }
+    },
+
+    async moveDiagram(diagramId, projectId) {
+      try {
+        await api.moveDiagram(diagramId, projectId);
+        await get().refreshList();
+        await get().loadProjects();
+        return null;
+      } catch (e) {
+        return describe(e);
+      }
     },
 
     async refreshWorkspaces() {
@@ -224,7 +335,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       try {
         const created = await api.createWorkspace(trimmed, crypto.randomUUID());
         set({ workspaces: [...get().workspaces.filter((w) => w.id !== created.data.id), created.data] });
-        await get().switchWorkspace(created.data.id);
+        await get().openWorkspacePage(created.data.id);
         return null;
       } catch (e) {
         return e instanceof ApiError && e.code === 'DOMAIN_VALIDATION_FAILED' ? e.message : describe(e);
@@ -248,12 +359,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       await get().refreshList();
     },
 
-    async createDiagram(name = 'Untitled diagram') {
+    async createDiagram(name = 'Untitled diagram', projectId) {
       const ws = get().workspace;
       if (!ws) return;
       if (session.getState().diagram && !(await settleBeforeLeaving())) return;
       voice.dispose();
-      const created = await api.createDiagram(ws.id, name, crypto.randomUUID());
+      const into = projectId ?? get().project?.id ?? session.getState().diagram?.projectId;
+      const created = await api.createDiagram(ws.id, name, crypto.randomUUID(), into);
       session.adopt(created.data);
       remember(get().user?.id, created.data.diagramId);
       void syncConversation(created.data.diagramId);
@@ -293,7 +405,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       voice.dispose();
       session.close();
       useConversationStore.getState().reset();
-      set({ phase: 'idle', error: null, user: null, workspace: null, workspaces: [], quota: null, diagrams: [], features: { aiCommands: false, aiModel: false, voice: false, speech: false, aiKey: { mode: 'server', source: 'NONE' } } });
+      set({ phase: 'idle', error: null, user: null, workspace: null, workspaces: [], quota: null, diagrams: [], projects: [], project: null, features: { aiCommands: false, aiModel: false, voice: false, speech: false, aiKey: { mode: 'server', source: 'NONE' } } });
     },
   };
 });

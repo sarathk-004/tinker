@@ -32,6 +32,7 @@ export type DiagramDocument = z.infer<typeof diagramDocumentSchema>;
 export const diagramSummarySchema = z.strictObject({
   id: uuidSchema,
   workspaceId: uuidSchema,
+  projectId: uuidSchema,
   name: diagramNameSchema,
   version: versionSchema,
   createdAt: z.iso.datetime(),
@@ -39,7 +40,9 @@ export const diagramSummarySchema = z.strictObject({
 });
 export type DiagramSummary = z.infer<typeof diagramSummarySchema>;
 
-export const createDiagramRequestSchema = z.strictObject({ name: diagramNameSchema });
+/** `projectId` omitted: the workspace's first project. */
+export const createDiagramRequestSchema = z.strictObject({ name: diagramNameSchema, projectId: uuidSchema.optional() });
+export const moveDiagramRequestSchema = z.strictObject({ projectId: uuidSchema });
 export const renameDiagramRequestSchema = z.strictObject({ expectedVersion: versionSchema, name: diagramNameSchema });
 
 /** PATCH /v1/diagrams/{id}/presentation: provided positions merge by node id; absent entries are unchanged. */
@@ -94,6 +97,7 @@ export const workspaceSummarySchema = z.strictObject({
   visibility: workspaceVisibilitySchema,
   diagramCount: z.number().int().min(0),
   memberCount: z.number().int().min(1),
+  projectCount: z.number().int().min(0),
   updatedAt: z.iso.datetime(),
 });
 export type WorkspaceSummary = z.infer<typeof workspaceSummarySchema>;
@@ -131,6 +135,42 @@ export const removedResponseSchema = z.strictObject({ removed: z.literal(true) }
 export const addMemberResponseSchema = z.strictObject({ status: z.enum(['ADDED', 'INVITED']) });
 export const changeMemberRoleRequestSchema = z.strictObject({ role: z.enum(['EDITOR', 'VIEWER']) });
 export const removeInviteRequestSchema = z.strictObject({ email: z.string().trim().toLowerCase().max(320) });
+
+/** A project groups related diagrams inside a workspace (workspace -> project -> diagram). */
+export const projectSummarySchema = z.strictObject({
+  id: uuidSchema,
+  workspaceId: uuidSchema,
+  name: z.string(),
+  description: z.string().nullable(),
+  diagramCount: z.number().int().min(0),
+  updatedAt: z.iso.datetime(),
+});
+export type ProjectSummary = z.infer<typeof projectSummarySchema>;
+export const projectListResponseSchema = z.strictObject({ projects: z.array(projectSummarySchema) });
+export const createProjectRequestSchema = z.strictObject({ name: z.string().trim().min(1).max(LIMITS.maxProjectNameLength), description: z.string().trim().max(LIMITS.maxWorkspaceDescriptionLength).optional() });
+export const updateProjectRequestSchema = z
+  .strictObject({
+    name: z.string().trim().min(1).max(LIMITS.maxProjectNameLength).optional(),
+    description: z.string().trim().max(LIMITS.maxWorkspaceDescriptionLength).nullable().optional(),
+  })
+  .refine((b) => Object.keys(b).length > 0, { message: 'nothing to change' });
+
+/** A diagram as a card: counts and a tiny drawing of its layout, with where it lives. */
+export const diagramCardSchema = z.strictObject({
+  id: uuidSchema,
+  workspaceId: uuidSchema,
+  projectId: uuidSchema,
+  workspaceName: z.string(),
+  projectName: z.string(),
+  name: z.string(),
+  nodeCount: z.number().int().min(0),
+  edgeCount: z.number().int().min(0),
+  updatedAt: z.iso.datetime(),
+  /** Up to 40 component positions and the connections between them (indexes into `nodes`), enough to draw a thumbnail. */
+  preview: z.strictObject({ nodes: z.array(z.tuple([z.number(), z.number()])), edges: z.array(z.tuple([z.number().int(), z.number().int()])) }),
+});
+export type DiagramCard = z.infer<typeof diagramCardSchema>;
+export const diagramCardsResponseSchema = z.strictObject({ diagrams: z.array(diagramCardSchema) });
 
 /** POST /v1/workspaces: start a team workspace (the caller becomes its owner). */
 export const createWorkspaceRequestSchema = z.strictObject({ name: z.string().trim().min(1).max(LIMITS.maxWorkspaceNameLength) });
@@ -174,6 +214,7 @@ export const diagramDetailSchema = z
   .strictObject({
     diagramId: uuidSchema,
     workspaceId: uuidSchema,
+    projectId: uuidSchema,
     name: diagramNameSchema,
     version: versionSchema,
     graph: graphSchema,

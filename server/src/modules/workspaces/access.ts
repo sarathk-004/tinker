@@ -21,6 +21,7 @@ interface SummaryRow {
   visibility: 'PRIVATE' | 'PUBLIC';
   diagram_count: number;
   member_count: number;
+  project_count: number;
   updated_at: Date;
 }
 
@@ -33,6 +34,7 @@ const toSummary = (r: SummaryRow): WorkspaceSummary => ({
   visibility: r.visibility,
   diagramCount: r.diagram_count,
   memberCount: r.member_count,
+  projectCount: r.project_count,
   updatedAt: r.updated_at.toISOString(),
 });
 
@@ -41,6 +43,7 @@ const SUMMARY_SELECT = `
   w.id, w.name, w.description, w.visibility, (w.personal_for_user_id IS NOT NULL) AS personal,
   (SELECT count(*)::int FROM diagrams d WHERE d.workspace_id = w.id AND d.deleted_at IS NULL) AS diagram_count,
   (SELECT count(*)::int FROM workspace_memberships mm WHERE mm.workspace_id = w.id) AS member_count,
+  (SELECT count(*)::int FROM projects pp WHERE pp.workspace_id = w.id AND pp.deleted_at IS NULL) AS project_count,
   GREATEST(w.updated_at, COALESCE((SELECT max(d.updated_at) FROM diagrams d WHERE d.workspace_id = w.id AND d.deleted_at IS NULL), w.updated_at)) AS updated_at`;
 
 export async function listWorkspaces(db: Queryable, userId: string): Promise<WorkspaceSummary[]> {
