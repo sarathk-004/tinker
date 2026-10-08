@@ -7,6 +7,9 @@ export const LIMITS = {
   maxRelationshipLength: 120,
   maxDiagramNameLength: 160,
   maxWorkspaceNameLength: 80,
+  /** Free text notes on the canvas, and how long one may be. */
+  maxNotes: 100,
+  maxNoteChars: 2000,
   /** Team workspaces one person may own (their personal workspace is not counted). */
   maxOwnedWorkspaces: 5,
   maxCommandTextBytes: 8 * 1024,

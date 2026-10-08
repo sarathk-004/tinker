@@ -13,9 +13,28 @@ export const viewportSchema = z.strictObject({
 /** `z.number()` rejects NaN and +/-Infinity, which satisfies D05's finite-coordinate rule. */
 export const nodePositionsSchema = z.record(uuidSchema, positionSchema);
 
+/** A free text note placed anywhere on the canvas. It belongs to the view, not to the architecture: it is not a component and has no connections. */
+export const noteSchema = z.strictObject({
+  id: uuidSchema,
+  x: z.number(),
+  y: z.number(),
+  text: z.string().max(LIMITS.maxNoteChars),
+  /** Width in canvas units; the note grows downwards as the text does. */
+  width: z.number().min(80).max(800).optional(),
+});
+export type Note = z.infer<typeof noteSchema>;
+
+export const layoutDirectionSchema = z.enum(['LR', 'TB']);
+export type LayoutDirection = z.infer<typeof layoutDirectionSchema>;
+
 export const presentationSchema = z.strictObject({
   nodePositions: nodePositionsSchema,
   viewport: viewportSchema,
+  notes: z.array(noteSchema).max(LIMITS.maxNotes).optional(),
+  /** Which way the diagram flows now (left to right, or top to bottom). */
+  layoutDir: layoutDirectionSchema.optional(),
+  /** The arrangement the person had in the OTHER direction, kept so that switching back restores it instead of recomputing it. */
+  layouts: z.strictObject({ LR: nodePositionsSchema.optional(), TB: nodePositionsSchema.optional() }).optional(),
 });
 
 export type Position = z.infer<typeof positionSchema>;

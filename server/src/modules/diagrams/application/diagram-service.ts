@@ -214,9 +214,15 @@ export async function patchPresentation(deps: ServiceDeps, actor: Actor, diagram
           return failure(actor.requestId, 'DOMAIN_VALIDATION_FAILED', 'A position refers to a node that does not exist.', { reason: 'NODE_NOT_FOUND', nodeId });
         }
       }
+      // Remembered arrangements may only mention components that exist.
+      const knownOnly = (positions: Record<string, { x: number; y: number }> | undefined) => positions && Object.fromEntries(Object.entries(positions).filter(([id]) => known.has(id)));
+      const layouts = request.layouts ? { ...(request.layouts.LR ? { LR: knownOnly(request.layouts.LR)! } : {}), ...(request.layouts.TB ? { TB: knownOnly(request.layouts.TB)! } : {}) } : current.presentation.layouts;
       const presentation = {
         nodePositions: { ...current.presentation.nodePositions, ...(request.nodePositions ?? {}) },
         viewport: request.viewport ?? current.presentation.viewport,
+        ...((request.notes ?? current.presentation.notes) ? { notes: request.notes ?? current.presentation.notes! } : {}),
+        ...((request.layoutDir ?? current.presentation.layoutDir) ? { layoutDir: request.layoutDir ?? current.presentation.layoutDir! } : {}),
+        ...(layouts && Object.keys(layouts).length > 0 ? { layouts } : {}),
       };
       const updated = await updateDocument(tx, { id: diagramId, expectedVersion: request.expectedVersion, presentation });
       if (!updated) throw new Error('conditional update affected no rows while holding the row lock');

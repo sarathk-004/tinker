@@ -4,7 +4,9 @@ import { LIMITS } from './limits.ts';
 import { graphSchema, uuidSchema } from './graph.ts';
 import {
   findPresentationIntegrityIssues,
+  layoutDirectionSchema,
   nodePositionsSchema,
+  noteSchema,
   presentationSchema,
   viewportSchema,
 } from './presentation.ts';
@@ -46,9 +48,14 @@ export const presentationPatchRequestSchema = z
     expectedVersion: versionSchema,
     nodePositions: nodePositionsSchema.optional(),
     viewport: viewportSchema.optional(),
+    /** Replaces ALL notes (the list is small and edited as a whole). */
+    notes: z.array(noteSchema).max(LIMITS.maxNotes).optional(),
+    layoutDir: layoutDirectionSchema.optional(),
+    /** Replaces the remembered arrangements. */
+    layouts: presentationSchema.shape.layouts,
   })
-  .refine((p) => p.nodePositions !== undefined || p.viewport !== undefined, {
-    message: 'provide nodePositions or viewport',
+  .refine((p) => p.nodePositions !== undefined || p.viewport !== undefined || p.notes !== undefined || p.layoutDir !== undefined || p.layouts !== undefined, {
+    message: 'provide nodePositions, viewport, notes, layoutDir or layouts',
   });
 export type PresentationPatchRequest = z.infer<typeof presentationPatchRequestSchema>;
 

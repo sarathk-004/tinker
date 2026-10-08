@@ -2,8 +2,9 @@ import dagre from '@dagrejs/dagre';
 import { Position } from '@xyflow/react';
 import { DiagramNode, DiagramEdge } from '../types/diagram';
 
-const NODE_WIDTH = 220;
-const NODE_HEIGHT = 90;
+// The size of a node card on screen (see AWSArchitectureNode), so that tidying leaves the same gaps the eye expects.
+const NODE_WIDTH = 240;
+const NODE_HEIGHT = 112;
 
 export function getLayoutedElements(
   nodes: DiagramNode[],

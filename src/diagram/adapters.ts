@@ -168,7 +168,3 @@ export function nodeEditCommands(
   if (Object.keys(updates).length > 0) commands.push({ type: 'UPDATE_NODE', nodeId: node.id, updates });
   return commands;
 }
-
-export function groupCommand(node: GraphNode, group: string): Extract<DiagramCommand, { type: 'UPDATE_NODE' }> {
-  return { type: 'UPDATE_NODE', nodeId: node.id, updates: { metadata: { ...node.metadata, group } as Metadata } };
-}

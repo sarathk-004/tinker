@@ -55,6 +55,62 @@ function nearestFreeSpot(wanted: Position, taken: Position[]): Position {
   return wanted;
 }
 
+const GAP = 90; // clear space between a new component and the one it is connected to
+
+/** Where a component with no connections goes: under the existing diagram, lined up with its left edge, so it is easy to find and to wire up. */
+function belowTheDiagram(existing: Record<string, Position>): Position | null {
+  const all = Object.values(existing);
+  if (all.length === 0) return null;
+  return { x: Math.min(...all.map((p) => p.x)), y: Math.max(...all.map((p) => p.y)) + NODE_HEIGHT + CLEARANCE };
+}
+
+const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.length;
+
+/**
+ * Put components that were just ADDED (and then connected, in the same plan) next to what they are connected to: to the right of what
+ * feeds them, to the left of what they feed, between the two when both exist (below instead of right in a top-to-bottom diagram).
+ * They are settled one at a time, starting with those connected to components that already existed, so a chain added in one request
+ * ("Orders to Cache to Database") lays out as a chain. Components with no connection keep the position they were given.
+ * Pure and deterministic; never touches positions of components that were not just added.
+ */
+export function settleNewNodes(
+  graph: Pick<Graph, 'nodes' | 'edges'>,
+  positions: Record<string, Position>,
+  newIds: readonly string[],
+  direction: 'LR' | 'TB' = 'LR',
+): Record<string, Position> {
+  const next = { ...positions };
+  const fresh = new Set(newIds);
+  const unsettled = new Set(newIds.filter((id) => next[id]));
+  const feeds = (id: string) => graph.edges.filter((e) => e.targetNodeId === id).map((e) => e.sourceNodeId);
+  const fedBy = (id: string) => graph.edges.filter((e) => e.sourceNodeId === id).map((e) => e.targetNodeId);
+  const anchored = (own: string) => (other: string) => other !== own && !!next[other] && !unsettled.has(other);
+  const isOld = (other: string) => !fresh.has(other);
+
+  for (;;) {
+    // Prefer a component connected to something that existed before; otherwise one connected to something already settled.
+    const candidates = [...unsettled].filter((id) => [...feeds(id), ...fedBy(id)].some(anchored(id)));
+    const pick = candidates.find((id) => [...feeds(id), ...fedBy(id)].some((o) => anchored(id)(o) && isOld(o))) ?? candidates[0];
+    if (!pick) break;
+    const before = feeds(pick).filter(anchored(pick));
+    const after = fedBy(pick).filter(anchored(pick));
+    const pos = (id: string) => next[id]!;
+    const step = direction === 'LR' ? { x: NODE_WIDTH + GAP, y: 0 } : { x: 0, y: NODE_HEIGHT + GAP };
+    let wanted: Position;
+    if (before.length > 0 && after.length > 0) {
+      wanted = { x: mean([...before, ...after].map((id) => pos(id).x)), y: mean([...before, ...after].map((id) => pos(id).y)) };
+    } else if (before.length > 0) {
+      wanted = { x: mean(before.map((id) => pos(id).x)) + step.x, y: mean(before.map((id) => pos(id).y)) + step.y };
+    } else {
+      wanted = { x: mean(after.map((id) => pos(id).x)) - step.x, y: mean(after.map((id) => pos(id).y)) - step.y };
+    }
+    const { [pick]: _own, ...others } = next;
+    next[pick] = nearestFreeSpot(wanted, Object.values(others));
+    unsettled.delete(pick);
+  }
+  return next;
+}
+
 /**
  * Decision P2: existing positions are preserved; only the listed new nodes receive a position.
  * Each new node starts from `hints[id]` (e.g. the midpoint of an insert) or its dagre-derived position,
@@ -71,7 +127,9 @@ export function placeNewNodes(
   const laidOut = layoutGraph(graph);
   const next = { ...existing };
   for (const id of newNodeIds) {
-    const wanted = hints[id] ?? laidOut[id];
+    // A hint (a drop point, the middle of an insert) wins. Without one, a new component goes under the existing diagram: the whole-graph
+    // layout would put an unconnected component wherever it likes, often far from everything.
+    const wanted = hints[id] ?? belowTheDiagram(next) ?? laidOut[id];
     if (!wanted) continue;
     next[id] = nearestFreeSpot(wanted, Object.values(next));
   }

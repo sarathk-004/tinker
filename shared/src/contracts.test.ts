@@ -114,6 +114,9 @@ describe('command union', () => {
     { type: 'DISCONNECT', edgeId: E1 },
     { type: 'DISCONNECT', sourceNodeId: A, targetNodeId: B },
     { type: 'INSERT_BETWEEN', sourceNodeId: A, targetNodeId: B, node: { name: 'Redis', kind: 'CACHE', technology: 'Redis' } },
+    { type: 'SET_GROUP', nodeIds: [A, B], group: 'Backend' },
+    { type: 'RENAME_GROUP', from: 'Backend', to: 'Platform / Backend' },
+    { type: 'ADD_NODE', node: { name: 'Orders', kind: 'SERVICE' }, position: { x: 10, y: 20 } },
     { type: 'RESET' },
   ];
 

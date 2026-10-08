@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { diagramCommandSchema, graphSchema, type Graph, type GraphNode, type Presentation } from '../contracts';
-import { addNodeCommand, groupCommand, insertBetweenCommand, nodeEditCommands, toNodeData, toViewEdges, toViewNodes, typeToKind } from './adapters';
+import { addNodeCommand, insertBetweenCommand, nodeEditCommands, toNodeData, toViewEdges, toViewNodes, typeToKind } from './adapters';
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const node = (id: number, name: string, kind: GraphNode['kind'] = 'SERVICE', extra: Partial<GraphNode> = {}): GraphNode => ({ id: U(id), name, kind, metadata: {}, ...extra });
@@ -85,12 +85,6 @@ describe('UI intent -> commands (every output is a valid contract command)', () 
     expect(all.map((c) => c.type)).toEqual(['RENAME_NODE', 'UPDATE_NODE']);
     const update = all[1] as Extract<(typeof all)[number], { type: 'UPDATE_NODE' }>;
     expect(update.updates).toMatchObject({ kind: 'DATABASE', technology: null, metadata: { icon: 'lambda', description: 'Charges cards' } });
-  });
-
-  it('grouping keeps existing metadata and adds the group', () => {
-    const c = groupCommand(node(1, 'A', 'SERVICE', { metadata: { icon: 'ec2' } }), 'Backend');
-    valid(c);
-    expect(c.updates.metadata).toEqual({ icon: 'ec2', group: 'Backend' });
   });
 
   it('every legacy type maps to a NodeKind and back to the same type', () => {

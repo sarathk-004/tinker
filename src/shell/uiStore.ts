@@ -17,6 +17,11 @@ interface UiState {
   rightTab: RightTab;
   /** The node whose properties dialog is open. */
   editingNodeId: string | null;
+  /** The canvas note whose text is being typed. */
+  editingNoteId: string | null;
+  /** The group whose name is being typed (its full path), and the one selected on the canvas. */
+  editingGroupPath: string | null;
+  selectedGroupPath: string | null;
   helpOpen: boolean;
   set(patch: Partial<Omit<UiState, 'set'>>): void;
 }
@@ -29,6 +34,9 @@ export const useUi = create<UiState>((set) => ({
   chatOpen: false,
   rightTab: 'chat',
   editingNodeId: null,
+  editingNoteId: null,
+  editingGroupPath: null,
+  selectedGroupPath: null,
   helpOpen: false,
   set: (patch) => set(patch),
 }));

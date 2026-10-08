@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { NODE_KINDS, diagramCommandSchema, nodeKindSchema, type DiagramCommand, type NodeKind } from '@tinker/shared';
 import { applyCommand, type DiagramDoc, type DomainError } from '../../diagrams/domain/index.ts';
+import { settleNewNodes } from '../../diagrams/domain/layout.ts';
 
 /**
  * A plan is a short list of steps in ALIAS terms (n1, e2, new1): the model never sees or invents UUIDs.
@@ -95,6 +96,7 @@ export function executePlan(start: DiagramDoc, steps: readonly PlanStep[], alias
   let implicitCount = 0;
   const commands: DiagramCommand[] = [];
   const summaries: CommandSummary[] = [];
+  const addedIds: string[] = []; // components added by ADD_NODE steps: they are positioned once the whole plan (and its connections) is known
 
   const clarify = (question: string, options: string[] = []): PlanOutcome => ({ ok: false, kind: 'CLARIFY', question, options });
   const known = () => [...aliases.nodeToAlias.keys()].map((id) => nameOf(start, id)).slice(0, 4);
@@ -222,6 +224,7 @@ export function executePlan(start: DiagramDoc, steps: readonly PlanStep[], alias
     if (producesNode && firstId) {
       // Models often refer to a node they just created as new1, new2... without declaring "as": number them implicitly.
       created.set(step.as ?? `new${++implicitCount}`, firstId);
+      if (step.type === 'ADD_NODE') addedIds.push(firstId);
     }
 
     doc = result.value;
@@ -229,6 +232,9 @@ export function executePlan(start: DiagramDoc, steps: readonly PlanStep[], alias
     summaries.push({ type: valid.data.type, summary: describe(doc) });
   }
 
+  if (addedIds.length > 0) {
+    doc = { ...doc, presentation: { ...doc.presentation, nodePositions: settleNewNodes(doc.graph, doc.presentation.nodePositions, addedIds, doc.presentation.layoutDir ?? 'LR') } };
+  }
   return { ok: true, doc, commands, summaries };
 }
 

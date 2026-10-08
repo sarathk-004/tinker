@@ -3,6 +3,7 @@ import { LIMITS } from './limits.ts';
 import { metadataSchema, nodeNameSchema, relationshipSchema, technologySchema, uuidSchema } from './graph.ts';
 import { nodeKindSchema } from './node-kind.ts';
 import { positionSchema } from './presentation.ts';
+import { groupPathSchema } from './groups.ts';
 
 /** Fields a client may supply for a new node. The server assigns the UUID (D04). */
 export const newNodeSchema = z.strictObject({
@@ -83,6 +84,20 @@ export const resetDiagramCommandSchema = z.strictObject({
   type: z.literal('RESET'),
 });
 
+/** Put components into a group (a path, see groups.ts), or take them out of any group with `group: null`. One command, one version. */
+export const setGroupCommandSchema = z.strictObject({
+  type: z.literal('SET_GROUP'),
+  nodeIds: z.array(uuidSchema).min(1).max(LIMITS.maxNodes),
+  group: groupPathSchema.nullable(),
+});
+
+/** Rename a group and everything inside it (this is also how a group is moved inside another one: its new path starts with the parent). */
+export const renameGroupCommandSchema = z.strictObject({
+  type: z.literal('RENAME_GROUP'),
+  from: groupPathSchema,
+  to: groupPathSchema,
+});
+
 export const diagramCommandSchema = z.discriminatedUnion('type', [
   addNodeCommandSchema,
   removeNodeCommandSchema,
@@ -91,6 +106,8 @@ export const diagramCommandSchema = z.discriminatedUnion('type', [
   connectNodesCommandSchema,
   disconnectNodesCommandSchema,
   insertBetweenCommandSchema,
+  setGroupCommandSchema,
+  renameGroupCommandSchema,
   resetDiagramCommandSchema,
 ]);
 
@@ -102,6 +119,8 @@ export const COMMAND_TYPES = [
   'CONNECT',
   'DISCONNECT',
   'INSERT_BETWEEN',
+  'SET_GROUP',
+  'RENAME_GROUP',
   'RESET',
 ] as const;
 

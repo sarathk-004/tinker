@@ -73,6 +73,7 @@ export const DOMAIN_ERROR_REASONS = [
   'EDGE_REQUIRED',
   'AMBIGUOUS_EDGE',
   'LIMIT_EXCEEDED',
+  'GROUP_NOT_FOUND',
 ] as const;
 export type DomainErrorReason = (typeof DOMAIN_ERROR_REASONS)[number];
 

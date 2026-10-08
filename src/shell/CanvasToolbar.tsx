@@ -9,6 +9,7 @@ import { toggleFullscreen, useFullscreen } from './fullscreen';
 import { MOD_KEY } from './TopBar';
 import { MENU_PANEL, MONO_LABEL, useDismiss } from './Popover';
 import { PALETTE } from './palette';
+import { groupSelected } from './groupActions';
 import { useUi } from './uiStore';
 
 const IconButton: React.FC<{ label: string; onClick: () => void; disabled?: boolean; active?: boolean; danger?: boolean; children: React.ReactNode; badge?: number }> = ({ label, onClick, disabled, active, danger, children, badge }) => (
@@ -75,6 +76,7 @@ const AddComponent: React.FC = () => {
 /** The tab row: the Diagram tab on the left, then tools, history, zoom and the editing actions. */
 export const CanvasToolbar: React.FC = () => {
   const tool = useUi((s) => s.tool);
+  const selectedGroup = useUi((s) => s.selectedGroupPath);
   const flow = useReactFlow();
   const { zoom } = useViewport();
   const fullscreen = useFullscreen();
@@ -113,8 +115,12 @@ export const CanvasToolbar: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-1 flex-shrink-0">
-        <IconButton label="Rename or edit the selected component (R). Select one first" disabled={selected.length !== 1} onClick={() => useUi.getState().set({ editingNodeId: selected[0]! })}><Edit3 className={ICON} /></IconButton>
-        <IconButton label="Group the selected components (G). Select two or more first" disabled={selected.length < 2} onClick={() => void store().groupNodes(selected, 'New group')}><Layers className={ICON} /></IconButton>
+        <IconButton
+          label="Rename or edit the selected component or group (R). Select one first"
+          disabled={selected.length !== 1 && !(selected.length === 0 && selectedGroup)}
+          onClick={() => useUi.getState().set(selected.length === 1 ? { editingNodeId: selected[0]! } : { editingGroupPath: selectedGroup })}
+        ><Edit3 className={ICON} /></IconButton>
+        <IconButton label="Group the selected components (G). Select two or more first" disabled={selected.length < 2} onClick={() => void groupSelected()}><Layers className={ICON} /></IconButton>
         <IconButton label={playing ? 'Playing…' : 'Play the flow, component by component'} active={playing} disabled={nodeCount === 0 || playing} onClick={() => void store().playFlow()}><Play className={ICON} /></IconButton>
         <IconButton label={`Tidy the layout (L). Now ${layoutDir === 'LR' ? 'left to right' : 'top to bottom'}; saved as a position update`} disabled={nodeCount === 0} onClick={() => void store().applyLayout()}><LayoutGrid className={ICON} /></IconButton>
         <IconButton label={`Switch to ${layoutDir === 'LR' ? 'top-to-bottom' : 'left-to-right'} layout`} disabled={nodeCount === 0} onClick={() => void store().applyLayout(layoutDir === 'LR' ? 'TB' : 'LR')}>

@@ -11,9 +11,12 @@ import { session } from '../document/instance';
 import { newNodeIds, type SessionState } from '../document/session';
 import type { Position } from '../contracts';
 import type { DiagramEdge, DiagramNode } from '../types/diagram';
-import { addNodeCommand, groupCommand, insertBetweenCommand, nodeEditCommands, toViewEdges, toViewNodes, type NewNodeSpec } from './adapters';
+import { addNodeCommand, insertBetweenCommand, nodeEditCommands, toViewEdges, toViewNodes, type NewNodeSpec } from './adapters';
 import { playFlow as runFlow } from './flow';
 import { getLayoutedElements } from './layout';
+import { planLayoutSwitch } from './layoutMemory';
+import { freshGroupName, groupOfNode, sharedParentGroup } from './groups';
+import { groupJoin, groupParent, isInGroup, normalizeGroupPath } from '../contracts';
 import type { AWSServiceIcon, SystemNodeType } from '../types/diagram';
 
 export interface NodeEdit {
@@ -44,7 +47,14 @@ export interface DiagramView extends Ephemeral {
   disconnectEdge(edgeId: string): Promise<void>;
   editNode(id: string, edit: NodeEdit): Promise<void>;
   insertBetween(source: string, target: string, spec: NewNodeSpec): Promise<string | null>;
-  groupNodes(ids: string[], groupName: string): Promise<void>;
+  /** Put the selected components in a NEW group (inside the group they all share, if any). Returns the new group's path. */
+  groupNodes(ids: string[]): Promise<string | null>;
+  /** Move components into a group, or out of any group (null). One command. */
+  setNodesGroup(ids: string[], group: string | null): Promise<void>;
+  /** Rename a group; a path with a parent in front moves it inside that group. */
+  renameGroup(from: string, to: string): Promise<void>;
+  /** Dissolve a group: its components and inner groups move up one level. The components themselves stay. */
+  ungroup(path: string): Promise<void>;
   reset(): Promise<void>;
   applyLayout(direction?: 'LR' | 'TB'): Promise<void>;
   /** Drag-end positions: shown at once, saved after a short quiet period. */
@@ -132,11 +142,35 @@ export const useDiagramStore = create<DiagramView>((set, get) => {
       return res ? (newNodeIds(before, res.graph)[0] ?? null) : null;
     },
 
-    async groupNodes(ids, groupName) {
-      for (const id of ids) {
-        const node = get().doc.graph.nodes.find((n) => n.id === id);
-        if (node) void run(groupCommand(node, groupName), `Grouped as ${groupName}`);
-      }
+    async groupNodes(ids) {
+      const nodes = get().doc.graph.nodes.filter((n) => ids.includes(n.id));
+      if (nodes.length < 2) return null;
+      const parent = sharedParentGroup(nodes.map(groupOfNode));
+      const existing = get().doc.graph.nodes.map(groupOfNode).filter((g): g is string => !!g);
+      const path = groupJoin(parent, freshGroupName(existing, parent));
+      const res = await run({ type: 'SET_GROUP', nodeIds: nodes.map((n) => n.id), group: path }, `Grouped ${nodes.length} components`);
+      return res ? path : null;
+    },
+
+    async setNodesGroup(ids, group) {
+      if (ids.length === 0) return;
+      await run({ type: 'SET_GROUP', nodeIds: ids, group }, group ? `Moved into ${group}` : 'Removed from group');
+    },
+
+    async renameGroup(from, to) {
+      const next = normalizeGroupPath(to);
+      if (!next || next === from) return;
+      await run({ type: 'RENAME_GROUP', from, to: next }, `Renamed group to ${next}`);
+    },
+
+    async ungroup(path) {
+      const up = groupParent(path);
+      const nodes = get().doc.graph.nodes;
+      // Inner groups first (they move up one level), then the components that were directly in this group.
+      const inner = [...new Set(nodes.map(groupOfNode).filter((g): g is string => !!g && g !== path && isInGroup(g, path)).map((g) => g.split(' / ').slice(0, path.split(' / ').length + 1).join(' / ')))];
+      for (const child of inner) void run({ type: 'RENAME_GROUP', from: child, to: groupJoin(up, child.split(' / ').pop()!) }, 'Ungrouped');
+      const direct = nodes.filter((n) => groupOfNode(n) === path).map((n) => n.id);
+      if (direct.length > 0) void run({ type: 'SET_GROUP', nodeIds: direct, group: up || null }, 'Ungrouped');
       await settle(session.flush(), undefined);
     },
 
@@ -146,11 +180,18 @@ export const useDiagramStore = create<DiagramView>((set, get) => {
     },
 
     async applyLayout(direction) {
-      const dir = direction ?? get().layoutDir;
-      const { nodes, edges } = get();
-      const laidOut = getLayoutedElements(nodes, edges, dir).nodes;
-      set((s) => ({ layoutDir: dir, ...derive(s.doc, { highlightedIds: s.highlightedIds, layoutDir: dir }) }));
-      session.savePositions(Object.fromEntries(laidOut.map((n) => [n.id, { x: Math.round(n.position.x), y: Math.round(n.position.y) }])));
+      const { nodes, edges, layoutDir: currentDir, doc } = get();
+      const targetDir = direction ?? currentDir;
+      const plan = planLayoutSwitch({
+        currentDir,
+        targetDir,
+        ids: nodes.map((n) => n.id),
+        current: doc.presentation.nodePositions,
+        layouts: doc.presentation.layouts,
+        fresh: (dir) => Object.fromEntries(getLayoutedElements(nodes, edges, dir).nodes.map((n) => [n.id, { x: Math.round(n.position.x), y: Math.round(n.position.y) }])),
+      });
+      session.savePositions(plan.positions);
+      session.saveExtras({ layoutDir: plan.layoutDir, layouts: plan.layouts });
       await settle(session.flush(), undefined);
     },
 
@@ -186,5 +227,8 @@ export const useDiagramStore = create<DiagramView>((set, get) => {
 
 // The session is the only writer of `doc`; the view is re-derived on every change.
 session.subscribe((doc) => {
-  useDiagramStore.setState((s) => ({ doc, ...derive(doc, { highlightedIds: s.highlightedIds, layoutDir: s.layoutDir }) }));
+  useDiagramStore.setState((s) => {
+    const layoutDir = doc.presentation.layoutDir ?? 'LR'; // the direction is part of the saved diagram, not of this browser tab
+    return { doc, layoutDir, ...derive(doc, { highlightedIds: s.highlightedIds, layoutDir }) };
+  });
 });

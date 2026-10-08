@@ -9,6 +9,9 @@ import {
   type GraphNode,
   type NewNode,
   type Position,
+  GROUP_SEPARATOR,
+  isInGroup,
+  renameInPath,
 } from '@tinker/shared';
 import { placeNewNodes } from './layout.ts';
 import { fail, ok, type DiagramDoc, type DomainResult, type NewId } from './types.ts';
@@ -45,6 +48,10 @@ function dispatch(doc: DiagramDoc, command: DiagramCommand, newId: NewId): Domai
       return disconnect(doc, command);
     case 'INSERT_BETWEEN':
       return insertBetween(doc, command, newId);
+    case 'SET_GROUP':
+      return setGroup(doc, command);
+    case 'RENAME_GROUP':
+      return renameGroup(doc, command);
     case 'RESET':
       return reset(doc);
   }
@@ -97,7 +104,9 @@ function removeNode(doc: DiagramDoc, c: Cmd<'REMOVE_NODE'>): DomainResult<Diagra
   const nodes = doc.graph.nodes.filter((n) => n.id !== c.nodeId);
   const edges = doc.graph.edges.filter((e) => e.sourceNodeId !== c.nodeId && e.targetNodeId !== c.nodeId);
   const { [c.nodeId]: _removed, ...nodePositions } = doc.presentation.nodePositions;
-  return ok({ graph: { schemaVersion: GRAPH_SCHEMA_VERSION, nodes, edges }, presentation: { ...doc.presentation, nodePositions } });
+  // The remembered arrangements of the other direction forget the component too.
+  const layouts = doc.presentation.layouts && Object.fromEntries((['LR', 'TB'] as const).flatMap((d) => (doc.presentation.layouts![d] ? [[d, Object.fromEntries(Object.entries(doc.presentation.layouts![d]!).filter(([id]) => id !== c.nodeId))]] : [])));
+  return ok({ graph: { schemaVersion: GRAPH_SCHEMA_VERSION, nodes, edges }, presentation: { ...doc.presentation, nodePositions, ...(layouts ? { layouts } : {}) } });
 }
 
 function renameNode(doc: DiagramDoc, c: Cmd<'RENAME_NODE'>): DomainResult<DiagramDoc> {
@@ -227,11 +236,36 @@ function insertBetween(doc: DiagramDoc, c: Cmd<'INSERT_BETWEEN'>, newId: NewId):
   return ok(withGraph(doc, [...doc.graph.nodes, node], edges, [node.id], hints));
 }
 
+/** Put components in a group, or take them out (`group: null`). The group is the path of the innermost boundary; the other components keep theirs. */
+function setGroup(doc: DiagramDoc, c: Cmd<'SET_GROUP'>): DomainResult<DiagramDoc> {
+  const ids = new Set(c.nodeIds);
+  for (const id of ids) if (!hasNode(doc, id)) return missingNode(id);
+  const nodes = doc.graph.nodes.map((n) => {
+    if (!ids.has(n.id)) return n;
+    const { group: _old, ...rest } = n.metadata;
+    return { ...n, metadata: c.group === null ? rest : { ...rest, group: c.group } };
+  });
+  return ok({ graph: { schemaVersion: GRAPH_SCHEMA_VERSION, nodes, edges: [...doc.graph.edges] }, presentation: doc.presentation });
+}
+
+/** Rename a group and every group inside it. Renaming into another existing group merges the two. */
+function renameGroup(doc: DiagramDoc, c: Cmd<'RENAME_GROUP'>): DomainResult<DiagramDoc> {
+  const touched = doc.graph.nodes.filter((n) => isInGroup(typeof n.metadata['group'] === 'string' ? (n.metadata['group'] as string) : undefined, c.from));
+  if (touched.length === 0) return fail('GROUP_NOT_FOUND', `There is no group called "${c.from}".`, { group: c.from });
+  // A group cannot be moved inside itself ("A" into "A / B").
+  if (c.to.startsWith(c.from + GROUP_SEPARATOR)) return fail('GROUP_NOT_FOUND', 'A group cannot be moved inside itself.', { group: c.from });
+  const nodes = doc.graph.nodes.map((n) => {
+    const g = n.metadata['group'];
+    return typeof g === 'string' && isInGroup(g, c.from) ? { ...n, metadata: { ...n.metadata, group: renameInPath(g, c.from, c.to) } } : n;
+  });
+  return ok({ graph: { schemaVersion: GRAPH_SCHEMA_VERSION, nodes, edges: [...doc.graph.edges] }, presentation: doc.presentation });
+}
+
 /** Clears graph and positions; the viewport is kept. Persistence still records this as a new version (D06). */
 function reset(doc: DiagramDoc): DomainResult<DiagramDoc> {
   return ok({
     graph: { schemaVersion: GRAPH_SCHEMA_VERSION, nodes: [], edges: [] },
-    presentation: { ...doc.presentation, nodePositions: {} },
+    presentation: (({ layouts: _layouts, ...rest }) => ({ ...rest, nodePositions: {} }))(doc.presentation),
   });
 }
 

@@ -18,11 +18,20 @@ import {
   type DiagramCommand,
   type DiagramDetail,
   type Graph,
+  type LayoutDirection,
+  type Note,
   type Position,
   type Presentation,
   type Viewport,
 } from '../contracts';
 import { ApiError, type MutationSpec, type Replayable } from '../api/client';
+
+/** Presentation details beyond node positions and the viewport: notes on the canvas, and which way the diagram flows with its remembered arrangements. */
+export interface PresentationExtras {
+  notes?: Note[];
+  layoutDir?: LayoutDirection;
+  layouts?: Presentation['layouts'];
+}
 
 export type SaveStatus = 'idle' | 'saving' | 'failed' | 'conflict' | 'blocked';
 
@@ -109,7 +118,7 @@ type Waiter = { resolve: (r: CommandResponse | DiagramDetail | AiCommandResponse
 
 type Item =
   | { type: 'command'; key: string; command: DiagramCommand; label: string; sent?: MutationSpec; waiters: Waiter[] }
-  | { type: 'presentation'; key: string; positions: Record<string, Position>; viewport?: Viewport; sent?: MutationSpec; sentPositions?: Record<string, Position>; waiters: Waiter[] }
+  | { type: 'presentation'; key: string; positions: Record<string, Position>; viewport?: Viewport; extras?: PresentationExtras; sent?: MutationSpec; sentPositions?: Record<string, Position>; sentExtras?: PresentationExtras; waiters: Waiter[] }
   | { type: 'rename'; key: string; name: string; sent?: MutationSpec; waiters: Waiter[] }
   /** A typed command: interpreted by the server, committed (or answered with a question) as ONE queued write. */
   | { type: 'ai'; key: string; text: string; conversationId?: string; sent?: MutationSpec; waiters: Waiter[] }
@@ -120,7 +129,7 @@ interface Draft {
   diagramId: string;
   baseVersion: number;
   savedAt: number;
-  items: Array<{ type: 'command'; command: DiagramCommand; label: string } | { type: 'presentation'; positions: Record<string, Position>; viewport?: Viewport } | { type: 'rename'; name: string } | { type: 'ai'; text: string; conversationId?: string } | { type: 'restore'; version: number }>;
+  items: Array<{ type: 'command'; command: DiagramCommand; label: string } | { type: 'presentation'; positions: Record<string, Position>; viewport?: Viewport; extras?: PresentationExtras } | { type: 'rename'; name: string } | { type: 'ai'; text: string; conversationId?: string } | { type: 'restore'; version: number }>;
 }
 
 const draftKey = (diagramId: string) => `tinker_draft_${diagramId}`;
@@ -138,6 +147,7 @@ export function createDocumentSession(deps: SessionDeps) {
   // ---- local, unsaved ----
   let overlay: Record<string, Position> = {};
   let overlayViewport: Viewport | undefined;
+  let overlayExtras: PresentationExtras = {};
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   // ---- queue ----
   const queue: Item[] = [];
@@ -149,7 +159,8 @@ export function createDocumentSession(deps: SessionDeps) {
   const listeners = new Set<(s: SessionState) => void>();
   const idleWaiters: Array<{ resolve: () => void; reject: (e: unknown) => void }> = [];
 
-  const hasDebouncedPositions = () => Object.keys(overlay).length > 0 && debounceTimer !== undefined;
+  const hasExtras = (e: PresentationExtras) => e.notes !== undefined || e.layoutDir !== undefined || e.layouts !== undefined;
+  const hasDebouncedPositions = () => (Object.keys(overlay).length > 0 || hasExtras(overlayExtras)) && debounceTimer !== undefined;
   const pendingCount = () => queue.length + (hasDebouncedPositions() ? 1 : 0);
 
   function view(): SessionState {
@@ -158,7 +169,12 @@ export function createDocumentSession(deps: SessionDeps) {
     return {
       diagram,
       graph,
-      presentation: { nodePositions: positions, viewport: overlayViewport ?? ackPresentation.viewport },
+      presentation: (() => {
+        const notes = overlayExtras.notes ?? ackPresentation.notes;
+        const layoutDir = overlayExtras.layoutDir ?? ackPresentation.layoutDir;
+        const layouts = overlayExtras.layouts ?? ackPresentation.layouts;
+        return { nodePositions: positions, viewport: overlayViewport ?? ackPresentation.viewport, ...(notes ? { notes } : {}), ...(layoutDir ? { layoutDir } : {}), ...(layouts ? { layouts } : {}) };
+      })(),
       status,
       pending: pendingCount(),
       conflict,
@@ -195,6 +211,7 @@ export function createDocumentSession(deps: SessionDeps) {
     queue.length = 0;
     overlay = {};
     overlayViewport = undefined;
+    overlayExtras = {};
     conflict = null;
     notice = null;
     setStatus('idle');
@@ -212,6 +229,7 @@ export function createDocumentSession(deps: SessionDeps) {
     queue.length = 0;
     overlay = {};
     overlayViewport = undefined;
+    overlayExtras = {};
     conflict = null;
     notice = null;
     setStatus('idle');
@@ -261,12 +279,21 @@ export function createDocumentSession(deps: SessionDeps) {
         // Positions for nodes that no longer exist (removed by an earlier queued command) must not be sent.
         const ids = new Set(graph.nodes.map((n) => n.id));
         const positions = Object.fromEntries(Object.entries(item.positions).filter(([id]) => ids.has(id)));
-        if (Object.keys(positions).length === 0 && !item.viewport) return null;
+        const extras = item.extras ?? {};
+        if (Object.keys(positions).length === 0 && !item.viewport && !hasExtras(extras)) return null;
         item.sentPositions = positions;
+        item.sentExtras = extras;
         return {
           method: 'PATCH',
           path: `${base}/presentation`,
-          body: { expectedVersion, ...(Object.keys(positions).length > 0 ? { nodePositions: positions } : {}), ...(item.viewport ? { viewport: item.viewport } : {}) },
+          body: {
+            expectedVersion,
+            ...(Object.keys(positions).length > 0 ? { nodePositions: positions } : {}),
+            ...(item.viewport ? { viewport: item.viewport } : {}),
+            ...(extras.notes ? { notes: extras.notes } : {}),
+            ...(extras.layoutDir ? { layoutDir: extras.layoutDir } : {}),
+            ...(extras.layouts ? { layouts: extras.layouts } : {}),
+          },
           idempotencyKey: item.key,
         };
       }
@@ -339,6 +366,13 @@ export function createDocumentSession(deps: SessionDeps) {
       presentation: data.presentation,
       ...('name' in data ? { name: data.name, updatedAt: data.updatedAt } : {}),
     });
+    if (item.type === 'presentation' && item.sentExtras) {
+      const sent = item.sentExtras;
+      // The server now holds what we sent: forget the local copy, unless something newer replaced it meanwhile.
+      if (sent.notes && JSON.stringify(overlayExtras.notes) === JSON.stringify(sent.notes)) delete overlayExtras.notes;
+      if (sent.layoutDir && overlayExtras.layoutDir === sent.layoutDir) delete overlayExtras.layoutDir;
+      if (sent.layouts && JSON.stringify(overlayExtras.layouts) === JSON.stringify(sent.layouts)) delete overlayExtras.layouts;
+    }
     if (item.type === 'presentation' && item.sentPositions) {
       // The server now holds what we sent: drop overlay entries that still equal it (newer drags stay).
       for (const [id, p] of Object.entries(item.sentPositions)) {
@@ -414,7 +448,7 @@ export function createDocumentSession(deps: SessionDeps) {
     if (item.type === 'rename') return { type: 'rename', name: item.name };
     if (item.type === 'ai') return { type: 'ai', text: item.text, ...(item.conversationId ? { conversationId: item.conversationId } : {}) };
     if (item.type === 'restore') return { type: 'restore', version: item.version };
-    return { type: 'presentation', positions: item.positions, ...(item.viewport ? { viewport: item.viewport } : {}) };
+    return { type: 'presentation', positions: item.positions, ...(item.viewport ? { viewport: item.viewport } : {}), ...(item.extras ? { extras: item.extras } : {}) };
   }
 
   function enterConflict(error: ApiError) {
@@ -425,7 +459,8 @@ export function createDocumentSession(deps: SessionDeps) {
     const queued: Record<string, Position> = {};
     for (const i of items) if (i.type === 'presentation') Object.assign(queued, i.positions);
     const extra = Object.fromEntries(Object.entries(overlay).filter(([id, p]) => queued[id]?.x !== p.x || queued[id]?.y !== p.y));
-    if (Object.keys(extra).length > 0) drafts.push({ type: 'presentation', positions: extra, ...(overlayViewport ? { viewport: overlayViewport } : {}) });
+    const unsavedExtras = overlayExtras;
+    if (Object.keys(extra).length > 0 || hasExtras(unsavedExtras)) drafts.push({ type: 'presentation', positions: extra, ...(overlayViewport ? { viewport: overlayViewport } : {}), ...(hasExtras(unsavedExtras) ? { extras: { ...unsavedExtras } } : {}) });
     clearTimeout(debounceTimer);
     debounceTimer = undefined;
     if (diagram && deps.storage && drafts.length > 0) {
@@ -512,20 +547,31 @@ export function createDocumentSession(deps: SessionDeps) {
     emit();
   }
 
+  /** Notes, the flow direction and the remembered arrangements: shown at once, saved with the next position save (replacing what was queued for them). */
+  function saveExtras(extras: PresentationExtras): void {
+    if (!diagram || status === 'conflict' || status === 'blocked') return;
+    overlayExtras = { ...overlayExtras, ...extras };
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(flushPositionsNow, debounceMs);
+    emit();
+  }
+
   function flushPositionsNow(): void {
     clearTimeout(debounceTimer);
     debounceTimer = undefined;
-    if (!diagram || (Object.keys(overlay).length === 0 && !overlayViewport)) return;
+    if (!diagram || (Object.keys(overlay).length === 0 && !overlayViewport && !hasExtras(overlayExtras))) return;
     if (status === 'conflict' || status === 'blocked') return;
     const positions = { ...overlay };
     const viewport = overlayViewport;
+    const extras = hasExtras(overlayExtras) ? { ...overlayExtras } : undefined;
     const tail = queue[queue.length - 1];
     // Coalesce into a position save that has not been sent yet; an in-flight one cannot change.
     if (tail && tail.type === 'presentation' && !tail.sent) {
       Object.assign(tail.positions, positions);
       if (viewport) tail.viewport = viewport;
+      if (extras) tail.extras = { ...tail.extras, ...extras };
     } else {
-      queue.push({ type: 'presentation', key: newKey(), positions, ...(viewport ? { viewport } : {}), waiters: [] });
+      queue.push({ type: 'presentation', key: newKey(), positions, ...(viewport ? { viewport } : {}), ...(extras ? { extras } : {}), waiters: [] });
     }
     emit();
     void pump();
@@ -577,7 +623,10 @@ export function createDocumentSession(deps: SessionDeps) {
         else if (item.type === 'rename') await renameDiagram(item.name);
         else if (item.type === 'ai') await ai(item.text, item.conversationId);
         else if (item.type === 'restore') await restore(item.version);
-        else savePositions(item.positions, item.viewport);
+        else {
+          savePositions(item.positions, item.viewport);
+          if (item.extras) saveExtras(item.extras);
+        }
         applied += 1;
       } catch (e) {
         if (e instanceof RefusedError) refused += 1;
@@ -618,6 +667,7 @@ export function createDocumentSession(deps: SessionDeps) {
     restore,
     renameDiagram,
     savePositions,
+    saveExtras,
     flush,
     retry,
     reloadLatest,

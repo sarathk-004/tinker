@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { useDiagramStore } from '../diagram/store';
 import { toggleFullscreen } from './fullscreen';
+import { groupSelected } from './groupActions';
 import { openRightTab, useUi } from './uiStore';
 
 export type ShortcutAction = 'select' | 'pan' | 'text' | 'fit' | 'components' | 'rename' | 'group' | 'fullscreen' | 'tidy' | 'help' | 'chat';
@@ -64,10 +65,11 @@ export function useShortcuts(): void {
         case 'components':
           return openRightTab('components');
         case 'rename':
-          // Only with exactly one component selected: with nothing selected there is nothing to rename.
-          return store.selectedNodeIds.length === 1 ? ui.set({ editingNodeId: store.selectedNodeIds[0]! }) : undefined;
+          // Only with exactly one component (or one group boundary) selected: with nothing selected there is nothing to rename.
+          if (store.selectedNodeIds.length === 1) return ui.set({ editingNodeId: store.selectedNodeIds[0]! });
+          return store.selectedNodeIds.length === 0 && ui.selectedGroupPath ? ui.set({ editingGroupPath: ui.selectedGroupPath }) : undefined;
         case 'group':
-          return store.selectedNodeIds.length >= 2 ? void store.groupNodes(store.selectedNodeIds, 'New group') : undefined;
+          return store.selectedNodeIds.length >= 2 ? void groupSelected() : undefined;
         case 'fullscreen':
           return void toggleFullscreen();
         case 'tidy':
