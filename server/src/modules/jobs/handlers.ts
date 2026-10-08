@@ -6,8 +6,10 @@ import { JobError, type JobType } from './queue.ts';
 
 /** Retention policy (decision D11). One place, so product copy and cleanup cannot drift apart. */
 export interface RetentionPolicy {
-  /** A revision is pruned only when it is NOT among the latest N of its diagram AND older than `revisionDays` (an intersection bound). */
+  /** The latest N revisions of a diagram are never pruned (undo walks them). */
   revisionKeepLatest: number;
+  /** Older ones are thinned to one per hour up to `revisionHourlyDays` days old, then one per day, and gone after `revisionDays`. */
+  revisionHourlyDays: number;
   revisionDays: number;
   /** How long a soft-deleted diagram can be recovered before it is physically purged. */
   deletedDiagramDays: number;
@@ -21,6 +23,7 @@ export interface RetentionPolicy {
 
 export const DEFAULT_RETENTION: RetentionPolicy = {
   revisionKeepLatest: REVISION_RETENTION.keepLatest,
+  revisionHourlyDays: REVISION_RETENTION.hourlyDays,
   revisionDays: REVISION_RETENTION.keepDays,
   deletedDiagramDays: 30,
   executionDays: 90,
@@ -38,8 +41,9 @@ export interface JobContext {
 export type JobHandler = (payload: unknown, context: JobContext) => Promise<Record<string, number>>;
 
 /**
- * Delete revisions that are older than the window AND not among the latest N. The newest revisions of a diagram are never touched,
- * and the diagram's current state lives in `diagrams`, not here. Safe to run twice (the second run finds nothing).
+ * Thin out old versions so a diagram edited for years never holds thousands. The latest N are untouched; of the older ones, only the
+ * newest version in each hour (for the first days) or each day (after that) survives, and anything past the final window goes.
+ * The diagram's current state lives in `diagrams`, not here. Safe to run twice (the second run finds nothing).
  */
 export const pruneRevisions: JobHandler = async (_payload, { pool, policy, signal }) => {
   const candidates = await pool.query<{ diagram_id: string }>(
@@ -50,15 +54,18 @@ export const pruneRevisions: JobHandler = async (_payload, { pool, policy, signa
   for (const { diagram_id } of candidates.rows) {
     if (signal.aborted) break;
     const deleted = await pool.query(
-      `DELETE FROM diagram_revisions
-        WHERE id IN (
-          SELECT id FROM (
-            SELECT id, created_at, row_number() OVER (ORDER BY version DESC) AS newest
-              FROM diagram_revisions WHERE diagram_id = $1
-          ) ranked
-          WHERE newest > $2 AND created_at < now() - make_interval(days => $3)
-        )`,
-      [diagram_id, policy.revisionKeepLatest, policy.revisionDays],
+      `WITH ranked AS (
+         SELECT id, created_at, version,
+                row_number() OVER (ORDER BY version DESC) AS newest,
+                row_number() OVER (
+                  PARTITION BY CASE WHEN created_at > now() - make_interval(days => $3)
+                                    THEN date_trunc('hour', created_at) ELSE date_trunc('day', created_at) END
+                  ORDER BY version DESC) AS in_bucket
+           FROM diagram_revisions WHERE diagram_id = $1
+       )
+       DELETE FROM diagram_revisions
+        WHERE id IN (SELECT id FROM ranked WHERE newest > $2 AND (in_bucket > 1 OR created_at < now() - make_interval(days => $4)))`,
+      [diagram_id, policy.revisionKeepLatest, policy.revisionHourlyDays, policy.revisionDays],
     );
     pruned += deleted.rowCount ?? 0;
   }
@@ -143,7 +150,14 @@ export const purgeDeletedDiagrams: JobHandler = async (_payload, { pool, policy,
       client.release();
     }
   }
-  return { diagramsDue: due.rows.length, diagramsPurged: purged };
+  // A deleted workspace goes for good once its window has passed and none of its diagrams remain.
+  const gone = await pool.query(
+    `DELETE FROM workspaces w
+      WHERE w.deleted_at IS NOT NULL AND w.deleted_at < now() - make_interval(days => $1)
+        AND NOT EXISTS (SELECT 1 FROM diagrams d WHERE d.workspace_id = w.id)`,
+    [policy.deletedDiagramDays],
+  );
+  return { diagramsDue: due.rows.length, diagramsPurged: purged, workspacesPurged: gone.rowCount ?? 0 };
 };
 
 export const HANDLERS: Record<JobType, JobHandler> = {

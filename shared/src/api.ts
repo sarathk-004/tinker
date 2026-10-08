@@ -80,13 +80,57 @@ export type HealthResponse = z.infer<typeof healthResponseSchema>;
 export const workspaceRoleSchema = z.enum(['OWNER', 'EDITOR', 'VIEWER']);
 export type WorkspaceRole = z.infer<typeof workspaceRoleSchema>;
 
+export const workspaceVisibilitySchema = z.enum(['PRIVATE', 'PUBLIC']);
+export type WorkspaceVisibility = z.infer<typeof workspaceVisibilitySchema>;
+
+/** One workspace as the dashboard and the switcher show it. */
 export const workspaceSummarySchema = z.strictObject({
   id: uuidSchema,
   name: z.string(),
   role: workspaceRoleSchema,
   personal: z.boolean(),
+  description: z.string().nullable(),
+  /** PRIVATE: only members. PUBLIC: anyone signed in who has the link can look (read-only). */
+  visibility: workspaceVisibilitySchema,
+  diagramCount: z.number().int().min(0),
+  memberCount: z.number().int().min(1),
+  updatedAt: z.iso.datetime(),
 });
 export type WorkspaceSummary = z.infer<typeof workspaceSummarySchema>;
+
+export const workspaceMemberSchema = z.strictObject({ userId: uuidSchema, email: z.string().nullable(), displayName: z.string().nullable(), role: workspaceRoleSchema });
+export const workspaceInviteSchema = z.strictObject({ email: z.string(), role: z.enum(['EDITOR', 'VIEWER']) });
+/** GET /v1/workspaces/{id}: the summary plus who is in it. Non-members of a public workspace see no member list. */
+export const workspaceDetailSchema = workspaceSummarySchema.extend({
+  /** false: this person is only looking at a public workspace. */
+  member: z.boolean(),
+  members: z.array(workspaceMemberSchema),
+  invites: z.array(workspaceInviteSchema),
+});
+export type WorkspaceDetail = z.infer<typeof workspaceDetailSchema>;
+
+/** PATCH /v1/workspaces/{id} (owner only). */
+export const updateWorkspaceRequestSchema = z
+  .strictObject({
+    name: z.string().trim().min(1).max(LIMITS.maxWorkspaceNameLength).optional(),
+    description: z.string().trim().max(LIMITS.maxWorkspaceDescriptionLength).nullable().optional(),
+    visibility: workspaceVisibilitySchema.optional(),
+  })
+  .refine((b) => Object.keys(b).length > 0, { message: 'nothing to change' });
+export type UpdateWorkspaceRequest = z.infer<typeof updateWorkspaceRequestSchema>;
+
+/** DELETE /v1/workspaces/{id} (owner only): the name must be typed again, so a stray click cannot delete a workspace. */
+export const deleteWorkspaceRequestSchema = z.strictObject({ confirmName: z.string() });
+
+/** POST /v1/workspaces/{id}/members: add a person by email. Someone without an account yet is invited and joins when they sign in. */
+export const addMemberRequestSchema = z.strictObject({ email: z.string().trim().toLowerCase().max(320).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'not an email address'), role: z.enum(['EDITOR', 'VIEWER']) });
+export type AddMemberRequest = z.infer<typeof addMemberRequestSchema>;
+export const deletedResponseSchema = z.strictObject({ deleted: z.literal(true) });
+export const updatedResponseSchema = z.strictObject({ updated: z.literal(true) });
+export const removedResponseSchema = z.strictObject({ removed: z.literal(true) });
+export const addMemberResponseSchema = z.strictObject({ status: z.enum(['ADDED', 'INVITED']) });
+export const changeMemberRoleRequestSchema = z.strictObject({ role: z.enum(['EDITOR', 'VIEWER']) });
+export const removeInviteRequestSchema = z.strictObject({ email: z.string().trim().toLowerCase().max(320) });
 
 /** POST /v1/workspaces: start a team workspace (the caller becomes its owner). */
 export const createWorkspaceRequestSchema = z.strictObject({ name: z.string().trim().min(1).max(LIMITS.maxWorkspaceNameLength) });

@@ -75,22 +75,25 @@ describe('diagram lifecycle', () => {
     expect(after.executions).toBe(before.executions + 1);
   });
 
-  it('presentation saves merge positions, bump the version and create no revision (D05)', async () => {
+  it('presentation saves merge positions, keep the version number and create no revision (D05)', async () => {
     const { diagram } = await createDiagramFor(h, u);
     const id = diagram.diagramId;
     const added = await cmd(id, u, h, 1, addNode('Orders'));
     const nodeId = added.body.graph.nodes[0].id;
     const saved = await call(h, u, 'PATCH', `/v1/diagrams/${id}/presentation`, { expectedVersion: 2, nodePositions: { [nodeId]: { x: 500, y: 300 } }, viewport: { x: 10, y: 20, zoom: 1.25 } }, { 'idempotency-key': key() });
     expect(saved.status).toBe(200);
-    expect(saved.body.version).toBe(3);
+    expect(saved.body.version).toBe(2); // moving things around is not a new version
     expect(saved.body.presentation.nodePositions[nodeId]).toEqual({ x: 500, y: 300 });
     expect(saved.body.presentation.viewport).toEqual({ x: 10, y: 20, zoom: 1.25 });
     expect((await counts(h, id)).revisions).toBe(1);
 
-    const unknown = await call(h, u, 'PATCH', `/v1/diagrams/${id}/presentation`, { expectedVersion: 3, nodePositions: { '00000000-0000-4000-8000-00000000dead': { x: 1, y: 1 } } }, { 'idempotency-key': key() });
+    const unknown = await call(h, u, 'PATCH', `/v1/diagrams/${id}/presentation`, { expectedVersion: 2, nodePositions: { '00000000-0000-4000-8000-00000000dead': { x: 1, y: 1 } } }, { 'idempotency-key': key() });
     expect(unknown.status).toBe(422);
     expect(unknown.body.error.details.reason).toBe('NODE_NOT_FOUND');
-    expect((await call(h, u, 'GET', `/v1/diagrams/${id}`)).body.version).toBe(3);
+    expect((await call(h, u, 'GET', `/v1/diagrams/${id}`)).body.version).toBe(2);
+    // many drags in a row never move the number
+    for (let i = 0; i < 5; i++) await call(h, u, 'PATCH', `/v1/diagrams/${id}/presentation`, { expectedVersion: 2, nodePositions: { [nodeId]: { x: i, y: i } } }, { 'idempotency-key': key() });
+    expect((await call(h, u, 'GET', `/v1/diagrams/${id}`)).body.version).toBe(2);
   });
 
   it('rename and soft delete participate in the version counter; a deleted diagram is gone for reads and writes', async () => {

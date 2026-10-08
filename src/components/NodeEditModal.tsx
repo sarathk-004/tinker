@@ -3,40 +3,17 @@ import { useDiagramStore } from '../diagram/store';
 import { AWSIcon } from './icons/AWSIcons';
 import { AWSServiceIcon, SystemNodeType } from '../types/diagram';
 import { X, Check, Trash2, ArrowRight } from 'lucide-react';
+import { groupByCategory, PALETTE, searchComponents } from '../shell/palette';
 
 interface NodeEditModalProps {
   nodeId: string | null;
   onClose: () => void;
 }
 
-const AWS_OPTIONS: Array<{
-  label: string;
-  type: SystemNodeType;
-  icon: AWSServiceIcon;
-  subType: string;
-}> = [
-  { label: 'API Gateway', type: 'gateway', icon: 'api-gateway', subType: 'Amazon API Gateway' },
-  { label: 'App Load Balancer', type: 'gateway', icon: 'alb', subType: 'Application Load Balancer' },
-  { label: 'CloudFront CDN', type: 'gateway', icon: 'cloudfront', subType: 'Amazon CloudFront' },
-  { label: 'Route 53 DNS', type: 'gateway', icon: 'route53', subType: 'Amazon Route 53' },
-  { label: 'AWS WAF', type: 'gateway', icon: 'waf', subType: 'AWS WAF' },
-  { label: 'EC2 Microservice', type: 'service', icon: 'ec2', subType: 'Amazon EC2' },
-  { label: 'AWS Lambda', type: 'service', icon: 'lambda', subType: 'AWS Lambda' },
-  { label: 'Amazon EKS', type: 'service', icon: 'eks', subType: 'Amazon EKS (Kubernetes)' },
-  { label: 'AWS Cognito', type: 'service', icon: 'cognito', subType: 'AWS Cognito (Auth)' },
-  { label: 'Step Functions', type: 'service', icon: 'step-functions', subType: 'AWS Step Functions' },
-  { label: 'Amazon RDS', type: 'database', icon: 'rds', subType: 'Amazon RDS (PostgreSQL)' },
-  { label: 'DynamoDB', type: 'database', icon: 'dynamodb', subType: 'Amazon DynamoDB' },
-  { label: 'OpenSearch', type: 'database', icon: 'opensearch', subType: 'Amazon OpenSearch' },
-  { label: 'Redis Cache', type: 'cache', icon: 'redis', subType: 'ElastiCache / Redis' },
-  { label: 'Amazon SQS', type: 'queue', icon: 'sqs', subType: 'Amazon SQS' },
-  { label: 'Amazon SNS', type: 'queue', icon: 'sns', subType: 'Amazon SNS' },
-  { label: 'EventBridge', type: 'queue', icon: 'eventbridge', subType: 'Amazon EventBridge' },
-  { label: 'Amazon Kinesis', type: 'queue', icon: 'kinesis', subType: 'Amazon Kinesis' },
-  { label: 'Amazon S3', type: 'storage', icon: 's3', subType: 'Amazon S3' },
-  { label: 'Secrets Manager', type: 'service', icon: 'secrets-manager', subType: 'AWS Secrets Manager' },
-  { label: 'Web / Mobile Client', type: 'client', icon: 'client', subType: 'Client Application' },
-];
+const squash = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+const DEFAULT_NAMES = new Set(PALETTE.flatMap((c) => [squash(c.label), squash(c.subType ?? ''), squash(c.awsIcon)]));
+/** A name that only repeats a service's own name ("CloudFront CDN", "CloudFrontCDN"). Such a name follows the service when it is changed; a name the person chose ("Orders") never does. */
+export const isServiceName = (name: string): boolean => DEFAULT_NAMES.has(squash(name));
 
 export const NodeEditModal: React.FC<NodeEditModalProps> = ({ nodeId, onClose }) => {
   const store = useDiagramStore();
@@ -47,6 +24,7 @@ export const NodeEditModal: React.FC<NodeEditModalProps> = ({ nodeId, onClose })
   const [selectedAwsIcon, setSelectedAwsIcon] = useState<AWSServiceIcon>('generic');
   const [selectedType, setSelectedType] = useState<SystemNodeType>('service');
   const [targetConnectId, setTargetConnectId] = useState<string>('');
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     if (node) {
@@ -137,31 +115,35 @@ export const NodeEditModal: React.FC<NodeEditModalProps> = ({ nodeId, onClose })
             <label className="block text-xs font-medium text-ink mb-2">
               Select AWS Component
             </label>
-            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto p-1 border border-line rounded-md bg-soft">
-              {AWS_OPTIONS.map((opt) => {
-                const isSelected = selectedAwsIcon === opt.icon;
-                return (
-                  <button
-                    key={opt.icon}
-                    type="button"
-                    onClick={() => {
-                      setSelectedAwsIcon(opt.icon);
-                      setSelectedType(opt.type);
-                      if (!subType || subType === node.data.subType) {
-                        setSubType(opt.subType);
-                      }
-                    }}
-                    className={`flex items-center gap-2 p-2 rounded-md text-left text-xs transition-all ${
-                      isSelected
-                        ? 'bg-surface border border-primary shadow-xs text-ink font-medium'
-                        : 'hover:bg-surface border border-transparent text-body'
-                    }`}
-                  >
-                    <AWSIcon name={opt.icon} type={opt.type} size={18} />
-                    <span className="truncate">{opt.label}</span>
-                  </button>
-                );
-              })}
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or purpose, e.g. monitoring" aria-label="Search components" className="w-full mb-1.5 px-3 py-1.5 text-xs rounded-md bg-soft border border-line focus:border-ink text-ink outline-none" />
+            <div className="max-h-56 overflow-y-auto p-1 border border-line rounded-md bg-soft">
+              {(query.trim() ? [{ category: 'Matches', items: searchComponents(query) }] : groupByCategory(PALETTE)).map(({ category, items }) => (
+                <div key={category}>
+                  <div className="px-1.5 pt-1.5 pb-1 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">{category}</div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {items.map((opt) => {
+                      const isSelected = selectedAwsIcon === opt.awsIcon;
+                      return (
+                        <button
+                          key={opt.awsIcon}
+                          type="button"
+                          onClick={() => {
+                            // The name follows the service only while it is just the old service's name.
+                            if (isServiceName(label)) setLabel(opt.label);
+                            setSelectedAwsIcon(opt.awsIcon);
+                            setSelectedType(opt.type);
+                            if (!subType || isServiceName(subType) || subType === node.data.subType) setSubType(opt.subType ?? '');
+                          }}
+                          className={`flex items-center gap-2 p-2 rounded-md text-left text-xs transition-all ${isSelected ? 'bg-surface border border-primary shadow-xs text-ink font-medium' : 'hover:bg-surface border border-transparent text-body'}`}
+                        >
+                          <AWSIcon name={opt.awsIcon} type={opt.type} size={18} />
+                          <span className="truncate">{opt.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

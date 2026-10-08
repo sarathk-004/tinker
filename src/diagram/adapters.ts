@@ -13,12 +13,10 @@ import {
   type Presentation,
 } from '../contracts';
 import type { AWSServiceIcon, DiagramEdge, DiagramNode, DiagramNodeData, SystemNodeType } from '../types/diagram';
+import { isKnownIcon } from '../catalog/services';
 import { inferAWSDetails, sanitizeLabel } from './inference';
 
-const KNOWN_ICONS: ReadonlySet<string> = new Set<AWSServiceIcon>([
-  'client', 'api-gateway', 'alb', 'ec2', 'lambda', 'ecs', 'eks', 'rds', 'dynamodb', 'elasticache', 'redis', 'sqs', 'sns', 's3',
-  'cloudfront', 'cognito', 'route53', 'waf', 'eventbridge', 'kinesis', 'opensearch', 'secrets-manager', 'step-functions', 'generic',
-]);
+const KNOWN_ICONS = { has: (id: string): boolean => id === 'generic' || isKnownIcon(id) };
 
 export const kindToType = (kind: NodeKind): SystemNodeType => kind.toLowerCase() as SystemNodeType;
 export const typeToKind = (type: SystemNodeType): NodeKind => NODE_KIND_FROM_LEGACY[type] ?? 'GENERIC';
@@ -88,7 +86,7 @@ export function toViewEdges(graph: Graph, highlightedIds: readonly string[]): Di
       target: edge.targetNodeId,
       ...(edge.relationship ? { label: edge.relationship } : {}),
       type: 'floating',
-      data: { index, count: pairCount.get(key) ?? 1 },
+      data: { index, count: pairCount.get(key) ?? 1, bidirectional },
       animated: lit,
       style: { stroke: color, strokeWidth: lit ? 2.25 : 1.5, opacity: dim ? 0.3 : 1 },
       labelStyle: { fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 10.5, fill: lit ? 'rgb(var(--primary-hover))' : 'rgb(var(--body))', letterSpacing: '0.02em' },

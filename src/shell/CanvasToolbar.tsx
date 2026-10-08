@@ -8,7 +8,7 @@ import { useAddComponent } from './addComponent';
 import { toggleFullscreen, useFullscreen } from './fullscreen';
 import { MOD_KEY } from './TopBar';
 import { MENU_PANEL, MONO_LABEL, useDismiss } from './Popover';
-import { PALETTE } from './palette';
+import { groupByCategory, searchComponents } from './palette';
 import { groupSelected } from './groupActions';
 import { useUi } from './uiStore';
 
@@ -37,7 +37,9 @@ const AddComponent: React.FC = () => {
   const ref = useDismiss(open, close);
   const add = useAddComponent();
   const hasDiagram = useDiagramStore((s) => s.doc.diagram !== null);
-  const categories = [...new Set(PALETTE.map((c) => c.category))];
+  const [query, setQuery] = useState('');
+  const matches = searchComponents(query);
+  const groups = query.trim() ? [{ category: `${matches.length} found`, items: matches }] : groupByCategory(matches);
   return (
     <div ref={ref} className="relative">
       <button onClick={() => setOpen((o) => !o)} disabled={!hasDiagram} aria-haspopup="menu" aria-expanded={open} className="flex items-center gap-1.5 h-9 pl-3 pr-2.5 rounded-lg bg-primary hover:bg-primary-hover disabled:opacity-50 text-white text-[13.5px] font-medium transition-colors">
@@ -45,15 +47,20 @@ const AddComponent: React.FC = () => {
       </button>
       {open && (
         <div role="menu" className={`${MENU_PANEL} right-0 top-full mt-2 w-80 max-h-[26rem] overflow-y-auto`}>
-          {categories.map((category) => (
+          <div className="sticky top-0 z-10 bg-surface pb-1.5">
+            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search, e.g. monitoring, queue, security" aria-label="Search components" className="w-full h-8 px-2.5 rounded-lg border border-line bg-soft text-[13px] text-ink placeholder:text-muted outline-none focus:border-ink" />
+          </div>
+          {groups.length === 0 && <p className="px-2.5 py-4 text-[13px] text-muted">No component matches.</p>}
+          {groups.map(({ category, items }) => (
             <div key={category} className="pb-1">
               <div className={`px-2.5 pt-2 pb-1 ${MONO_LABEL}`}>{category}</div>
-              {PALETTE.filter((c) => c.category === category).map((c) => (
+              {items.map((c) => (
                 <button
                   key={c.label}
                   role="menuitem"
                   onClick={() => {
                     setOpen(false);
+                    setQuery('');
                     void add(c);
                   }}
                   className="w-full flex items-center gap-3 px-2.5 py-1.5 rounded-lg text-left hover:bg-canvas"

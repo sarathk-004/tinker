@@ -14,7 +14,7 @@ import { RefusedError } from '../document/session';
 export interface HistoryState {
   diagramId: string | null;
   revisions: RevisionSummary[];
-  retention: { keepLatest: number; keepDays: number };
+  retention: { keepLatest: number; hourlyDays: number; keepDays: number };
   hasMore: boolean;
   loading: boolean;
   busy: boolean;
@@ -82,7 +82,7 @@ const messageOf = (error: unknown) =>
 export const useHistoryStore = create<HistoryState>((set, get) => ({
   diagramId: null,
   revisions: [],
-  retention: { keepLatest: 100, keepDays: 30 },
+  retention: { keepLatest: 100, hourlyDays: 7, keepDays: 90 },
   hasMore: false,
   loading: false,
   busy: false,

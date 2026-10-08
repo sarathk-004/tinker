@@ -27,8 +27,9 @@ export const SaveStatus: React.FC = () => {
 };
 
 const FORMATS: Array<[ExportFormat, string, string, React.ReactNode]> = [
-  ['png', 'PNG image', 'For slides and chat', <ImageIcon key="p" className="w-4 h-4" />],
-  ['svg', 'SVG', 'Sharp at any size', <Shapes key="s" className="w-4 h-4" />],
+  ['png', 'PNG image', 'Transparent background, just the diagram', <ImageIcon key="p" className="w-4 h-4" />],
+  ['png-solid', 'PNG with background', 'Filled with the canvas colour', <ImageIcon key="ps" className="w-4 h-4" />],
+  ['svg', 'SVG', 'Sharp at any size, transparent', <Shapes key="s" className="w-4 h-4" />],
   ['md', 'Markdown summary', 'Components and connections as text', <FileText key="m" className="w-4 h-4" />],
   ['json', 'JSON', 'The saved diagram, as data', <FileJson key="j" className="w-4 h-4" />],
 ];

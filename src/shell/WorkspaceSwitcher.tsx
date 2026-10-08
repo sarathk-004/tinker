@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Check, ChevronsUpDown, Loader2, Plus } from 'lucide-react';
+import { Check, ChevronsUpDown, LayoutGrid, Loader2, Plus, Settings } from 'lucide-react';
+import { useUi } from './uiStore';
 import { LIMITS } from '../contracts';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { MENU_ITEM, MENU_PANEL, MONO_LABEL, useDismiss } from './Popover';
@@ -62,7 +63,7 @@ export const WorkspaceSwitcher: React.FC = () => {
                 aria-checked={w.id === workspace.id}
                 onClick={() => {
                   close();
-                  void useWorkspaceStore.getState().switchWorkspace(w.id);
+                  void useWorkspaceStore.getState().openWorkspace(w.id);
                 }}
                 className={MENU_ITEM}
               >
@@ -71,6 +72,14 @@ export const WorkspaceSwitcher: React.FC = () => {
                 <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">{w.personal ? 'Personal' : w.role.toLowerCase()}</span>
               </button>
             ))}
+          </div>
+          <div className="border-t border-fill mt-1 pt-1">
+            <button onClick={() => { close(); useUi.getState().set({ view: 'dashboard' }); }} className={MENU_ITEM}>
+              <LayoutGrid className="w-4 h-4 text-body" /> All workspaces
+            </button>
+            <button onClick={() => { close(); useUi.getState().set({ workspaceSettingsId: workspace.id }); }} className={MENU_ITEM}>
+              <Settings className="w-4 h-4 text-body" /> Workspace settings
+            </button>
           </div>
           <div className="border-t border-fill mt-1 pt-1">
             {creating ? (

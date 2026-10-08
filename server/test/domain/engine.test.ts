@@ -333,3 +333,24 @@ describe('purity', () => {
     for (const command of commands) expect(() => applyCommand(doc, command, sequence())).not.toThrow();
   });
 });
+
+describe('UPDATE_EDGE (text on a connection)', () => {
+  const withEdge = () => ordersToPostgres();
+  it('changes and clears the text, and keeps the rest of the connection', () => {
+    let doc = expectOk(withEdge(), { type: 'UPDATE_EDGE', edgeId: E_ORDERS_PG, relationship: 'HTTPS' });
+    expect(doc.graph.edges[0]).toMatchObject({ id: E_ORDERS_PG, relationship: 'HTTPS', metadata: { protocol: 'tcp' } });
+    doc = expectOk(doc, { type: 'UPDATE_EDGE', edgeId: E_ORDERS_PG, relationship: null });
+    expect(doc.graph.edges[0]!.relationship).toBeUndefined();
+  });
+  it('makes a connection point both ways and back', () => {
+    let doc = expectOk(withEdge(), { type: 'UPDATE_EDGE', edgeId: E_ORDERS_PG, bidirectional: true });
+    expect(doc.graph.edges[0]!.metadata).toMatchObject({ bidirectional: true, protocol: 'tcp' });
+    doc = expectOk(doc, { type: 'UPDATE_EDGE', edgeId: E_ORDERS_PG, bidirectional: false });
+    expect(doc.graph.edges[0]!.metadata).toEqual({ protocol: 'tcp' });
+  });
+  it('refuses unknown connections and text that would duplicate another connection', () => {
+    expect(expectError(withEdge(), { type: 'UPDATE_EDGE', edgeId: uid(7), relationship: 'x' }).reason).toBe('EDGE_NOT_FOUND');
+    const doc = expectOk(withEdge(), { type: 'CONNECT', sourceNodeId: ORDERS, targetNodeId: POSTGRES, relationship: 'HTTPS' });
+    expect(expectError(doc, { type: 'UPDATE_EDGE', edgeId: E_ORDERS_PG, relationship: 'HTTPS' }).reason).toBe('DUPLICATE_EDGE');
+  });
+});

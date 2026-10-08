@@ -89,7 +89,7 @@ export async function listDiagramSummaries(db: Queryable, workspaceId: string, l
  */
 export async function updateDocument(
   db: Queryable,
-  input: { id: string; expectedVersion: number; graph?: Graph; presentation?: Presentation; name?: string; deleted?: boolean },
+  input: { id: string; expectedVersion: number; graph?: Graph; presentation?: Presentation; name?: string; deleted?: boolean; /** false: a view-only change (positions, zoom, notes) keeps the version number. */ bump?: boolean },
 ): Promise<DiagramRow | null> {
   const { rows } = await db.query<RawRow>(
     `UPDATE diagrams
@@ -97,7 +97,7 @@ export async function updateDocument(
             presentation = COALESCE($4::jsonb, presentation),
             name = COALESCE($5, name),
             deleted_at = CASE WHEN $6::boolean THEN now() ELSE deleted_at END,
-            version = version + 1,
+            version = CASE WHEN $7::boolean THEN version + 1 ELSE version END,
             updated_at = now()
       WHERE id = $1 AND version = $2 AND deleted_at IS NULL
       RETURNING ${COLUMNS}`,
@@ -108,6 +108,7 @@ export async function updateDocument(
       input.presentation ? JSON.stringify(input.presentation) : null,
       input.name ?? null,
       input.deleted ?? false,
+      input.bump ?? true,
     ],
   );
   return rows[0] ? toRow(rows[0]) : null;

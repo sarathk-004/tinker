@@ -3,9 +3,8 @@ import { GripVertical, Search } from 'lucide-react';
 import { AWSIcon } from '../components/icons/AWSIcons';
 import { useDiagramStore } from '../diagram/store';
 import { COMPONENT_DRAG_TYPE, useAddComponent } from './addComponent';
-import { PALETTE, type QuickComponent } from './palette';
+import { groupByCategory, searchComponents, type QuickComponent } from './palette';
 import { MONO_LABEL } from './Popover';
-import { scoreText } from './search';
 
 /** The "Components" tab: every component Tinker knows, to drag onto the canvas or click to add. */
 export const ComponentsPanel: React.FC = () => {
@@ -14,10 +13,9 @@ export const ComponentsPanel: React.FC = () => {
   const hasDiagram = useDiagramStore((s) => s.doc.diagram !== null);
 
   const groups = useMemo(() => {
-    const q = query.trim();
-    const matches = PALETTE.filter((c) => !q || Math.max(scoreText(c.label, q), scoreText(c.subType ?? '', q), scoreText(c.category, q)) > 0);
-    const categories = [...new Set(matches.map((c) => c.category))];
-    return categories.map((category) => ({ category, items: matches.filter((c) => c.category === category) }));
+    const matches = searchComponents(query);
+    // Searching shows the best match first; browsing shows the categories.
+    return query.trim() ? [{ category: `${matches.length} found`, items: matches }] : groupByCategory(matches);
   }, [query]);
 
   return (
@@ -25,7 +23,7 @@ export const ComponentsPanel: React.FC = () => {
       <div className="px-4 pt-3 pb-2 flex-shrink-0">
         <label className="flex items-center gap-2 h-9 px-3 rounded-lg border border-line bg-soft focus-within:bg-surface focus-within:border-ink">
           <Search className="w-4 h-4 text-muted" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search components" aria-label="Search components" className="flex-1 bg-transparent text-[13.5px] outline-none placeholder-faint" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or purpose, e.g. monitoring" aria-label="Search components" className="flex-1 bg-transparent text-[13.5px] outline-none placeholder-faint" />
         </label>
         <p className="mt-2 text-[12px] text-muted">Drag a component onto the canvas, or click it to add it to the middle of the view.</p>
       </div>

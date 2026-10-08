@@ -2,6 +2,10 @@ import React, { useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AiKeyDialog } from '../components/AiKeyDialog';
 import { SettingsDialog } from '../components/SettingsDialog';
+import { WorkspaceSettingsDialog } from '../components/WorkspaceSettingsDialog';
+import { Dashboard } from './Dashboard';
+import { Eye } from 'lucide-react';
+import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { DiagramCanvas } from '../components/DiagramCanvas';
 import { NodeEditModal } from '../components/NodeEditModal';
 import { StatusBanners } from '../components/StatusBanners';
@@ -31,6 +35,8 @@ const ShellBody: React.FC = () => {
   const navOpen = useUi((s) => s.navOpen);
   const chatOpen = useUi((s) => s.chatOpen);
   const editingNodeId = useUi((s) => s.editingNodeId);
+  const view = useUi((s) => s.view);
+  const viewerOnly = useWorkspaceStore((s) => s.workspace?.role === 'VIEWER');
 
   // Cmd/Ctrl+K opens search from anywhere (also while typing: it is the one shortcut people expect to work everywhere).
   useEffect(() => {
@@ -49,9 +55,18 @@ const ShellBody: React.FC = () => {
       <div className="flex flex-col w-screen h-screen bg-canvas text-ink overflow-hidden select-none font-sans">
         <TopBar />
         <StatusBanners />
+        {view === 'editor' && viewerOnly && (
+          <div role="status" className="w-full px-6 py-1.5 flex items-center gap-2 text-xs border-b border-line bg-fill text-body">
+            <Eye className="w-3.5 h-3.5" /> You can look at this workspace but not change it. Ask an owner for edit access.
+          </div>
+        )}
         <AiKeyDialog />
         <SettingsDialog />
+        <WorkspaceSettingsDialog />
 
+        {view === 'dashboard' ? (
+          <Dashboard />
+        ) : (
         <div className="flex flex-1 min-h-0 w-full overflow-hidden relative">
           <div className="hidden lg:block h-full flex-shrink-0">
             <LeftNav />
@@ -71,6 +86,7 @@ const ShellBody: React.FC = () => {
             <RightPanel />
           </div>
         </div>
+        )}
 
         {navOpen && (
           <div className="fixed inset-0 z-40 flex lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">

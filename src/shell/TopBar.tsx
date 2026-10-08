@@ -73,10 +73,10 @@ export const TopBar: React.FC = () => {
       <button onClick={() => useUi.getState().set({ navOpen: true })} aria-label="Open navigation" className="lg:hidden p-1.5 -ml-1 rounded-lg text-body hover:bg-canvas">
         <Menu className="w-5 h-5" />
       </button>
-      <div className="flex items-center gap-2.5 flex-shrink-0">
+      <button onClick={() => useUi.getState().set({ view: 'dashboard' })} title="All workspaces" aria-label="Tinker: all workspaces" className="flex items-center gap-2.5 flex-shrink-0 rounded-lg">
         <TinkerLogo size={26} />
         <span className="text-[20px] font-semibold tracking-[-0.03em] text-ink">Tinker</span>
-      </div>
+      </button>
       <div className="hidden sm:block h-6 w-px bg-line" />
       <WorkspaceSwitcher />
 

@@ -6,7 +6,12 @@ import {
   aiCommandRequestSchema,
   commandRequestSchema,
   createDiagramRequestSchema,
+  addMemberRequestSchema,
+  changeMemberRoleRequestSchema,
   createWorkspaceRequestSchema,
+  deleteWorkspaceRequestSchema,
+  removeInviteRequestSchema,
+  updateWorkspaceRequestSchema,
   diagramCommandSchema,
   expectedVersionQuerySchema,
   idempotencyKeySchema,
@@ -28,6 +33,7 @@ import type { RateLimiter } from '../../../infrastructure/http/rate-limiter.ts';
 import type { RunResult, TestHooks } from '../../../infrastructure/idempotency/mutation-requests.ts';
 import { listWorkspaces } from '../../workspaces/access.ts';
 import { createWorkspace } from '../../workspaces/workspace-service.ts';
+import { addMember, changeMemberRole, deleteWorkspace, getWorkspaceDetail, removeInvite, removeMember, updateWorkspace } from '../../workspaces/workspace-admin.ts';
 import { avatarUpdatedAt, deleteAvatar, getAvatar, putAvatar } from '../../profile/avatar.ts';
 import { createRateLimiter } from '../../../infrastructure/http/rate-limiter.ts';
 import { askAdvice } from '../../ai/application/advice-service.ts';
@@ -156,6 +162,53 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
       const key = idempotencyKeyOf(request);
       const body = parseOrThrow(createWorkspaceRequestSchema, request.body, 'INVALID_REQUEST', 'Give the workspace a name (1 to 80 characters).');
       return send(reply, request, await createWorkspace(svc, actorOf(request), key, body));
+    });
+
+    // Workspace settings and members. Owners only (checked again inside each transaction); changes are limited per person.
+    const adminLimiter = createRateLimiter({ limit: 40 });
+    const memberParams = z.object({ workspaceId: uuidSchema, userId: uuidSchema });
+    app.get(`${API_PREFIX}/workspaces/:workspaceId`, async (request) => {
+      const { workspaceId } = parseOrThrow(workspaceParams, request.params, 'INVALID_REQUEST', 'Invalid workspace id.');
+      return getWorkspaceDetail(pool, request.auth!.userId, workspaceId);
+    });
+    app.patch(`${API_PREFIX}/workspaces/:workspaceId`, async (request) => {
+      const { workspaceId } = parseOrThrow(workspaceParams, request.params, 'INVALID_REQUEST', 'Invalid workspace id.');
+      const body = parseOrThrow(updateWorkspaceRequestSchema, request.body, 'INVALID_REQUEST', 'Those settings are not valid.');
+      adminLimiter.check(request.auth!.userId);
+      return updateWorkspace(pool, actorOf(request), workspaceId, body);
+    });
+    app.delete(`${API_PREFIX}/workspaces/:workspaceId`, async (request) => {
+      const { workspaceId } = parseOrThrow(workspaceParams, request.params, 'INVALID_REQUEST', 'Invalid workspace id.');
+      const body = parseOrThrow(deleteWorkspaceRequestSchema, request.body, 'INVALID_REQUEST', 'Type the workspace name to delete it.');
+      adminLimiter.check(request.auth!.userId);
+      await deleteWorkspace(pool, actorOf(request), workspaceId, body.confirmName);
+      return { deleted: true as const };
+    });
+    app.post(`${API_PREFIX}/workspaces/:workspaceId/members`, async (request) => {
+      const { workspaceId } = parseOrThrow(workspaceParams, request.params, 'INVALID_REQUEST', 'Invalid workspace id.');
+      const body = parseOrThrow(addMemberRequestSchema, request.body, 'INVALID_REQUEST', 'Enter a valid email address and a role.');
+      adminLimiter.check(request.auth!.userId);
+      return { status: await addMember(pool, actorOf(request), workspaceId, body) };
+    });
+    app.patch(`${API_PREFIX}/workspaces/:workspaceId/members/:userId`, async (request) => {
+      const { workspaceId, userId } = parseOrThrow(memberParams, request.params, 'INVALID_REQUEST', 'Invalid id.');
+      const body = parseOrThrow(changeMemberRoleRequestSchema, request.body, 'INVALID_REQUEST', 'Choose Editor or Viewer.');
+      adminLimiter.check(request.auth!.userId);
+      await changeMemberRole(pool, actorOf(request), workspaceId, userId, body.role);
+      return { updated: true as const };
+    });
+    app.delete(`${API_PREFIX}/workspaces/:workspaceId/members/:userId`, async (request) => {
+      const { workspaceId, userId } = parseOrThrow(memberParams, request.params, 'INVALID_REQUEST', 'Invalid id.');
+      adminLimiter.check(request.auth!.userId);
+      await removeMember(pool, actorOf(request), workspaceId, userId);
+      return { removed: true as const };
+    });
+    app.post(`${API_PREFIX}/workspaces/:workspaceId/invites/remove`, async (request) => {
+      const { workspaceId } = parseOrThrow(workspaceParams, request.params, 'INVALID_REQUEST', 'Invalid workspace id.');
+      const body = parseOrThrow(removeInviteRequestSchema, request.body, 'INVALID_REQUEST', 'Invalid email.');
+      adminLimiter.check(request.auth!.userId);
+      await removeInvite(pool, actorOf(request), workspaceId, body.email);
+      return { removed: true as const };
     });
 
     app.get(`${API_PREFIX}/workspaces/:workspaceId/diagrams`, async (request) => {

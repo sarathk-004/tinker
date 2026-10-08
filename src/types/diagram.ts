@@ -11,31 +11,8 @@ export type SystemNodeType =
   | 'external'
   | 'generic';
 
-export type AWSServiceIcon =
-  | 'client'
-  | 'api-gateway'
-  | 'alb'
-  | 'ec2'
-  | 'lambda'
-  | 'ecs'
-  | 'eks'
-  | 'rds'
-  | 'dynamodb'
-  | 'elasticache'
-  | 'redis'
-  | 'sqs'
-  | 'sns'
-  | 's3'
-  | 'cloudfront'
-  | 'cognito'
-  | 'route53'
-  | 'waf'
-  | 'eventbridge'
-  | 'kinesis'
-  | 'opensearch'
-  | 'secrets-manager'
-  | 'step-functions'
-  | 'generic';
+/** The icon key of a catalog service (see src/catalog/services.ts), 'client' or 'generic'. */
+export type AWSServiceIcon = string;
 
 export interface DiagramNodeData extends Record<string, unknown> {
   id: string;

@@ -8,8 +8,11 @@ import { presentationSchema } from './presentation.ts';
 export const REVISION_REASONS = ['AI_COMMAND', 'MANUAL_COMMAND', 'AUTOSAVE', 'CHECKPOINT', 'RESTORE'] as const;
 export const revisionReasonSchema = z.enum(REVISION_REASONS);
 
-/** What the history window keeps (decision D11): the latest N revisions, and anything newer than `keepDays` days. */
-export const REVISION_RETENTION = { keepLatest: 100, keepDays: 30 } as const;
+/**
+ * What the history keeps (decision D11, tiered): every one of the latest `keepLatest` versions (this is what undo walks), then one
+ * per hour for `hourlyDays` days, then one per day until `keepDays` days. A diagram never holds more than a few hundred versions.
+ */
+export const REVISION_RETENTION = { keepLatest: 100, hourlyDays: 7, keepDays: 90 } as const;
 
 export const revisionSummarySchema = z.strictObject({
   version: versionSchema,
@@ -25,7 +28,7 @@ export type RevisionSummary = z.infer<typeof revisionSummarySchema>;
 export const revisionListResponseSchema = z.strictObject({
   revisions: z.array(revisionSummarySchema),
   nextBefore: versionSchema.nullable(),
-  retention: z.strictObject({ keepLatest: z.number().int(), keepDays: z.number().int() }),
+  retention: z.strictObject({ keepLatest: z.number().int(), hourlyDays: z.number().int(), keepDays: z.number().int() }),
 });
 export type RevisionListResponse = z.infer<typeof revisionListResponseSchema>;
 

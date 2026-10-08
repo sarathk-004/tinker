@@ -2,6 +2,8 @@ import { create } from 'zustand';
 
 export type Tool = 'pan' | 'select' | 'text';
 export type RightTab = 'chat' | 'components';
+/** The page: the dashboard of all workspaces (the landing page), or the editor of the open diagram. */
+export type View = 'dashboard' | 'editor';
 
 /** View-only state of the shell (never saved, never sent to the server). */
 interface UiState {
@@ -15,6 +17,9 @@ interface UiState {
   chatOpen: boolean;
   /** Which tab of the right panel is showing. */
   rightTab: RightTab;
+  view: View;
+  /** The workspace whose settings dialog is open. */
+  workspaceSettingsId: string | null;
   /** The node whose properties dialog is open. */
   editingNodeId: string | null;
   /** The canvas note whose text is being typed. */
@@ -22,6 +27,8 @@ interface UiState {
   /** The group whose name is being typed (its full path), and the one selected on the canvas. */
   editingGroupPath: string | null;
   selectedGroupPath: string | null;
+  /** The connection whose text is being typed. */
+  editingEdgeId: string | null;
   helpOpen: boolean;
   settingsOpen: boolean;
   set(patch: Partial<Omit<UiState, 'set'>>): void;
@@ -34,10 +41,13 @@ export const useUi = create<UiState>((set) => ({
   navOpen: false,
   chatOpen: false,
   rightTab: 'chat',
+  view: 'dashboard',
+  workspaceSettingsId: null,
   editingNodeId: null,
   editingNoteId: null,
   editingGroupPath: null,
   selectedGroupPath: null,
+  editingEdgeId: null,
   helpOpen: false,
   settingsOpen: false,
   set: (patch) => set(patch),

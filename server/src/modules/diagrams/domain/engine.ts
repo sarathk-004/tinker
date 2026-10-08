@@ -46,6 +46,8 @@ function dispatch(doc: DiagramDoc, command: DiagramCommand, newId: NewId): Domai
       return connect(doc, command, newId);
     case 'DISCONNECT':
       return disconnect(doc, command);
+    case 'UPDATE_EDGE':
+      return updateEdge(doc, command);
     case 'INSERT_BETWEEN':
       return insertBetween(doc, command, newId);
     case 'SET_GROUP':
@@ -156,6 +158,22 @@ function connect(doc: DiagramDoc, c: Cmd<'CONNECT'>, newId: NewId): DomainResult
     metadata: c.metadata ?? {},
   };
   return ok(withGraph(doc, [...doc.graph.nodes], [...doc.graph.edges, edge]));
+}
+
+/** Set or clear the text on one connection, and/or make it point both ways. Two connections cannot end up identical. */
+function updateEdge(doc: DiagramDoc, c: Cmd<'UPDATE_EDGE'>): DomainResult<DiagramDoc> {
+  const current = doc.graph.edges.find((e) => e.id === c.edgeId);
+  if (!current) return fail('EDGE_NOT_FOUND', 'That connection does not exist.', { edgeId: c.edgeId });
+  const { relationship: _old, ...base } = current;
+  const relationship = c.relationship === undefined ? current.relationship : (c.relationship ?? undefined);
+  const metadata = { ...current.metadata };
+  if (c.bidirectional === true) metadata['bidirectional'] = true;
+  else if (c.bidirectional === false) delete metadata['bidirectional'];
+  const next: GraphEdge = { ...base, ...(relationship !== undefined ? { relationship } : {}), metadata };
+  if (doc.graph.edges.some((e) => e.id !== c.edgeId && edgeKey(e) === edgeKey(next))) {
+    return fail('DUPLICATE_EDGE', 'These nodes are already connected with the same text.', { edgeId: c.edgeId });
+  }
+  return ok(withGraph(doc, [...doc.graph.nodes], doc.graph.edges.map((e) => (e.id === c.edgeId ? next : e))));
 }
 
 /** Removes exactly one directed edge. (The prototype removed both directions; that now takes two commands.) */

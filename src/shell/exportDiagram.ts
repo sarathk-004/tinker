@@ -61,7 +61,7 @@ export function download(blob: Blob, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export type ExportFormat = 'png' | 'svg' | 'json' | 'md';
+export type ExportFormat = 'png' | 'png-solid' | 'svg' | 'json' | 'md';
 
 /** What an image export needs from the canvas (the picture is taken from the real, rendered canvas). */
 export type CanvasHandle = Parameters<typeof renderCanvasImage>[0];
@@ -70,5 +70,6 @@ export async function exportDiagram(doc: ExportDoc, format: ExportFormat, canvas
   const base = safeFileName(doc.name);
   if (format === 'json') return download(new Blob([toJson(doc)], { type: 'application/json' }), `${base}.json`);
   if (format === 'md') return download(new Blob([toMarkdown(doc)], { type: 'text/markdown' }), `${base}.md`);
+  if (format === 'png-solid') return download(await renderCanvasImage(canvas, 'png', { solid: true }), `${base}.png`);
   return download(await renderCanvasImage(canvas, format), `${base}.${format}`);
 }

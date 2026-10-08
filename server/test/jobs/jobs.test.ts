@@ -264,11 +264,37 @@ describe('retention: revision pruning (D11)', () => {
     expect(kept.filter((v) => v <= 40)).toHaveLength(10); // v31-40 are old but inside the latest 100 -> kept
   });
 
-  it('recent revisions are kept even beyond 100, and a short or ancient history is never trimmed', async () => {
-    const many = await seedRevisions(h, u, 130, 0); // 130 revisions, all recent
+  it('thins older versions to one per hour, then one per day, and drops everything past 90 days', async () => {
+    const { diagram } = await createDiagramFor(h, u, 'Thinned');
+    const id = diagram.diagramId;
+    const by = (await h.pool.query(`SELECT created_by FROM diagrams WHERE id = $1`, [id])).rows[0].created_by as string;
+    await h.pool.query(`DELETE FROM diagram_revisions WHERE diagram_id = $1`, [id]);
+    // 200 versions, one every 30 minutes (about 4 days); then 20 versions 30 days ago (same day) and 5 versions 120 days ago
+    await h.pool.query(
+      `INSERT INTO diagram_revisions (diagram_id, version, graph, presentation, reason, created_by, created_at)
+       SELECT $1, v, '{"schemaVersion":1,"nodes":[],"edges":[]}'::jsonb, '{"nodePositions":{},"viewport":{"x":0,"y":0,"zoom":1}}'::jsonb, 'MANUAL_COMMAND', $2,
+              CASE WHEN v <= 5 THEN now() - interval '120 days'
+                   WHEN v <= 25 THEN now() - interval '30 days' + (v * interval '1 minute')
+                   ELSE now() - ((225 - v) * interval '30 minutes') END
+         FROM generate_series(1, 225) AS v`,
+      [id, by],
+    );
+    await prune();
+    const kept = await versionsOf(h.pool, id);
+    expect(kept.filter((v) => v > 125)).toHaveLength(100); // the latest 100 are all there
+    expect(kept.filter((v) => v <= 5)).toHaveLength(0); // past 90 days
+    expect(kept.filter((v) => v > 5 && v <= 25)).toHaveLength(1); // 20 versions on one old day: one stays
+    const middle = kept.filter((v) => v > 25 && v <= 125);
+    expect(middle.length).toBeGreaterThan(40);
+    expect(middle.length).toBeLessThanOrEqual(52); // about 50 hours: one per hour
+    expect(kept.length).toBeLessThan(160);
+  });
+
+  it('the latest 100 are always kept; a short history is never trimmed', async () => {
+    const many = await seedRevisions(h, u, 130, 0); // 130 revisions made within the same hour
     const few = await seedRevisions(h, u, 20, 20); // 20 revisions, all old
     await prune();
-    expect(await versionsOf(h.pool, many)).toHaveLength(130);
+    expect(await versionsOf(h.pool, many)).toHaveLength(100); // the older 30 share one hour with the newest: thinned to one per hour
     expect(await versionsOf(h.pool, few)).toHaveLength(20);
   });
 
@@ -401,6 +427,6 @@ describe('retention: expired idempotency data and deleted diagrams', () => {
   });
 
   it('the retention windows are the documented ones', () => {
-    expect(DEFAULT_RETENTION).toMatchObject({ revisionKeepLatest: 100, revisionDays: 30, deletedDiagramDays: 30 });
+    expect(DEFAULT_RETENTION).toMatchObject({ revisionKeepLatest: 100, revisionHourlyDays: 7, revisionDays: 90, deletedDiagramDays: 30 });
   });
 });

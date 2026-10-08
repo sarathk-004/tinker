@@ -45,6 +45,8 @@ export interface DiagramView extends Ephemeral {
   deleteSelected(): Promise<void>;
   connect(source: string, target: string, label?: string, bidirectional?: boolean): Promise<void>;
   disconnectEdge(edgeId: string): Promise<void>;
+  /** Write text on a connection (null or empty removes it) and/or make it point both ways. */
+  updateEdge(edgeId: string, change: { relationship?: string | null; bidirectional?: boolean }): Promise<void>;
   editNode(id: string, edit: NodeEdit): Promise<void>;
   insertBetween(source: string, target: string, spec: NewNodeSpec): Promise<string | null>;
   /** Put the selected components in a NEW group (inside the group they all share, if any). Returns the new group's path. */
@@ -123,6 +125,11 @@ export const useDiagramStore = create<DiagramView>((set, get) => {
         },
         'Connected nodes',
       );
+    },
+
+    async updateEdge(edgeId, change) {
+      const relationship = change.relationship === undefined ? undefined : (change.relationship?.trim() || null);
+      await run({ type: 'UPDATE_EDGE', edgeId, ...(relationship !== undefined ? { relationship } : {}), ...(change.bidirectional !== undefined ? { bidirectional: change.bidirectional } : {}) }, 'Updated connection');
     },
 
     async disconnectEdge(edgeId) {

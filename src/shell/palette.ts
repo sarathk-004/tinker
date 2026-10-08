@@ -1,42 +1,38 @@
-import { AWSServiceIcon, SystemNodeType } from '../types/diagram';
+import type { AWSServiceIcon, SystemNodeType } from '../types/diagram';
+import { CATALOG, CATEGORIES, type Category } from '../catalog/services';
+import { scoreText } from './search';
 
 export interface QuickComponent {
   label: string;
   type: SystemNodeType;
   awsIcon: AWSServiceIcon;
   subType?: string;
-  category: 'Compute' | 'Networking' | 'Storage & DB' | 'Queues & Events' | 'Security';
+  category: Category;
+  /** What it is for, in everyday words (searched, never shown). */
+  keywords: string;
 }
 
-export const PALETTE: QuickComponent[] = [
-  // Compute
-  { label: 'EC2 Microservice', type: 'service', awsIcon: 'ec2', subType: 'Amazon EC2', category: 'Compute' },
-  { label: 'AWS Lambda', type: 'service', awsIcon: 'lambda', subType: 'AWS Lambda', category: 'Compute' },
-  { label: 'Amazon EKS', type: 'service', awsIcon: 'eks', subType: 'Amazon EKS', category: 'Compute' },
-  { label: 'Step Functions', type: 'service', awsIcon: 'step-functions', subType: 'AWS Step Functions', category: 'Compute' },
+export const PALETTE: QuickComponent[] = CATALOG.map((c) => ({ label: c.label, type: c.type, awsIcon: c.id, subType: c.subType, category: c.category, keywords: c.keywords }));
 
-  // Networking
-  { label: 'API Gateway', type: 'gateway', awsIcon: 'api-gateway', subType: 'Amazon API Gateway', category: 'Networking' },
-  { label: 'App Load Balancer', type: 'gateway', awsIcon: 'alb', subType: 'Application Load Balancer', category: 'Networking' },
-  { label: 'CloudFront CDN', type: 'gateway', awsIcon: 'cloudfront', subType: 'Amazon CloudFront', category: 'Networking' },
-  { label: 'Route 53 DNS', type: 'gateway', awsIcon: 'route53', subType: 'Amazon Route 53', category: 'Networking' },
+/**
+ * Components matching what was typed, best first: a name or service match beats a category match, which beats a match in the plain words
+ * for what it does ("monitoring" finds CloudWatch, X-Ray and Grafana; "encrypt" finds KMS). No query: everything, in category order.
+ */
+export function searchComponents(query: string, items: readonly QuickComponent[] = PALETTE): QuickComponent[] {
+  const q = query.trim();
+  if (!q) return [...items].sort((a, b) => CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category));
+  return items
+    .map((c, index) => {
+      const name = Math.max(scoreText(c.label, q), scoreText(c.subType ?? '', q));
+      const purpose = Math.max(scoreText(c.category, q, false), scoreText(c.keywords, q, false)) * 0.6;
+      return { c, index, score: Math.max(name, purpose) };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map((x) => x.c);
+}
 
-  // Storage & DB
-  { label: 'PostgreSQL DB', type: 'database', awsIcon: 'rds', subType: 'Amazon RDS (PostgreSQL)', category: 'Storage & DB' },
-  { label: 'DynamoDB', type: 'database', awsIcon: 'dynamodb', subType: 'Amazon DynamoDB', category: 'Storage & DB' },
-  { label: 'Redis Cache', type: 'cache', awsIcon: 'redis', subType: 'ElastiCache / Redis', category: 'Storage & DB' },
-  { label: 'OpenSearch', type: 'database', awsIcon: 'opensearch', subType: 'Amazon OpenSearch', category: 'Storage & DB' },
-  { label: 'S3 Storage', type: 'storage', awsIcon: 's3', subType: 'Amazon S3', category: 'Storage & DB' },
-
-  // Queues & Events
-  { label: 'SQS Queue', type: 'queue', awsIcon: 'sqs', subType: 'Amazon SQS', category: 'Queues & Events' },
-  { label: 'SNS Notifications', type: 'queue', awsIcon: 'sns', subType: 'Amazon SNS', category: 'Queues & Events' },
-  { label: 'EventBridge', type: 'queue', awsIcon: 'eventbridge', subType: 'Amazon EventBridge', category: 'Queues & Events' },
-  { label: 'Kinesis Stream', type: 'queue', awsIcon: 'kinesis', subType: 'Amazon Kinesis', category: 'Queues & Events' },
-
-  // Security & Client
-  { label: 'AWS Cognito', type: 'service', awsIcon: 'cognito', subType: 'AWS Cognito (Auth)', category: 'Security' },
-  { label: 'AWS WAF', type: 'gateway', awsIcon: 'waf', subType: 'AWS WAF', category: 'Security' },
-  { label: 'Secrets Manager', type: 'service', awsIcon: 'secrets-manager', subType: 'AWS Secrets Manager', category: 'Security' },
-  { label: 'Web Client', type: 'client', awsIcon: 'client', subType: 'Web / Mobile Client', category: 'Security' },
-];
+export function groupByCategory(items: readonly QuickComponent[], keepOrder = false): Array<{ category: Category; items: QuickComponent[] }> {
+  const categories = keepOrder ? [...new Set(items.map((c) => c.category))] : CATEGORIES.filter((cat) => items.some((c) => c.category === cat));
+  return categories.map((category) => ({ category, items: items.filter((c) => c.category === category) }));
+}

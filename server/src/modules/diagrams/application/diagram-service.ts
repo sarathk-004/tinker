@@ -195,7 +195,7 @@ export async function executeCommand(deps: ServiceDeps, actor: Actor, diagramId:
 
 /**
  * Drag-end / viewport saves (D05): provided positions merge by node id, absent entries stay, unknown nodes are refused.
- * Bumps the one version counter; creates no revision (no revision per pointer movement).
+ * Creates no revision and does not change the version number: moving things around is not a new version of the design.
  */
 export async function patchPresentation(deps: ServiceDeps, actor: Actor, diagramId: string, key: string, request: PresentationPatchRequest): Promise<RunResult> {
   await authorizeDiagram(deps.pool, actor.userId, diagramId, 'modify');
@@ -224,7 +224,7 @@ export async function patchPresentation(deps: ServiceDeps, actor: Actor, diagram
         ...((request.layoutDir ?? current.presentation.layoutDir) ? { layoutDir: request.layoutDir ?? current.presentation.layoutDir! } : {}),
         ...(layouts && Object.keys(layouts).length > 0 ? { layouts } : {}),
       };
-      const updated = await updateDocument(tx, { id: diagramId, expectedVersion: request.expectedVersion, presentation });
+      const updated = await updateDocument(tx, { id: diagramId, expectedVersion: request.expectedVersion, presentation, bump: false });
       if (!updated) throw new Error('conditional update affected no rows while holding the row lock');
       return { status: 200, body: detail(updated) };
     },

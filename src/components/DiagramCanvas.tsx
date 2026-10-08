@@ -17,7 +17,7 @@ import { FloatingEdge } from './FloatingEdge';
 import { useDiagramStore } from '../diagram/store';
 import { EmptyCanvas } from './EmptyCanvas';
 import { useUi } from '../shell/uiStore';
-import { useTheme } from '../theme/theme';
+import { themeColor, useTheme } from '../theme/theme';
 import { COMPONENT_DRAG_TYPE, useAddComponent } from '../shell/addComponent';
 import { PALETTE } from '../shell/palette';
 import { NoteNode } from './NoteNode';
@@ -73,6 +73,18 @@ export const DiagramCanvas: React.FC = () => {
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([...storeNodes, ...extraNodes]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(storeEdges);
+
+  // A selected connection stands out: orange, thicker, with an orange arrowhead (the glow is drawn by the edge itself).
+  const primary = themeColor('primary', '#f54e00');
+  const shownEdges = React.useMemo(
+    () =>
+      edges.map((e) => {
+        if (!e.selected) return e;
+        const paint = (m: Edge['markerEnd']) => (m && typeof m === 'object' ? { ...m, color: primary } : m);
+        return { ...e, animated: false, style: { ...e.style, stroke: primary, strokeWidth: 2.5, opacity: 1 }, markerEnd: paint(e.markerEnd), markerStart: paint(e.markerStart), zIndex: 10 };
+      }),
+    [edges, primary, theme],
+  );
 
   // Never overwrite React Flow's nodes while the user is dragging one (the server may acknowledge another write meanwhile).
   const dragging = useRef(false);
@@ -229,7 +241,7 @@ export const DiagramCanvas: React.FC = () => {
 
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={shownEdges}
         colorMode={theme}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
@@ -238,6 +250,7 @@ export const DiagramCanvas: React.FC = () => {
         connectionRadius={28}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onEdgeDoubleClick={(_, edge) => useUi.getState().set({ editingEdgeId: edge.id })}
         onSelectionChange={({ nodes: selNodes }) => {
           useDiagramStore.getState().setSelectedNodeIds(selNodes.filter((n) => !isNoteNodeId(n.id) && !isGroupNodeId(n.id)).map((n) => n.id));
           const boxes = selNodes.filter((n) => isGroupNodeId(n.id));

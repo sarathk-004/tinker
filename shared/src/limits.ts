@@ -12,6 +12,8 @@ export const LIMITS = {
   maxNoteChars: 2000,
   /** Team workspaces one person may own (their personal workspace is not counted). */
   maxOwnedWorkspaces: 5,
+  maxWorkspaceMembers: 25,
+  maxWorkspaceDescriptionLength: 300,
   maxCommandTextBytes: 8 * 1024,
   maxMetadataChars: 8 * 1024,
   maxMetadataKeyLength: 64,

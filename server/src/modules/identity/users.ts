@@ -54,6 +54,17 @@ export async function ensureUser(pool: Pool, claims: TokenClaims): Promise<Inter
        ON CONFLICT (workspace_id, user_id) DO NOTHING`,
       [row.id],
     );
+    // Invitations sent to this email before they had an account become memberships now (the sign-in already proved the address).
+    if (row.email) {
+      await tx.query(
+        `INSERT INTO workspace_memberships (workspace_id, user_id, role)
+         SELECT i.workspace_id, $1, i.role FROM workspace_invites i JOIN workspaces w ON w.id = i.workspace_id AND w.deleted_at IS NULL
+          WHERE i.email = lower($2)
+         ON CONFLICT (workspace_id, user_id) DO NOTHING`,
+        [row.id, row.email],
+      );
+      await tx.query(`DELETE FROM workspace_invites WHERE email = lower($1)`, [row.email]);
+    }
     return { id: row.id, externalAuthId: claims.subject, email: row.email, displayName: row.display_name };
   });
 }

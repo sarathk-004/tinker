@@ -14,6 +14,14 @@ import {
   errorEnvelopeSchema,
   meResponseSchema,
   avatarResponseSchema,
+  addMemberResponseSchema,
+  deletedResponseSchema,
+  updatedResponseSchema,
+  removedResponseSchema,
+  workspaceDetailSchema,
+  type WorkspaceDetail,
+  type UpdateWorkspaceRequest,
+  type AddMemberRequest,
   deleteAvatarResponseSchema,
   type AvatarResponse,
   workspaceSummarySchema,
@@ -245,6 +253,14 @@ export function createApiClient(options: ApiClientOptions) {
     /** Start a team workspace (the caller becomes its owner). The caller owns the idempotency key. */
     createWorkspace: (name: string, idempotencyKey: string) =>
       request('POST', '/v1/workspaces', { name }, idempotencyKey, workspaceSummarySchema) as Promise<Replayable<WorkspaceSummary>>,
+    /** Workspace settings and sharing. Owners manage; anyone signed in can look at a public workspace by its link. */
+    workspace: (id: string) => request('GET', `/v1/workspaces/${id}`, undefined, undefined, workspaceDetailSchema).then((r) => r.data as WorkspaceDetail),
+    updateWorkspace: (id: string, patch: UpdateWorkspaceRequest) => request('PATCH', `/v1/workspaces/${id}`, patch, undefined, workspaceDetailSchema).then((r) => r.data as WorkspaceDetail),
+    deleteWorkspace: (id: string, confirmName: string) => request('DELETE', `/v1/workspaces/${id}`, { confirmName }, undefined, deletedResponseSchema).then((r) => r.data),
+    addMember: (id: string, body: AddMemberRequest) => request('POST', `/v1/workspaces/${id}/members`, body, undefined, addMemberResponseSchema).then((r) => r.data),
+    changeMemberRole: (id: string, userId: string, role: 'EDITOR' | 'VIEWER') => request('PATCH', `/v1/workspaces/${id}/members/${userId}`, { role }, undefined, updatedResponseSchema).then((r) => r.data),
+    removeMember: (id: string, userId: string) => request('DELETE', `/v1/workspaces/${id}/members/${userId}`, undefined, undefined, removedResponseSchema).then((r) => r.data),
+    removeInvite: (id: string, email: string) => request('POST', `/v1/workspaces/${id}/invites/remove`, { email }, undefined, removedResponseSchema).then((r) => r.data),
     listDiagrams: (workspaceId: string) =>
       request('GET', `/v1/workspaces/${workspaceId}/diagrams`, undefined, undefined, diagramListResponseSchema).then((r) => r.data as DiagramListResponse),
     loadDiagram: (diagramId: string) => request('GET', `/v1/diagrams/${diagramId}`, undefined, undefined, diagramDetailSchema).then((r) => r.data as DiagramDetail),

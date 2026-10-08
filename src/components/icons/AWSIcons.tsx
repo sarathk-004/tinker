@@ -1,6 +1,18 @@
 import React from 'react';
 import { AWSServiceIcon, SystemNodeType } from '../../types/diagram';
 import { AWS_OFFICIAL_ICONS } from './awsIconDefinitions';
+import { AWS_MORE_ICONS } from './awsMoreIcons';
+import { CATEGORY_COLOR, catalogEntry } from '../../catalog/services';
+
+const ICONS = { ...AWS_MORE_ICONS, ...AWS_OFFICIAL_ICONS };
+
+/** Letters for a service with no official icon: "GuardDuty" -> "GD", "Rekognition" -> "RE". */
+export const badgeLetters = (label: string): string => {
+  const words = label.replace(/[^A-Za-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
+  const camel = (words[0] ?? '').match(/[A-Z][a-z]+|[A-Z]+(?![a-z])|\d+/g) ?? [];
+  const parts = words.length > 1 ? words : camel;
+  return (parts.length > 1 ? (parts[0]![0]! + parts[1]![0]!) : (parts[0] ?? '?').slice(0, 2)).toUpperCase();
+};
 
 interface AWSIconProps {
   name?: AWSServiceIcon;
@@ -18,7 +30,7 @@ export const AWSIcon: React.FC<AWSIconProps> = ({
   const resolvedName = name || mapTypeToIcon(type);
 
   // If official AWS service icon exists in bundle, render the authentic AWS architecture vector graphic
-  const officialIcon = AWS_OFFICIAL_ICONS[resolvedName];
+  const officialIcon = ICONS[resolvedName];
   if (officialIcon) {
     return (
       <svg
@@ -48,6 +60,17 @@ export const AWSIcon: React.FC<AWSIconProps> = ({
         <rect x="3" y="4" width="18" height="12" rx="2" />
         <line x1="8" y1="20" x2="16" y2="20" />
         <line x1="12" y1="16" x2="12" y2="20" />
+      </svg>
+    );
+  }
+
+  // A catalog service without an official icon: a coloured badge with its letters.
+  const entry = catalogEntry(resolvedName);
+  if (entry && resolvedName !== 'generic') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" className={`flex-shrink-0 ${className}`} role="img" aria-label={entry.label}>
+        <rect width="24" height="24" rx="4" fill={CATEGORY_COLOR[entry.category]} />
+        <text x="12" y="16" textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#fff" fontFamily="Inter, system-ui, sans-serif">{badgeLetters(entry.label)}</text>
       </svg>
     );
   }

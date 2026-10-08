@@ -51,7 +51,7 @@ describe('history: listing', () => {
     expect(list.body.revisions[0]).toMatchObject({ nodeCount: 2, edgeCount: 1 });
     expect(list.body.revisions[3]).toMatchObject({ nodeCount: 0, edgeCount: 0 });
     expect(list.body.nextBefore).toBeNull();
-    expect(list.body.retention).toEqual({ keepLatest: 100, keepDays: 30 });
+    expect(list.body.retention).toEqual({ keepLatest: 100, hourlyDays: 7, keepDays: 90 });
   });
 
   it('pages newest first with a continuation cursor', async () => {

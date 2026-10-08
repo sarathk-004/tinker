@@ -32,7 +32,7 @@ export const VersionsPanel: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-surface">
       <div className="px-3 py-1.5 border-b border-line bg-soft flex-shrink-0 text-[10px] font-mono text-muted">
-        Restoring never deletes anything: it is saved as a new version, so you can go forward again. Keeps your latest {retention.keepLatest} versions and everything from the last {retention.keepDays} days.
+        Restoring never deletes anything: it is saved as a new version, so you can go forward again. Moving things around never creates a version. Keeps your latest {retention.keepLatest}, then one per hour for {retention.hourlyDays} days and one per day up to {retention.keepDays} days.
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
         {error && <div className="p-2 rounded-md border border-danger/30 bg-danger/5 text-[11px] text-danger-ink">{error}</div>}

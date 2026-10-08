@@ -98,6 +98,16 @@ export const renameGroupCommandSchema = z.strictObject({
   to: groupPathSchema,
 });
 
+/** Change the text written on a connection (null removes it) and/or whether it points both ways. */
+export const updateEdgeCommandSchema = z
+  .strictObject({
+    type: z.literal('UPDATE_EDGE'),
+    edgeId: uuidSchema,
+    relationship: relationshipSchema.nullable().optional(),
+    bidirectional: z.boolean().optional(),
+  })
+  .refine((c) => c.relationship !== undefined || c.bidirectional !== undefined, { message: 'change the text or the direction' });
+
 export const diagramCommandSchema = z.discriminatedUnion('type', [
   addNodeCommandSchema,
   removeNodeCommandSchema,
@@ -105,6 +115,7 @@ export const diagramCommandSchema = z.discriminatedUnion('type', [
   updateNodeCommandSchema,
   connectNodesCommandSchema,
   disconnectNodesCommandSchema,
+  updateEdgeCommandSchema,
   insertBetweenCommandSchema,
   setGroupCommandSchema,
   renameGroupCommandSchema,
@@ -118,6 +129,7 @@ export const COMMAND_TYPES = [
   'UPDATE_NODE',
   'CONNECT',
   'DISCONNECT',
+  'UPDATE_EDGE',
   'INSERT_BETWEEN',
   'SET_GROUP',
   'RENAME_GROUP',

@@ -53,7 +53,7 @@ describe('migrations are reversible and repeatable on a scratch database', () =>
     expect(afterDown.rows[0].n).toBe(0);
     await runner({ ...opts, direction: 'up', count: Infinity });
     const afterUp = await withClient(dbUrlFor(name), (c) => c.query(`SELECT count(*)::int AS n FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'pgmigrations'`));
-    expect(afterUp.rows[0].n).toBe(13);
+    expect(afterUp.rows[0].n).toBe(14);
     await withClient(adminUrl(), (c) => c.query(`DROP DATABASE ${name}`));
   });
 });
