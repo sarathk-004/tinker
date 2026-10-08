@@ -197,6 +197,20 @@ export const diagramCardSchema = z.strictObject({
   preview: z.strictObject({ nodes: z.array(z.tuple([z.number(), z.number()])), edges: z.array(z.tuple([z.number().int(), z.number().int()])) }),
 });
 export type DiagramCard = z.infer<typeof diagramCardSchema>;
+/** What is in all of a person's diagrams together: the dashboard's "at a glance". */
+export const overviewSchema = z.strictObject({
+  diagrams: z.number().int().min(0),
+  components: z.number().int().min(0),
+  connections: z.number().int().min(0),
+  /** Components by kind, most first. */
+  byKind: z.array(z.strictObject({ kind: z.string(), count: z.number().int().min(1) })),
+  /** The components used most often. `key` is the icon key when the component has one (else its name). */
+  topComponents: z.array(z.strictObject({ key: z.string(), label: z.string(), count: z.number().int().min(1) })),
+  /** The diagram with the most components. */
+  largest: z.strictObject({ id: uuidSchema, name: z.string(), components: z.number().int().min(0) }).nullable(),
+});
+export type Overview = z.infer<typeof overviewSchema>;
+
 export const diagramCardsResponseSchema = z.strictObject({ diagrams: z.array(diagramCardSchema) });
 
 /** POST /v1/workspaces: start a team workspace (the caller becomes its owner). */

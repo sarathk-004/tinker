@@ -36,7 +36,7 @@ import { AppError, parseOrThrow } from '../../../infrastructure/http/errors.ts';
 import type { RateLimiter } from '../../../infrastructure/http/rate-limiter.ts';
 import type { RunResult, TestHooks } from '../../../infrastructure/idempotency/mutation-requests.ts';
 import { listWorkspaces } from '../../workspaces/access.ts';
-import { createProject, deleteProject, listProjectDiagrams, listProjects, listRecentDiagrams, moveDiagram, setDiagramIcon, updateProject } from '../../projects/projects.ts';
+import { createProject, deleteProject, getOverview, listProjectDiagrams, listProjects, listRecentDiagrams, moveDiagram, setDiagramIcon, updateProject } from '../../projects/projects.ts';
 import { createWorkspace } from '../../workspaces/workspace-service.ts';
 import { addMember, changeMemberRole, deleteWorkspace, getWorkspaceDetail, removeInvite, removeMember, updateWorkspace } from '../../workspaces/workspace-admin.ts';
 import { avatarUpdatedAt, deleteAvatar, getAvatar, putAvatar } from '../../profile/avatar.ts';
@@ -245,6 +245,7 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
       const { projectId } = parseOrThrow(projectParams, request.params, 'INVALID_REQUEST', 'Invalid project id.');
       return { diagrams: await listProjectDiagrams(pool, request.auth!.userId, projectId) };
     });
+    app.get(`${API_PREFIX}/overview`, async (request) => getOverview(pool, request.auth!.userId));
     app.get(`${API_PREFIX}/diagrams-recent`, async (request) => ({ diagrams: await listRecentDiagrams(pool, request.auth!.userId) }));
     app.post(`${API_PREFIX}/diagrams/:diagramId/icon`, async (request) => {
       const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');

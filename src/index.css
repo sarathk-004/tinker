@@ -55,7 +55,6 @@ body {
 /* A cutting mat: a very faint grid (fine lines every 24 px, slightly firmer every 120 px),
    so it hints at the texture without competing with the content. Cards on top are solid, so no line shows through them. */
 .cutting-mat {
-  background-color: rgb(var(--canvas));
   background-image:
     linear-gradient(rgb(var(--line-strong) / 0.14) 1px, transparent 1px),
     linear-gradient(90deg, rgb(var(--line-strong) / 0.14) 1px, transparent 1px),

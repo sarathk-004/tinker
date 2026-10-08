@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { FolderKanban, Globe, Keyboard, Layers, Loader2, Lock, Plus, Search, Settings, Sparkles, Users } from 'lucide-react';
-import { LIMITS, type DiagramCard, type WorkspaceSummary } from '../contracts';
+import { BarChart3 as ChartBar, FolderKanban, Globe, Layers, Loader2, Lock, Plus, Search, Settings, Sparkles, Users } from 'lucide-react';
+import { LIMITS, type DiagramCard, type Overview, type WorkspaceSummary } from '../contracts';
+import { catalogEntry } from '../catalog/services';
+import { AWSIcon } from '../components/icons/AWSIcons';
 import { api } from '../document/instance';
 import { DitherGradient } from '../components/dither-kit/gradient';
 import { PresetArt, presetFor } from '../components/ProjectCoverArt';
@@ -163,25 +165,86 @@ const Stat: React.FC<{ tone: Tone; icon: React.ReactNode; value: number; label: 
   </div>
 );
 
-/** The single-key shortcuts, as a short vertical list, so the quick way is not a secret. */
-const TipsCard: React.FC = () => (
+const KIND_TONE: Record<string, string> = {
+  SERVICE: 'bg-primary',
+  DATABASE: 'bg-blue',
+  CACHE: 'bg-amber',
+  QUEUE: 'bg-violet',
+  GATEWAY: 'bg-success',
+  STORAGE: 'bg-warn',
+  CLIENT: 'bg-body',
+  EXTERNAL: 'bg-muted',
+  GENERIC: 'bg-faint',
+};
+const kindLabel = (kind: string) => kind.charAt(0) + kind.slice(1).toLowerCase();
+
+/** What all your diagrams hold together: totals, what kinds of component, what you use most, and the biggest diagram. */
+const OverviewCard: React.FC<{ overview: Overview | null }> = ({ overview }) => (
   <div className="rounded-[20px] bg-surface lifted p-4">
     <div className="flex items-center gap-2.5">
-      <span className="w-9 h-9 rounded-xl bg-violet-tint text-violet flex items-center justify-center flex-shrink-0" aria-hidden>
-        <Keyboard className="w-[18px] h-[18px]" />
+      <span className="w-9 h-9 rounded-xl bg-blue-tint text-blue flex items-center justify-center flex-shrink-0" aria-hidden>
+        <ChartBar className="w-[18px] h-[18px]" />
       </span>
-      <span className="text-[14px] font-medium text-ink">Quick keys</span>
+      <span className="text-[14px] font-medium text-ink">Across your diagrams</span>
     </div>
-    <dl className="mt-3 space-y-1.5">
-      {([['C', 'Components'], ['R', 'Rename'], ['T', 'Add text'], ['K', 'Fit the view'], ['/', 'Message box'], ['?', 'All keys']] as const).map(([key, what]) => (
-        <div key={key} className="flex items-center justify-between gap-3 text-[12.5px]">
-          <dt className="text-body">{what}</dt>
-          <dd>
-            <kbd className="inline-flex min-w-[1.6rem] justify-center px-1.5 py-0.5 rounded-md bg-canvas font-mono text-[11px] text-ink shadow-[inset_0_0_0_1px_rgb(var(--ink)/0.08)]">{key}</kbd>
-          </dd>
+    {overview === null && (
+      <div className="py-6 flex justify-center text-muted" role="status" aria-label="Loading">
+        <Loader2 className="w-4 h-4 animate-spin" />
+      </div>
+    )}
+    {overview && overview.components === 0 && <p className="pretty mt-3 text-[12.5px] leading-relaxed text-muted">Nothing drawn yet. Add components to a diagram and the totals, the kinds you use and your most used components show up here.</p>}
+    {overview && overview.components > 0 && (
+      <>
+        <div className="tabular mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-canvas px-3 py-2">
+            <div className="text-[20px] leading-none font-semibold tracking-[-0.02em] text-ink">{overview.components}</div>
+            <div className="mt-1 text-[11.5px] text-muted">Components</div>
+          </div>
+          <div className="rounded-xl bg-canvas px-3 py-2">
+            <div className="text-[20px] leading-none font-semibold tracking-[-0.02em] text-ink">{overview.connections}</div>
+            <div className="mt-1 text-[11.5px] text-muted">Connections</div>
+          </div>
         </div>
-      ))}
-    </dl>
+
+        <h3 className="mt-4 mb-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">What they are</h3>
+        <div className="flex h-2 overflow-hidden rounded-full bg-fill" role="img" aria-label={overview.byKind.map((k) => `${kindLabel(k.kind)} ${k.count}`).join(', ')}>
+          {overview.byKind.map((k) => (
+            <span key={k.kind} className={KIND_TONE[k.kind] ?? 'bg-faint'} style={{ width: `${(k.count / overview.components) * 100}%` }} />
+          ))}
+        </div>
+        <ul className="tabular mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+          {overview.byKind.slice(0, 6).map((k) => (
+            <li key={k.kind} className="flex items-center gap-1.5 text-[11.5px] text-body min-w-0">
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${KIND_TONE[k.kind] ?? 'bg-faint'}`} aria-hidden />
+              <span className="truncate">{kindLabel(k.kind)}</span>
+              <span className="ml-auto text-muted">{k.count}</span>
+            </li>
+          ))}
+        </ul>
+
+        <h3 className="mt-4 mb-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">Used most</h3>
+        <ul className="space-y-1.5">
+          {overview.topComponents.map((c) => {
+            const known = catalogEntry(c.key);
+            return (
+              <li key={c.key} className="flex items-center gap-2 text-[12.5px] min-w-0">
+                <span className="w-7 h-7 rounded-lg bg-canvas flex items-center justify-center flex-shrink-0" aria-hidden>
+                  <AWSIcon name={known ? c.key : 'generic'} type={known ? known.type : 'generic'} size={18} />
+                </span>
+                <span className="truncate text-ink">{known?.label ?? c.label}</span>
+                <span className="tabular ml-auto text-muted">{c.count}</span>
+              </li>
+            );
+          })}
+        </ul>
+
+        {overview.largest && (
+          <p className="pretty mt-4 pt-3 border-t border-fill text-[12px] leading-relaxed text-muted">
+            Biggest diagram: <span className="text-ink font-medium">{overview.largest.name}</span> with {overview.largest.components} components.
+          </p>
+        )}
+      </>
+    )}
   </div>
 );
 
@@ -214,6 +277,7 @@ export const Dashboard: React.FC = () => {
   const current = useWorkspaceStore((s) => s.workspace);
   const user = useWorkspaceStore((s) => s.user);
   const [recent, setRecent] = useState<DiagramCard[] | null>(null);
+  const [overview, setOverview] = useState<Overview | null>(null);
   const first = (user?.displayName ?? '').trim().split(/\s+/)[0];
   const mine = workspaces.filter((w) => w.role === 'OWNER');
   const shared = workspaces.filter((w) => w.role !== 'OWNER');
@@ -225,6 +289,10 @@ export const Dashboard: React.FC = () => {
     api.recentDiagrams().then(
       (cards) => live && setRecent(cards),
       () => live && setRecent([]),
+    );
+    api.overview().then(
+      (o) => live && setOverview(o),
+      () => live && setOverview({ diagrams: 0, components: 0, connections: 0, byKind: [], topComponents: [], largest: null }),
     );
     return () => {
       live = false;
@@ -245,7 +313,7 @@ export const Dashboard: React.FC = () => {
       <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)_19rem] items-start">
         <aside aria-label="Today" className="arrive order-2 lg:order-1 space-y-3 lg:sticky lg:top-0" style={group(2)}>
           <AllowanceCard />
-          <TipsCard />
+          <OverviewCard overview={overview} />
         </aside>
 
         <div className="order-1 lg:order-2 min-w-0">

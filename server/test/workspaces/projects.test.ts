@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { diagramCardsResponseSchema, diagramDetailSchema, meResponseSchema, projectListResponseSchema, projectSummarySchema } from '@tinker/shared';
+import { diagramCardsResponseSchema, diagramDetailSchema, meResponseSchema, overviewSchema, projectListResponseSchema, projectSummarySchema } from '@tinker/shared';
 import { call, key, startHarness, type Harness, type TestUser } from '../support/harness.ts';
 
 describe('projects: workspace -> project -> diagram', () => {
@@ -149,5 +149,21 @@ describe('projects: workspace -> project -> diagram', () => {
     expect(set.body.cover).toBe('ocean');
     expect((await call(h, owner, 'PATCH', `/v1/workspaces/${w.id}`, { cover: 'nope' })).status).toBe(400);
     expect(meResponseSchema.parse((await call(h, owner, 'GET', '/v1/me')).body).workspaces.find((x) => x.id === w.id)!.cover).toBe('ocean');
+  });
+
+  it('the overview totals what is in all of your diagrams, and only theirs', async () => {
+    const w = await workspace('Totals');
+    const d = diagramDetailSchema.parse((await newDiagram(w.id, 'Big one')).body);
+    let version = d.version;
+    for (const [name, kind] of [['Orders', 'SERVICE'], ['Billing', 'SERVICE'], ['Main DB', 'DATABASE']] as const) {
+      version = (await call(h, owner, 'POST', `/v1/diagrams/${d.diagramId}/commands`, { expectedVersion: version, command: { type: 'ADD_NODE', node: { name, kind, technology: kind === 'DATABASE' ? 'PostgreSQL' : 'Node' } } }, { 'idempotency-key': key() })).body.version;
+    }
+    const mine = overviewSchema.parse((await call(h, owner, 'GET', '/v1/overview')).body);
+    expect(mine).toMatchObject({ components: 3, connections: 0, largest: { id: d.diagramId, name: 'Big one', components: 3 } });
+    expect(mine.byKind).toEqual([{ kind: 'SERVICE', count: 2 }, { kind: 'DATABASE', count: 1 }]);
+    expect(mine.topComponents[0]).toMatchObject({ count: 2 });
+    const other = await h.newUser('overview-other');
+    expect(overviewSchema.parse((await call(h, other, 'GET', '/v1/overview')).body)).toMatchObject({ components: 0, largest: null });
+    expect((await call(h, null, 'GET', '/v1/overview')).status).toBe(401);
   });
 });

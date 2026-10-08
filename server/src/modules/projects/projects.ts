@@ -1,4 +1,4 @@
-import { LIMITS, graphSchema, presentationSchema, type DiagramCard, type Graph, type Presentation, type ProjectCover, type ProjectSummary } from '@tinker/shared';
+import { LIMITS, graphSchema, presentationSchema, type DiagramCard, type Graph, type Overview, type Presentation, type ProjectCover, type ProjectSummary } from '@tinker/shared';
 import { withTransaction, type Pool, type Queryable } from '../../infrastructure/database/pool.ts';
 import { AppError } from '../../infrastructure/http/errors.ts';
 import { authorizeWorkspace, can, workspaceRole } from '../workspaces/access.ts';
@@ -208,4 +208,44 @@ export async function listRecentDiagrams(pool: Pool, userId: string, limit = 8):
     [userId, limit],
   );
   return rows.map(toCard);
+}
+
+/** Totals across the diagrams this person can open (the newest 300 at most): how much there is, of what, and what is used most. */
+export async function getOverview(pool: Pool, userId: string): Promise<Overview> {
+  const { rows } = await pool.query<{ id: string; name: string; graph: unknown }>(
+    `SELECT d.id, d.name, d.graph FROM diagrams d JOIN workspaces w ON w.id = d.workspace_id AND w.deleted_at IS NULL
+      WHERE d.deleted_at IS NULL AND EXISTS (SELECT 1 FROM workspace_memberships m WHERE m.workspace_id = d.workspace_id AND m.user_id = $1)
+      ORDER BY d.updated_at DESC, d.id LIMIT 300`,
+    [userId],
+  );
+  const kinds = new Map<string, number>();
+  const used = new Map<string, { label: string; count: number }>();
+  let components = 0;
+  let connections = 0;
+  let largest: Overview['largest'] = null;
+  for (const row of rows) {
+    const parsed = graphSchema.safeParse(row.graph);
+    if (!parsed.success) continue;
+    const graph = parsed.data;
+    components += graph.nodes.length;
+    connections += graph.edges.length;
+    if (graph.nodes.length > 0 && (!largest || graph.nodes.length > largest.components)) largest = { id: row.id, name: row.name, components: graph.nodes.length };
+    for (const n of graph.nodes) {
+      kinds.set(n.kind, (kinds.get(n.kind) ?? 0) + 1);
+      const icon = typeof n.metadata['icon'] === 'string' ? (n.metadata['icon'] as string) : null;
+      const key = icon && icon !== 'generic' ? icon : (n.technology ?? n.name);
+      const seen = used.get(key);
+      if (seen) seen.count += 1;
+      else used.set(key, { label: n.technology ?? n.name, count: 1 });
+    }
+  }
+  const byCount = <T extends { count: number }>(a: T, b: T) => b.count - a.count;
+  return {
+    diagrams: rows.length,
+    components,
+    connections,
+    byKind: [...kinds].map(([kind, count]) => ({ kind, count })).sort(byCount),
+    topComponents: [...used].map(([key, v]) => ({ key, label: v.label, count: v.count })).sort(byCount).slice(0, 5),
+    largest,
+  };
 }
