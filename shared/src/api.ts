@@ -136,14 +136,29 @@ export const addMemberResponseSchema = z.strictObject({ status: z.enum(['ADDED',
 export const changeMemberRoleRequestSchema = z.strictObject({ role: z.enum(['EDITOR', 'VIEWER']) });
 export const removeInviteRequestSchema = z.strictObject({ email: z.string().trim().toLowerCase().max(320) });
 
+/** The covers a project can have: the drawing of its latest diagram, or one of the dithered covers the app draws itself. */
+export const PROJECT_COVERS = ['preview', 'dusk', 'ember', 'meadow', 'rose', 'ocean', 'sunrise', 'slate', 'mint'] as const;
+export const projectCoverSchema = z.enum(PROJECT_COVERS);
+export type ProjectCover = z.infer<typeof projectCoverSchema>;
+
 /** A project groups related diagrams inside a workspace (workspace -> project -> diagram). */
 export const projectSummarySchema = z.strictObject({
   id: uuidSchema,
   workspaceId: uuidSchema,
   name: z.string(),
   description: z.string().nullable(),
+  /** null: automatic (the latest diagram's drawing, or a dithered cover when the project is empty). */
+  cover: projectCoverSchema.nullable(),
   diagramCount: z.number().int().min(0),
   updatedAt: z.iso.datetime(),
+  /** The diagram worked on most recently, with a tiny drawing of it. */
+  latestDiagram: z
+    .strictObject({
+      id: uuidSchema,
+      name: z.string(),
+      preview: z.strictObject({ nodes: z.array(z.tuple([z.number(), z.number()])), edges: z.array(z.tuple([z.number().int(), z.number().int()])) }),
+    })
+    .nullable(),
 });
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 export const projectListResponseSchema = z.strictObject({ projects: z.array(projectSummarySchema) });
@@ -152,6 +167,7 @@ export const updateProjectRequestSchema = z
   .strictObject({
     name: z.string().trim().min(1).max(LIMITS.maxProjectNameLength).optional(),
     description: z.string().trim().max(LIMITS.maxWorkspaceDescriptionLength).nullable().optional(),
+    cover: projectCoverSchema.nullable().optional(),
   })
   .refine((b) => Object.keys(b).length > 0, { message: 'nothing to change' });
 

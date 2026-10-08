@@ -30,11 +30,29 @@ interface UiState {
   /** The connection whose text is being typed. */
   editingEdgeId: string | null;
   helpOpen: boolean;
+  /** Dragging a component snaps to the edges and middles of the others and shows guide lines (on by default; hold Alt to skip it once). */
+  snap: boolean;
   /** The popup listing earlier chats about this diagram. */
   historyOpen: boolean;
   settingsOpen: boolean;
   set(patch: Partial<Omit<UiState, 'set'>>): void;
 }
+
+const SNAP_KEY = 'tinker_snap';
+const readSnap = (): boolean => {
+  try {
+    return localStorage.getItem(SNAP_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+};
+export const saveSnap = (on: boolean): void => {
+  try {
+    localStorage.setItem(SNAP_KEY, on ? 'on' : 'off');
+  } catch {
+    /* storage unavailable: it applies for this visit only */
+  }
+};
 
 export const useUi = create<UiState>((set) => ({
   tool: 'pan',
@@ -51,6 +69,7 @@ export const useUi = create<UiState>((set) => ({
   selectedGroupPath: null,
   editingEdgeId: null,
   helpOpen: false,
+  snap: readSnap(),
   historyOpen: false,
   settingsOpen: false,
   set: (patch) => set(patch),

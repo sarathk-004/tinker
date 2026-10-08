@@ -80,7 +80,7 @@ const NewWorkspaceCard: React.FC = () => {
         onClick={() => setCreating(true)}
         disabled={atLimit}
         title={atLimit ? `You can own up to ${LIMITS.maxOwnedWorkspaces} team workspaces.` : undefined}
-        className="rounded-2xl border border-dashed border-line-strong bg-surface/60 hover:border-ink hover:bg-surface min-h-[10.5rem] flex flex-col items-center justify-center gap-2 text-body hover:text-ink disabled:opacity-50 disabled:hover:border-line-strong transition-colors"
+        className="rounded-2xl border border-dashed border-line-strong bg-surface hover:border-ink hover:bg-surface min-h-[10.5rem] flex flex-col items-center justify-center gap-2 text-body hover:text-ink disabled:opacity-50 disabled:hover:border-line-strong transition-colors"
       >
         <Plus className="w-5 h-5 text-primary" />
         <span className="text-[14px] font-medium">New team workspace</span>
@@ -200,7 +200,7 @@ export const Dashboard: React.FC = () => {
             <Loader2 className="w-5 h-5 animate-spin" />
           </div>
         )}
-        {recent?.length === 0 && <p className="rounded-2xl border border-dashed border-line-strong bg-surface/60 px-4 py-6 text-[13px] text-muted text-center">Diagrams you work on show up here.</p>}
+        {recent?.length === 0 && <p className="rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-6 text-[13px] text-muted text-center">Diagrams you work on show up here.</p>}
         {recent && recent.length > 0 && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {recent.slice(0, 4).map((c) => (

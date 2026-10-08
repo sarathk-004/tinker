@@ -112,4 +112,20 @@ describe('projects: workspace -> project -> diagram', () => {
     expect((await call(h, owner, 'POST', `/v1/workspaces/${w.id}/projects`, { name: '' })).status).toBe(400);
     expect((await call(h, null, 'GET', `/v1/workspaces/${w.id}/projects`)).status).toBe(401);
   });
+
+  it('a project carries a cover and the diagram it was last worked on', async () => {
+    const w = await workspace('Covers');
+    const [general] = await projects(w.id);
+    expect(general).toMatchObject({ cover: null, latestDiagram: null });
+    const older = diagramDetailSchema.parse((await newDiagram(w.id, 'Older')).body);
+    const newer = diagramDetailSchema.parse((await newDiagram(w.id, 'Newer')).body);
+    const [after] = await projects(w.id);
+    expect(after!.latestDiagram).toMatchObject({ id: newer.diagramId, name: 'Newer' });
+    await call(h, owner, 'POST', `/v1/diagrams/${older.diagramId}/commands`, { expectedVersion: older.version, command: { type: 'ADD_NODE', node: { name: 'Orders', kind: 'SERVICE' } } }, { 'idempotency-key': key() });
+    expect((await projects(w.id))[0]!.latestDiagram).toMatchObject({ id: older.diagramId }); // editing makes it the latest
+    const set = await call(h, owner, 'PATCH', `/v1/projects/${general!.id}`, { cover: 'dusk' });
+    expect(projectSummarySchema.parse(set.body).cover).toBe('dusk');
+    expect(projectSummarySchema.parse((await call(h, owner, 'PATCH', `/v1/projects/${general!.id}`, { cover: null })).body).cover).toBeNull();
+    expect((await call(h, owner, 'PATCH', `/v1/projects/${general!.id}`, { cover: 'not-a-cover' })).status).toBe(400);
+  });
 });

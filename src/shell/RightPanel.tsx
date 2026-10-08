@@ -26,7 +26,7 @@ export const RightPanel: React.FC<{ overlay?: boolean }> = ({ overlay = false })
       <div role="tablist" className="h-12 flex-shrink-0 flex items-stretch justify-between pl-5 pr-2 border-b border-line">
         <div className="flex items-stretch gap-6">
           <Tab id="chat" active={tab}>
-            <TinkerLogo size={18} /> Tinker
+            <TinkerLogo size={18} /> tinker
             <span title={modelAvailable ? 'AI is on' : 'Plain commands only (no AI model on this server)'} className={`w-1.5 h-1.5 rounded-full ${modelAvailable ? 'bg-success' : 'bg-faint'}`} />
           </Tab>
           <Tab id="components" active={tab}>

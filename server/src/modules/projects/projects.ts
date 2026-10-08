@@ -1,4 +1,4 @@
-import { LIMITS, graphSchema, presentationSchema, type DiagramCard, type ProjectSummary } from '@tinker/shared';
+import { LIMITS, graphSchema, presentationSchema, type DiagramCard, type Graph, type Presentation, type ProjectCover, type ProjectSummary } from '@tinker/shared';
 import { withTransaction, type Pool, type Queryable } from '../../infrastructure/database/pool.ts';
 import { AppError } from '../../infrastructure/http/errors.ts';
 import { authorizeWorkspace, can, workspaceRole } from '../workspaces/access.ts';
@@ -14,8 +14,13 @@ interface ProjectRow {
   workspace_id: string;
   name: string;
   description: string | null;
+  cover: ProjectCover | null;
   diagram_count: number;
   updated_at: Date;
+  latest_id: string | null;
+  latest_name: string | null;
+  latest_graph: unknown;
+  latest_presentation: unknown;
 }
 
 const toSummary = (r: ProjectRow): ProjectSummary => ({
@@ -23,14 +28,21 @@ const toSummary = (r: ProjectRow): ProjectSummary => ({
   workspaceId: r.workspace_id,
   name: r.name,
   description: r.description,
+  cover: r.cover,
   diagramCount: r.diagram_count,
   updatedAt: r.updated_at.toISOString(),
+  latestDiagram: r.latest_id ? { id: r.latest_id, name: r.latest_name ?? '', preview: previewOf(graphSchema.parse(r.latest_graph), presentationSchema.parse(r.latest_presentation)) } : null,
 });
 
 const SELECT = `
-  p.id, p.workspace_id, p.name, p.description,
+  p.id, p.workspace_id, p.name, p.description, p.cover, l.id AS latest_id, l.name AS latest_name, l.graph AS latest_graph, l.presentation AS latest_presentation,
   (SELECT count(*)::int FROM diagrams d WHERE d.project_id = p.id AND d.deleted_at IS NULL) AS diagram_count,
   GREATEST(p.updated_at, COALESCE((SELECT max(d.updated_at) FROM diagrams d WHERE d.project_id = p.id AND d.deleted_at IS NULL), p.updated_at)) AS updated_at`;
+
+/** Every project with the diagram it was last worked on (for the card's cover and for opening the project straight into it). */
+const FROM_PROJECTS = `FROM projects p LEFT JOIN LATERAL (
+  SELECT d.id, d.name, d.graph, d.presentation FROM diagrams d WHERE d.project_id = p.id AND d.deleted_at IS NULL ORDER BY d.updated_at DESC, d.id LIMIT 1
+) l ON true`;
 
 /** The workspace's first project; made on the spot when a workspace somehow has none (older data, or a first read after a restore). */
 export async function ensureDefaultProject(db: Queryable, workspaceId: string, userId: string): Promise<string> {
@@ -51,7 +63,7 @@ export async function resolveProject(db: Queryable, workspaceId: string, project
 export async function listProjects(pool: Pool, userId: string, workspaceId: string): Promise<ProjectSummary[]> {
   const role = await authorizeWorkspace(pool, userId, workspaceId, 'view');
   if (can(role, 'modify')) await ensureDefaultProject(pool, workspaceId, userId);
-  const { rows } = await pool.query<ProjectRow>(`SELECT ${SELECT} FROM projects p WHERE p.workspace_id = $1 AND p.deleted_at IS NULL ORDER BY p.created_at, p.id`, [workspaceId]);
+  const { rows } = await pool.query<ProjectRow>(`SELECT ${SELECT} ${FROM_PROJECTS} WHERE p.workspace_id = $1 AND p.deleted_at IS NULL ORDER BY p.created_at, p.id`, [workspaceId]);
   return rows.map(toSummary);
 }
 
@@ -73,20 +85,21 @@ export async function createProject(pool: Pool, userId: string, workspaceId: str
       throw new AppError('DOMAIN_VALIDATION_FAILED', `A workspace can have up to ${LIMITS.maxProjectsPerWorkspace} projects.`, { reason: 'LIMIT_EXCEEDED', limit: LIMITS.maxProjectsPerWorkspace });
     }
     const { rows } = await tx.query<{ id: string }>(`INSERT INTO projects (workspace_id, name, description, created_by) VALUES ($1, $2, $3, $4) RETURNING id`, [workspaceId, input.name, input.description || null, userId]);
-    const made = await tx.query<ProjectRow>(`SELECT ${SELECT} FROM projects p WHERE p.id = $1`, [rows[0]!.id]);
+    const made = await tx.query<ProjectRow>(`SELECT ${SELECT} ${FROM_PROJECTS} WHERE p.id = $1`, [rows[0]!.id]);
     return toSummary(made.rows[0]!);
   });
 }
 
-export async function updateProject(pool: Pool, userId: string, projectId: string, input: { name?: string | undefined; description?: string | null | undefined }): Promise<ProjectSummary> {
+export async function updateProject(pool: Pool, userId: string, projectId: string, input: { name?: string | undefined; description?: string | null | undefined; cover?: ProjectCover | null | undefined }): Promise<ProjectSummary> {
   return withTransaction(pool, async (tx) => {
     const { workspaceId } = await locate(tx, userId, projectId);
     await authorizeWorkspace(tx, userId, workspaceId, 'modify');
     await tx.query(
-      `UPDATE projects SET name = COALESCE($2, name), description = CASE WHEN $3::boolean THEN $4 ELSE description END, updated_at = now() WHERE id = $1`,
-      [projectId, input.name ?? null, input.description !== undefined, input.description || null],
+      `UPDATE projects SET name = COALESCE($2, name), description = CASE WHEN $3::boolean THEN $4 ELSE description END,
+            cover = CASE WHEN $5::boolean THEN $6 ELSE cover END, updated_at = now() WHERE id = $1`,
+      [projectId, input.name ?? null, input.description !== undefined, input.description || null, input.cover !== undefined, input.cover ?? null],
     );
-    const { rows } = await tx.query<ProjectRow>(`SELECT ${SELECT} FROM projects p WHERE p.id = $1`, [projectId]);
+    const { rows } = await tx.query<ProjectRow>(`SELECT ${SELECT} ${FROM_PROJECTS} WHERE p.id = $1`, [projectId]);
     return toSummary(rows[0]!);
   });
 }
@@ -132,11 +145,22 @@ interface CardRow {
 }
 
 /** Positions of up to 40 components and the connections among them: enough to draw a thumbnail. */
-function toCard(r: CardRow): DiagramCard {
-  const graph = graphSchema.parse(r.graph);
-  const positions = presentationSchema.parse(r.presentation).nodePositions;
+function previewOf(graph: Graph, presentation: Presentation): DiagramCard['preview'] {
+  const positions = presentation.nodePositions;
   const placed = graph.nodes.filter((n) => positions[n.id]).slice(0, MAX_PREVIEW_NODES);
   const index = new Map(placed.map((n, i) => [n.id, i]));
+  return {
+    nodes: placed.map((n) => [Math.round(positions[n.id]!.x), Math.round(positions[n.id]!.y)] as [number, number]),
+    edges: graph.edges.flatMap((e) => {
+      const a = index.get(e.sourceNodeId);
+      const b = index.get(e.targetNodeId);
+      return a !== undefined && b !== undefined ? [[a, b] as [number, number]] : [];
+    }),
+  };
+}
+
+function toCard(r: CardRow): DiagramCard {
+  const graph = graphSchema.parse(r.graph);
   return {
     id: r.id,
     workspaceId: r.workspace_id,
@@ -147,14 +171,7 @@ function toCard(r: CardRow): DiagramCard {
     nodeCount: graph.nodes.length,
     edgeCount: graph.edges.length,
     updatedAt: r.updated_at.toISOString(),
-    preview: {
-      nodes: placed.map((n) => [Math.round(positions[n.id]!.x), Math.round(positions[n.id]!.y)] as [number, number]),
-      edges: graph.edges.flatMap((e) => {
-        const a = index.get(e.sourceNodeId);
-        const b = index.get(e.targetNodeId);
-        return a !== undefined && b !== undefined ? [[a, b] as [number, number]] : [];
-      }),
-    },
+    preview: previewOf(graph, presentationSchema.parse(r.presentation)),
   };
 }
 

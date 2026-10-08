@@ -105,7 +105,7 @@ export const ProjectPage: React.FC = () => {
           </div>
         )}
         {cards?.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-line-strong bg-surface/60 px-4 py-10 text-center">
+          <div className="rounded-2xl border border-dashed border-line-strong bg-surface px-4 py-10 text-center">
             <p className="text-[14px] text-ink font-medium">No diagrams in this project yet</p>
             <p className="mt-1 text-[13px] text-muted">{canEdit ? 'Start one, or describe a system to Tinker and let it draw.' : 'Nothing here yet.'}</p>
           </div>

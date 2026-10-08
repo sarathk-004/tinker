@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { DiagramSummary, MeResponse, ProjectSummary, Quota, WorkspaceDetail, WorkspaceSummary } from '../contracts';
+import type { DiagramSummary, MeResponse, ProjectCover, ProjectSummary, Quota, WorkspaceDetail, WorkspaceSummary } from '../contracts';
 import { useUi } from '../shell/uiStore';
 import { ApiError } from '../api/client';
 import { api, session } from '../document/instance';
@@ -72,7 +72,9 @@ interface WorkspaceState {
   /** Start a diagram in a project (the open one by default) and go to the editor. */
   newDiagramInEditor(projectId?: string, name?: string): Promise<void>;
   createProject(name: string, description?: string): Promise<string | null>;
-  updateProject(id: string, patch: { name?: string; description?: string | null }): Promise<string | null>;
+  updateProject(id: string, patch: { name?: string; description?: string | null; cover?: ProjectCover | null }): Promise<string | null>;
+  /** Open a project: straight into the diagram worked on most recently (a new one when it has none). */
+  openProjectLatest(id: string): Promise<void>;
   deleteProject(id: string): Promise<string | null>;
   moveDiagram(diagramId: string, projectId: string): Promise<string | null>;
   /** Go to the editor in this workspace (from the dashboard or a link). */
@@ -227,6 +229,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => {
       const found = get().projects.find((p) => p.id === id);
       if (found) set({ project: found });
       useUi.getState().set({ view: 'project' });
+    },
+
+    async openProjectLatest(id) {
+      const found = get().projects.find((p) => p.id === id);
+      if (found) set({ project: found });
+      if (found?.latestDiagram) await get().openDiagramInEditor(found.latestDiagram.id);
+      else await get().newDiagramInEditor(id);
     },
 
     async openDiagramInEditor(id) {

@@ -75,7 +75,7 @@ export const TopBar: React.FC = () => {
       </button>
       <button onClick={() => useUi.getState().set({ view: 'dashboard' })} title="All workspaces" aria-label="Tinker: all workspaces" className="flex items-center gap-2.5 flex-shrink-0 rounded-lg">
         <TinkerLogo size={26} />
-        <span className="text-[20px] font-semibold tracking-[-0.03em] text-ink">Tinker</span>
+        <span className="text-[20px] font-semibold tracking-[-0.03em] text-ink">tinker</span>
       </button>
       <div className="hidden sm:block h-6 w-px bg-line" />
       <WorkspaceSwitcher />

@@ -36,7 +36,7 @@ const ShowOnDiagram: React.FC<{ ids: string[] }> = ({ ids }) => (
 const AssistantHeader: React.FC<{ turn: ConversationTurn }> = ({ turn }) => (
   <div className="flex items-center gap-2 mb-1.5">
     <TinkerLogo size={18} />
-    <span className="text-[13.5px] font-semibold text-ink">Tinker</span>
+    <span className="text-[13.5px] font-semibold text-ink">tinker</span>
     <span className="font-mono text-[10.5px] text-faint">{clock(turn.timestamp)}</span>
     {turn.source === 'AI' && <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded-md bg-fill text-body">AI</span>}
   </div>
@@ -142,7 +142,7 @@ const examples = ['Put Redis between Orders and PostgreSQL', 'Add an API Gateway
 const EmptyState: React.FC<{ canType: boolean }> = ({ canType }) => (
   <div className="h-full flex flex-col items-center justify-center text-center px-6">
     <span className="w-11 h-11 rounded-xl bg-soft border border-line flex items-center justify-center mb-3"><TinkerLogo size={24} /></span>
-    <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-ink">Tinker it</h2>
+    <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-ink">tinker it</h2>
     <p className="mt-1.5 text-[13.5px] leading-relaxed text-body max-w-[17rem]">Describe a change in plain words, or ask a question about the diagram. Every change is saved as a version you can go back to.</p>
     {canType && (
       <div className="mt-4 flex flex-col gap-2 w-full max-w-[19rem]">

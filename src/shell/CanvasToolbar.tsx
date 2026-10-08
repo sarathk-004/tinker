@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useReactFlow, useViewport } from '@xyflow/react';
-import { ArrowRightLeft, ArrowUpDown, ChevronDown, Edit3, Expand, Hand, Layers, LayoutGrid, Minimize, MousePointer2, Play, Plus, Redo2, Scan, Shapes, Trash2, Type, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowRightLeft, ArrowUpDown, ChevronDown, Edit3, Expand, Hand, Layers, LayoutGrid, Minimize, Magnet, MousePointer2, Play, Plus, Redo2, Scan, Shapes, Trash2, Type, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
 import { AWSIcon } from '../components/icons/AWSIcons';
 import { useDiagramStore } from '../diagram/store';
 import { useHistoryStore } from '../history/history';
@@ -10,7 +10,7 @@ import { MOD_KEY } from './TopBar';
 import { MENU_PANEL, MONO_LABEL, useDismiss } from './Popover';
 import { groupByCategory, searchComponents } from './palette';
 import { groupSelected } from './groupActions';
-import { useUi } from './uiStore';
+import { saveSnap, useUi } from './uiStore';
 
 const IconButton: React.FC<{ label: string; onClick: () => void; disabled?: boolean; active?: boolean; danger?: boolean; children: React.ReactNode; badge?: number }> = ({ label, onClick, disabled, active, danger, children, badge }) => (
   <button
@@ -87,6 +87,7 @@ export const CanvasToolbar: React.FC = () => {
   const flow = useReactFlow();
   const { zoom } = useViewport();
   const fullscreen = useFullscreen();
+  const snap = useUi((s) => s.snap);
   const canUndo = useHistoryStore((s) => s.canUndo);
   const canRedo = useHistoryStore((s) => s.canRedo);
   const busy = useHistoryStore((s) => s.busy);
@@ -118,6 +119,7 @@ export const CanvasToolbar: React.FC = () => {
         <button onClick={() => void flow.zoomTo(1, { duration: 150 })} title="Reset zoom to 100%" className="w-12 h-9 rounded-lg font-mono text-[12px] text-ink hover:bg-canvas">{Math.round(zoom * 100)}%</button>
         <IconButton label="Zoom in" onClick={() => void flow.zoomIn({ duration: 150 })}><ZoomIn className={ICON} /></IconButton>
         <IconButton label="Resize the view to fit the whole diagram (K)" onClick={() => void flow.fitView({ padding: 0.25, duration: 300, maxZoom: 1 })}><Scan className={ICON} /></IconButton>
+        <IconButton label={snap ? 'Snapping is on: components line up as you drag (hold Alt to skip)' : 'Snapping is off'} active={snap} onClick={() => { saveSnap(!snap); useUi.getState().set({ snap: !snap }); }}><Magnet className={ICON} /></IconButton>
         <IconButton label={fullscreen ? 'Leave full screen (F)' : 'Full screen (F)'} active={fullscreen} onClick={() => void toggleFullscreen()}>{fullscreen ? <Minimize className={ICON} /> : <Expand className={ICON} />}</IconButton>
       </div>
 

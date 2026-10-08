@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ReactFlow,
   ConnectionMode,
@@ -7,9 +7,13 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useStore,
+  ViewportPortal,
   type Connection,
   type Edge,
   type Node,
+  type NodeChange,
+  type NodePositionChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { AWSArchitectureNode } from './AWSArchitectureNode';
@@ -24,6 +28,7 @@ import { NoteNode } from './NoteNode';
 import { GroupBox } from './GroupBox';
 import { computeGroupBoxes, groupNodeId, groupPathOfNodeId, isGroupNodeId, regroupAfterDrag, reparentAfterGroupDrag, type PlacedNode } from '../diagram/groups';
 import { isInGroup } from '../contracts';
+import { NO_GUIDES, snapBox, type Guides } from '../diagram/snap';
 import { isNoteNodeId, noteActions, noteIdOf, noteNodeId } from '../diagram/notes';
 import type { Note } from '../contracts';
 
@@ -148,6 +153,41 @@ export const DiagramCanvas: React.FC = () => {
   // Dragging a boundary moves the whole group: its components and the boundaries inside it follow while the pointer moves.
   const nodesRef = useRef<Node[]>([]);
   nodesRef.current = nodes;
+
+  // Snapping: a single component dragged near the edges or middle of another lines up with it, and guide lines show why.
+  const snap = useUi((s) => s.snap);
+  const zoom = useStore((s) => s.transform[2]);
+  const [guides, setGuides] = useState<Guides>(NO_GUIDES);
+  const altDown = useRef(false);
+  useEffect(() => {
+    const set = (e: KeyboardEvent) => void (altDown.current = e.altKey);
+    window.addEventListener('keydown', set);
+    window.addEventListener('keyup', set);
+    return () => {
+      window.removeEventListener('keydown', set);
+      window.removeEventListener('keyup', set);
+    };
+  }, []);
+  const sizeOf = (n: Node) => ({ width: n.measured?.width ?? n.width ?? 220, height: n.measured?.height ?? n.height ?? 90 });
+  const handleNodesChange = React.useCallback(
+    (changes: NodeChange[]) => {
+      const moves = changes.filter((c): c is NodePositionChange => c.type === 'position' && c.dragging === true && !!c.position);
+      if (snap && !altDown.current && moves.length === 1 && !isNoteNodeId(moves[0]!.id) && !isGroupNodeId(moves[0]!.id)) {
+        const move = moves[0]!;
+        const moving = nodesRef.current.find((n) => n.id === move.id);
+        if (moving) {
+          const others = nodesRef.current.filter((n) => n.id !== move.id && !isNoteNodeId(n.id) && !isGroupNodeId(n.id)).map((n) => ({ ...n.position, ...sizeOf(n) }));
+          const r = snapBox({ ...move.position!, ...sizeOf(moving) }, others, 8 / zoom);
+          move.position = { x: r.x, y: r.y };
+          setGuides(r.guides);
+        }
+      } else if (moves.length !== 1 || !snap) {
+        setGuides((g) => (g === NO_GUIDES ? g : NO_GUIDES));
+      }
+      onNodesChange(changes);
+    },
+    [snap, zoom, onNodesChange],
+  );
   const groupDrag = useRef<{ path: string; origin: { x: number; y: number }; start: Record<string, { x: number; y: number }> } | null>(null);
 
   const onNodeDragStart = React.useCallback((_e: unknown, node: Node) => {
@@ -178,6 +218,7 @@ export const DiagramCanvas: React.FC = () => {
   const onNodeDragStop = React.useCallback(
     (_event: unknown, node: Node, dragged: Node[]) => {
       dragging.current = false;
+      setGuides(NO_GUIDES);
       const store = useDiagramStore.getState();
       const g = groupDrag.current;
       groupDrag.current = null;
@@ -248,7 +289,7 @@ export const DiagramCanvas: React.FC = () => {
         // Loose: a connection can start or end on any of a component's four points, top and bottom included.
         connectionMode={ConnectionMode.Loose}
         connectionRadius={28}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onEdgeDoubleClick={(_, edge) => useUi.getState().set({ editingEdgeId: edge.id })}
         onSelectionChange={({ nodes: selNodes }) => {
@@ -280,6 +321,18 @@ export const DiagramCanvas: React.FC = () => {
         className="touch-none"
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} color="rgb(var(--line-strong))" />
+        {(guides.vertical.length > 0 || guides.horizontal.length > 0) && (
+          <ViewportPortal>
+            <svg style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1, overflow: 'visible', pointerEvents: 'none' }} aria-hidden>
+              {guides.vertical.map((g, i) => (
+                <line key={`v${i}`} x1={g.x} x2={g.x} y1={g.y1 - 12} y2={g.y2 + 12} style={{ stroke: "rgb(var(--primary))" }} strokeWidth={1 / zoom} strokeDasharray={`${4 / zoom} ${3 / zoom}`} />
+              ))}
+              {guides.horizontal.map((g, i) => (
+                <line key={`h${i}`} y1={g.y} y2={g.y} x1={g.x1 - 12} x2={g.x2 + 12} style={{ stroke: "rgb(var(--primary))" }} strokeWidth={1 / zoom} strokeDasharray={`${4 / zoom} ${3 / zoom}`} />
+              ))}
+            </svg>
+          </ViewportPortal>
+        )}
       </ReactFlow>
     </div>
   );

@@ -23,6 +23,7 @@ import {
   projectSummarySchema,
   diagramCardsResponseSchema,
   type ProjectSummary,
+  type ProjectCover,
   type DiagramCard,
   type WorkspaceDetail,
   type UpdateWorkspaceRequest,
@@ -270,7 +271,7 @@ export function createApiClient(options: ApiClientOptions) {
     projects: (workspaceId: string) => request('GET', `/v1/workspaces/${workspaceId}/projects`, undefined, undefined, projectListResponseSchema).then((r) => r.data.projects as ProjectSummary[]),
     createProject: (workspaceId: string, name: string, description?: string) =>
       request('POST', `/v1/workspaces/${workspaceId}/projects`, { name, ...(description ? { description } : {}) }, undefined, projectSummarySchema).then((r) => r.data as ProjectSummary),
-    updateProject: (projectId: string, patch: { name?: string; description?: string | null }) => request('PATCH', `/v1/projects/${projectId}`, patch, undefined, projectSummarySchema).then((r) => r.data as ProjectSummary),
+    updateProject: (projectId: string, patch: { name?: string; description?: string | null; cover?: ProjectCover | null }) => request('PATCH', `/v1/projects/${projectId}`, patch, undefined, projectSummarySchema).then((r) => r.data as ProjectSummary),
     deleteProject: (projectId: string) => request('DELETE', `/v1/projects/${projectId}`, undefined, undefined, deletedResponseSchema).then((r) => r.data),
     projectDiagrams: (projectId: string) => request('GET', `/v1/projects/${projectId}/diagrams`, undefined, undefined, diagramCardsResponseSchema).then((r) => r.data.diagrams as DiagramCard[]),
     recentDiagrams: () => request('GET', '/v1/diagrams-recent', undefined, undefined, diagramCardsResponseSchema).then((r) => r.data.diagrams as DiagramCard[]),
