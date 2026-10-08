@@ -81,7 +81,7 @@ export function toViewEdges(graph: Graph, highlightedIds: readonly string[]): Di
     const key = pairKey(edge);
     const index = pairSeen.get(key) ?? 0;
     pairSeen.set(key, index + 1);
-    const color = lit ? '#f54e00' : dim ? '#cfcdc4' : INK;
+    const color = lit ? '#f54e00' : dim ? '#9a988f' : INK;
     return {
       id: edge.id,
       source: edge.sourceNodeId,
@@ -91,8 +91,8 @@ export function toViewEdges(graph: Graph, highlightedIds: readonly string[]): Di
       data: { index, count: pairCount.get(key) ?? 1 },
       animated: lit,
       style: { stroke: color, strokeWidth: lit ? 2.25 : 1.5, opacity: dim ? 0.3 : 1 },
-      labelStyle: { fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 10.5, fill: lit ? '#d04200' : '#5a5852', letterSpacing: '0.02em' },
-      labelBgStyle: { fill: '#f7f7f4', fillOpacity: 1 },
+      labelStyle: { fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 10.5, fill: lit ? 'rgb(var(--primary-hover))' : 'rgb(var(--body))', letterSpacing: '0.02em' },
+      labelBgStyle: { fill: 'rgb(var(--canvas))', fillOpacity: 1 },
       labelBgPadding: [6, 3] as [number, number],
       labelBgBorderRadius: 6,
       ...(bidirectional ? { markerStart: { type: MarkerType.Arrow, width: 14, height: 14, color } } : {}),

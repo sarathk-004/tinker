@@ -121,10 +121,10 @@ export const CommandPalette: React.FC = () => {
 
   let lastGroup: PaletteGroup | null = null;
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-[14vh] px-4 bg-[#26251e]/25 backdrop-blur-[1px]" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div role="dialog" aria-label="Search" aria-modal="true" onKeyDown={onKeyDown} className="w-full max-w-xl rounded-2xl border border-[#e6e5e0] bg-white shadow-[0_24px_70px_rgba(38,37,30,0.22)] overflow-hidden animate-fade-in">
-        <div className="flex items-center gap-3 px-4 h-14 border-b border-[#efeee8]">
-          <Search className="w-[18px] h-[18px] text-[#807d72]" />
+    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-[14vh] px-4 bg-scrim/25 backdrop-blur-[1px]" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <div role="dialog" aria-label="Search" aria-modal="true" onKeyDown={onKeyDown} className="w-full max-w-xl rounded-2xl border border-line bg-surface shadow-[0_24px_70px_rgba(38,37,30,0.22)] overflow-hidden animate-fade-in">
+        <div className="flex items-center gap-3 px-4 h-14 border-b border-fill">
+          <Search className="w-[18px] h-[18px] text-muted" />
           <input
             ref={inputRef}
             value={query}
@@ -134,41 +134,41 @@ export const CommandPalette: React.FC = () => {
             role="combobox"
             aria-expanded
             aria-controls="palette-results"
-            className="flex-1 bg-transparent text-[15px] text-[#26251e] placeholder-[#a09c92] outline-none"
+            className="flex-1 bg-transparent text-[15px] text-ink placeholder-faint outline-none"
           />
-          <kbd className="font-mono text-[10.5px] text-[#807d72] px-1.5 py-0.5 rounded-md border border-[#e6e5e0] bg-[#fafaf7]">Esc</kbd>
+          <kbd className="font-mono text-[10.5px] text-muted px-1.5 py-0.5 rounded-md border border-line bg-soft">Esc</kbd>
         </div>
         <div ref={listRef} id="palette-results" role="listbox" className="max-h-[52vh] overflow-y-auto p-1.5">
           {results.length === 0 ? (
-            <div className="px-4 py-10 text-center text-[13.5px] text-[#807d72]">Nothing matches “{query}”.</div>
+            <div className="px-4 py-10 text-center text-[13.5px] text-muted">Nothing matches “{query}”.</div>
           ) : (
             results.map((item, index) => {
               const header = item.group !== lastGroup ? item.group : null;
               lastGroup = item.group;
               return (
                 <React.Fragment key={item.id}>
-                  {header && <div className="px-3 pt-2.5 pb-1 font-mono text-[10px] uppercase tracking-[0.08em] text-[#807d72]">{header}</div>}
+                  {header && <div className="px-3 pt-2.5 pb-1 font-mono text-[10px] uppercase tracking-[0.08em] text-muted">{header}</div>}
                   <button
                     role="option"
                     aria-selected={index === active}
                     data-index={index}
                     onMouseMove={() => setActive(index)}
                     onClick={() => choose(item)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left ${index === active ? 'bg-[#f7f7f4]' : ''}`}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left ${index === active ? 'bg-canvas' : ''}`}
                   >
-                    <span className={`flex-shrink-0 ${index === active ? 'text-[#f54e00]' : 'text-[#807d72]'}`}>{GROUP_ICON[item.group]}</span>
+                    <span className={`flex-shrink-0 ${index === active ? 'text-primary' : 'text-muted'}`}>{GROUP_ICON[item.group]}</span>
                     <span className="flex-1 min-w-0">
-                      <span className="block text-[14px] text-[#26251e] truncate">{item.title}</span>
-                      {item.subtitle && <span className="block text-[12px] text-[#807d72] truncate">{item.subtitle}</span>}
+                      <span className="block text-[14px] text-ink truncate">{item.title}</span>
+                      {item.subtitle && <span className="block text-[12px] text-muted truncate">{item.subtitle}</span>}
                     </span>
-                    {index === active && <CornerDownLeft className="w-3.5 h-3.5 text-[#a09c92]" />}
+                    {index === active && <CornerDownLeft className="w-3.5 h-3.5 text-faint" />}
                   </button>
                 </React.Fragment>
               );
             })
           )}
         </div>
-        <div className="flex items-center gap-4 px-4 h-9 border-t border-[#efeee8] bg-[#fafaf7] font-mono text-[10.5px] text-[#807d72]">
+        <div className="flex items-center gap-4 px-4 h-9 border-t border-fill bg-soft font-mono text-[10.5px] text-muted">
           <span>↑↓ move</span>
           <span>↵ open</span>
           <span>esc close</span>

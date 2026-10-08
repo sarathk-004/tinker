@@ -35,15 +35,15 @@ export const NoteNode: React.FC<NodeProps> = memo(({ data, selected }) => {
   return (
     <div
       onDoubleClick={() => useUi.getState().set({ editingNoteId: noteId })}
-      className={`h-full min-h-[44px] rounded-lg border px-3 py-2 text-[14px] leading-[1.5] text-[#26251e] bg-[#fdf8e6] ${selected ? 'border-[#f54e00]' : 'border-[#ecdfae]'} shadow-[0_1px_2px_rgba(38,37,30,0.04)]`}
+      className={`h-full min-h-[44px] rounded-lg border px-3 py-2 text-[14px] leading-[1.5] text-ink bg-note ${selected ? 'border-primary' : 'border-note-line'} shadow-[0_1px_2px_rgba(38,37,30,0.04)]`}
     >
       <NodeResizer
         minWidth={120}
         maxWidth={800}
         minHeight={44}
         isVisible={selected && !editing}
-        lineClassName="!border-[#f54e00]/40"
-        handleClassName="!w-2 !h-2 !bg-white !border !border-[#f54e00]"
+        lineClassName="!border-primary/40"
+        handleClassName="!w-2 !h-2 !bg-surface !border !border-primary"
         onResizeEnd={(_e, p) => noteActions.update(noteId, { width: Math.round(p.width), x: Math.round(p.x), y: Math.round(p.y) })}
       />
       {editing ? (
@@ -65,7 +65,7 @@ export const NoteNode: React.FC<NodeProps> = memo(({ data, selected }) => {
           placeholder="Type a note…"
         />
       ) : (
-        <div className="whitespace-pre-wrap break-words">{text || <span className="text-[#a09c92]">Empty note</span>}</div>
+        <div className="whitespace-pre-wrap break-words">{text || <span className="text-faint">Empty note</span>}</div>
       )}
     </div>
   );

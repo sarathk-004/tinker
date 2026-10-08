@@ -1,9 +1,11 @@
 import { toCanvas, toSvg } from 'html-to-image';
 import { getNodesBounds, type ReactFlowInstance } from '@xyflow/react';
 
-/** The canvas colours (the same as the app's), so an exported picture is the picture on screen. */
-const CANVAS = '#f7f7f4';
-const DOT = '#cfcdc4';
+import { themeColor } from '../theme/theme';
+
+/** The canvas colours in the theme that is on screen right now, so an exported picture is the picture you are looking at. */
+const canvasColor = () => themeColor('canvas', '#f7f7f4');
+const dotColor = () => themeColor('line-strong', '#cfcdc4');
 const GRID = 24;
 const PADDING = 56;
 const MAX_SIDE = 8000; // pixels: browsers refuse bigger canvases
@@ -27,8 +29,8 @@ export function dataUrlToBlob(dataUrl: string): Blob {
 
 /** The canvas background (colour and dots) as SVG, placed behind the diagram in an SVG export. */
 export const svgBackdrop = (): string =>
-  `<defs><pattern id="tinker-dots" width="${GRID}" height="${GRID}" patternUnits="userSpaceOnUse"><circle cx="${GRID / 2}" cy="${GRID / 2}" r="1.5" fill="${DOT}"/></pattern></defs>` +
-  `<rect width="100%" height="100%" fill="${CANVAS}"/><rect width="100%" height="100%" fill="url(#tinker-dots)"/>`;
+  `<defs><pattern id="tinker-dots" width="${GRID}" height="${GRID}" patternUnits="userSpaceOnUse"><circle cx="${GRID / 2}" cy="${GRID / 2}" r="1.5" fill="${dotColor()}"/></pattern></defs>` +
+  `<rect width="100%" height="100%" fill="${canvasColor()}"/><rect width="100%" height="100%" fill="url(#tinker-dots)"/>`;
 
 /** Put the backdrop right after the opening <svg ...> tag. */
 export function withBackdrop(svg: string): string {
@@ -81,9 +83,9 @@ export async function renderCanvasImage(flow: Pick<ReactFlowInstance, 'getNodes'
     out.height = layer.height;
     const ctx = out.getContext('2d');
     if (!ctx) throw new Error('Images are not available in this browser.');
-    ctx.fillStyle = CANVAS;
+    ctx.fillStyle = canvasColor();
     ctx.fillRect(0, 0, out.width, out.height);
-    ctx.fillStyle = DOT;
+    ctx.fillStyle = dotColor();
     const step = GRID * pixelRatio;
     for (let y = step / 2; y < out.height; y += step) {
       for (let x = step / 2; x < out.width; x += step) {

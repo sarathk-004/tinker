@@ -37,13 +37,13 @@ export const GroupBox: React.FC<NodeProps> = memo(({ data, selected }) => {
   };
 
   return (
-    <div className={`w-full h-full rounded-2xl border-[1.5px] border-dashed pointer-events-none ${selected ? 'border-[#f54e00] bg-[#f54e00]/[0.03]' : 'border-[#cfcdc4] bg-white/20'}`}>
+    <div className={`w-full h-full rounded-2xl border-[1.5px] border-dashed pointer-events-none ${selected ? 'border-primary bg-primary/[0.03]' : 'border-line-strong bg-surface/20'}`}>
       <div
         onDoubleClick={() => useUi.getState().set({ editingGroupPath: path })}
         title={`${path}. Drag to move the group, double-click to rename`}
-        className="group-handle pointer-events-auto absolute left-3 top-2 max-w-[calc(100%-1.5rem)] flex items-center gap-1.5 h-6 pl-2 pr-1 rounded-md bg-[#f7f7f4] cursor-grab active:cursor-grabbing select-none"
+        className="group-handle pointer-events-auto absolute left-3 top-2 max-w-[calc(100%-1.5rem)] flex items-center gap-1.5 h-6 pl-2 pr-1 rounded-md bg-canvas cursor-grab active:cursor-grabbing select-none"
       >
-        <Layers className="w-3.5 h-3.5 text-[#807d72] flex-shrink-0" />
+        <Layers className="w-3.5 h-3.5 text-muted flex-shrink-0" />
         {editing ? (
           <input
             ref={input}
@@ -58,12 +58,12 @@ export const GroupBox: React.FC<NodeProps> = memo(({ data, selected }) => {
               if (e.key === 'Escape') finish(false);
               e.stopPropagation();
             }}
-            className="nodrag w-40 bg-white border border-[#26251e] rounded px-1 text-[12.5px] font-medium text-[#26251e] outline-none"
+            className="nodrag w-40 bg-surface border border-ink rounded px-1 text-[12.5px] font-medium text-ink outline-none"
           />
         ) : (
-          <span className="text-[12.5px] font-medium text-[#5a5852] truncate">{label}</span>
+          <span className="text-[12.5px] font-medium text-body truncate">{label}</span>
         )}
-        {!editing && <span className="font-mono text-[10px] text-[#a09c92]">{count}</span>}
+        {!editing && <span className="font-mono text-[10px] text-faint">{count}</span>}
         {!editing && (
           <button
             onClick={(e) => {
@@ -73,7 +73,7 @@ export const GroupBox: React.FC<NodeProps> = memo(({ data, selected }) => {
             onMouseDown={(e) => e.stopPropagation()}
             title="Ungroup (the components stay)"
             aria-label={`Ungroup ${label}`}
-            className="nodrag p-0.5 rounded text-[#a09c92] hover:text-[#cf2d56] hover:bg-[#cf2d56]/10"
+            className="nodrag p-0.5 rounded text-faint hover:text-danger hover:bg-danger/10"
           >
             <X className="w-3 h-3" />
           </button>

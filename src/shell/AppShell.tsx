@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AiKeyDialog } from '../components/AiKeyDialog';
+import { SettingsDialog } from '../components/SettingsDialog';
 import { DiagramCanvas } from '../components/DiagramCanvas';
 import { NodeEditModal } from '../components/NodeEditModal';
 import { StatusBanners } from '../components/StatusBanners';
@@ -45,17 +46,18 @@ const ShellBody: React.FC = () => {
 
   return (
     <>
-      <div className="flex flex-col w-screen h-screen bg-[#f7f7f4] text-[#26251e] overflow-hidden select-none font-sans">
+      <div className="flex flex-col w-screen h-screen bg-canvas text-ink overflow-hidden select-none font-sans">
         <TopBar />
         <StatusBanners />
         <AiKeyDialog />
+        <SettingsDialog />
 
         <div className="flex flex-1 min-h-0 w-full overflow-hidden relative">
           <div className="hidden lg:block h-full flex-shrink-0">
             <LeftNav />
           </div>
 
-          <main className="relative flex-1 min-w-0 flex flex-col bg-[#f7f7f4]">
+          <main className="relative flex-1 min-w-0 flex flex-col bg-canvas">
             <CanvasHeader />
             <CanvasToolbar />
             <div className="relative flex-1 min-h-0">
@@ -73,12 +75,12 @@ const ShellBody: React.FC = () => {
         {navOpen && (
           <div className="fixed inset-0 z-40 flex lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
             <div className="h-full shadow-2xl animate-fade-in"><LeftNav overlay /></div>
-            <button aria-label="Close navigation" className="flex-1 bg-[#26251e]/25" onClick={() => useUi.getState().set({ navOpen: false })} />
+            <button aria-label="Close navigation" className="flex-1 bg-scrim/25" onClick={() => useUi.getState().set({ navOpen: false })} />
           </div>
         )}
         {chatOpen && (
           <div className="fixed inset-0 z-40 flex justify-end xl:hidden" role="dialog" aria-modal="true" aria-label="Chat">
-            <button aria-label="Close chat" className="flex-1 bg-[#26251e]/25" onClick={() => useUi.getState().set({ chatOpen: false })} />
+            <button aria-label="Close chat" className="flex-1 bg-scrim/25" onClick={() => useUi.getState().set({ chatOpen: false })} />
             <div className="h-full shadow-2xl animate-fade-in max-w-full"><RightPanel overlay /></div>
           </div>
         )}

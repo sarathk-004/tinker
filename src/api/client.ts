@@ -13,6 +13,9 @@ import {
   revisionListResponseSchema,
   errorEnvelopeSchema,
   meResponseSchema,
+  avatarResponseSchema,
+  deleteAvatarResponseSchema,
+  type AvatarResponse,
   workspaceSummarySchema,
   type AiAskResponse,
   type AiKeyStatus,
@@ -233,6 +236,11 @@ export function createApiClient(options: ApiClientOptions) {
         timeoutMs: 20_000,
         noRetryCodes: ['AI_TIMEOUT', 'AI_PROVIDER_ERROR', 'AI_UNAVAILABLE', 'RATE_LIMITED'],
       }).then((r) => r.data as SpeakResponse),
+    /** My profile picture (404 means none). Only the owner can read or change it. */
+    avatar: () => request('GET', '/v1/me/avatar', undefined, undefined, avatarResponseSchema).then((r) => r.data as AvatarResponse),
+    saveAvatar: (contentType: string, data: string) =>
+      request('PUT', '/v1/me/avatar', { contentType, data }, undefined, avatarResponseSchema.pick({ updatedAt: true }), { noRetryCodes: ['RATE_LIMITED'] }).then((r) => r.data as { updatedAt: string }),
+    removeAvatar: () => request('DELETE', '/v1/me/avatar', undefined, undefined, deleteAvatarResponseSchema).then((r) => r.data),
     me: () => request('GET', '/v1/me', undefined, undefined, meResponseSchema).then((r) => r.data as MeResponse),
     /** Start a team workspace (the caller becomes its owner). The caller owns the idempotency key. */
     createWorkspace: (name: string, idempotencyKey: string) =>

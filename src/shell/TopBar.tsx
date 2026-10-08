@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { HelpCircle, KeyRound, LogOut, Menu, MessageSquare, Search } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { HelpCircle, KeyRound, LogOut, Menu, MessageSquare, Search, Settings } from 'lucide-react';
+import { avatarCache, avatarListeners, loadAvatar } from '../auth/account';
 import { signOut, useAuthStore } from '../auth/auth';
 import { useAiKeyStore } from '../ai/aiKey';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
@@ -21,12 +22,26 @@ export const initialsOf = (email: string | null | undefined, name?: string | nul
 export const Avatar: React.FC<{ size?: number; className?: string }> = ({ size = 32, className = '' }) => {
   const email = useAuthStore((s) => s.email);
   const name = useWorkspaceStore((s) => s.user?.displayName);
+  const stamp = useWorkspaceStore((s) => s.user?.avatarUpdatedAt ?? null);
+  const [, bump] = useState(0);
+  const [url, setUrl] = useState<string | null>(avatarCache.stamp === stamp ? avatarCache.url : null);
+  useEffect(() => {
+    const again = () => bump((n) => n + 1);
+    avatarListeners.add(again);
+    return () => void avatarListeners.delete(again);
+  }, []);
+  useEffect(() => {
+    let live = true;
+    loadAvatar(stamp).then(
+      (u) => live && setUrl(u),
+      () => live && setUrl(null),
+    );
+    return () => void (live = false);
+  }, [stamp, avatarCache.url]);
+  const style = { width: size, height: size, fontSize: Math.round(size * 0.37) };
+  if (url) return <img src={url} alt="" aria-hidden style={style} className={`rounded-full object-cover flex-shrink-0 ${className}`} />;
   return (
-    <span
-      aria-hidden
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.37) }}
-      className={`inline-flex items-center justify-center rounded-full bg-[#26251e] text-white font-semibold tracking-normal flex-shrink-0 ${className}`}
-    >
+    <span aria-hidden style={style} className={`inline-flex items-center justify-center rounded-full bg-inverse text-on-inverse font-semibold tracking-normal flex-shrink-0 ${className}`}>
       {initialsOf(email, name)}
     </span>
   );
@@ -54,15 +69,15 @@ export const TopBar: React.FC = () => {
   const helpRef = useDismiss(helpOpen, closeHelp);
 
   return (
-    <header className="h-14 flex-shrink-0 flex items-center gap-3 pl-4 pr-4 border-b border-[#e6e5e0] bg-white z-30">
-      <button onClick={() => useUi.getState().set({ navOpen: true })} aria-label="Open navigation" className="lg:hidden p-1.5 -ml-1 rounded-lg text-[#5a5852] hover:bg-[#f7f7f4]">
+    <header className="h-14 flex-shrink-0 flex items-center gap-3 pl-4 pr-4 border-b border-line bg-surface z-30">
+      <button onClick={() => useUi.getState().set({ navOpen: true })} aria-label="Open navigation" className="lg:hidden p-1.5 -ml-1 rounded-lg text-body hover:bg-canvas">
         <Menu className="w-5 h-5" />
       </button>
       <div className="flex items-center gap-2.5 flex-shrink-0">
         <TinkerLogo size={26} />
-        <span className="text-[20px] font-semibold tracking-[-0.03em] text-[#26251e]">Tinker</span>
+        <span className="text-[20px] font-semibold tracking-[-0.03em] text-ink">Tinker</span>
       </div>
-      <div className="hidden sm:block h-6 w-px bg-[#e6e5e0]" />
+      <div className="hidden sm:block h-6 w-px bg-line" />
       <WorkspaceSwitcher />
 
       <div className="flex-1" />
@@ -70,18 +85,18 @@ export const TopBar: React.FC = () => {
       <button
         onClick={() => useUi.getState().set({ paletteOpen: true })}
         aria-label="Search"
-        className="hidden md:flex items-center gap-2.5 h-9 w-[300px] lg:w-[340px] px-3 rounded-lg border border-[#e6e5e0] bg-[#f7f7f4] hover:bg-white hover:border-[#cfcdc4] text-left transition-colors"
+        className="hidden md:flex items-center gap-2.5 h-9 w-[300px] lg:w-[340px] px-3 rounded-lg border border-line bg-canvas hover:bg-surface hover:border-line-strong text-left transition-colors"
       >
-        <Search className="w-4 h-4 text-[#807d72]" />
-        <span className="flex-1 text-[13.5px] text-[#807d72] truncate">Search diagrams, components…</span>
-        <kbd className="font-mono text-[10.5px] text-[#807d72] px-1.5 py-0.5 rounded-md border border-[#e6e5e0] bg-white">{MOD_KEY} K</kbd>
+        <Search className="w-4 h-4 text-muted" />
+        <span className="flex-1 text-[13.5px] text-muted truncate">Search diagrams, components…</span>
+        <kbd className="font-mono text-[10.5px] text-muted px-1.5 py-0.5 rounded-md border border-line bg-surface">{MOD_KEY} K</kbd>
       </button>
-      <button onClick={() => useUi.getState().set({ paletteOpen: true })} aria-label="Search" className="md:hidden p-2 rounded-lg text-[#5a5852] hover:bg-[#f7f7f4]">
+      <button onClick={() => useUi.getState().set({ paletteOpen: true })} aria-label="Search" className="md:hidden p-2 rounded-lg text-body hover:bg-canvas">
         <Search className="w-[18px] h-[18px]" />
       </button>
 
       <div ref={helpRef} className="relative">
-        <button onClick={() => useUi.getState().set({ helpOpen: !helpOpen })} aria-label="Help and shortcuts" aria-expanded={helpOpen} className="p-2 rounded-lg text-[#5a5852] hover:bg-[#f7f7f4] hover:text-[#26251e]">
+        <button onClick={() => useUi.getState().set({ helpOpen: !helpOpen })} aria-label="Help and shortcuts" aria-expanded={helpOpen} className="p-2 rounded-lg text-body hover:bg-canvas hover:text-ink">
           <HelpCircle className="w-[18px] h-[18px]" />
         </button>
         {helpOpen && (
@@ -90,32 +105,41 @@ export const TopBar: React.FC = () => {
             <dl className="space-y-1.5">
               {SHORTCUTS.map(([keys, what]) => (
                 <div key={keys} className="flex items-center justify-between gap-3 text-[13px]">
-                  <dt className="text-[#5a5852]">{what}</dt>
-                  <dd><kbd className="font-mono text-[11px] px-1.5 py-0.5 rounded-md border border-[#e6e5e0] bg-[#fafaf7] whitespace-nowrap">{keys}</kbd></dd>
+                  <dt className="text-body">{what}</dt>
+                  <dd><kbd className="font-mono text-[11px] px-1.5 py-0.5 rounded-md border border-line bg-soft whitespace-nowrap">{keys}</kbd></dd>
                 </div>
               ))}
             </dl>
-            <p className="mt-3 pt-3 border-t border-[#efeee8] text-[12.5px] leading-relaxed text-[#5a5852]">
+            <p className="mt-3 pt-3 border-t border-fill text-[12.5px] leading-relaxed text-body">
               Tell Tinker what to change in plain words, for example <em>put Redis between Orders and PostgreSQL</em>. Questions ending in ? are answered without changing anything.
             </p>
           </div>
         )}
       </div>
 
-      <button onClick={() => useUi.getState().set({ chatOpen: !useUi.getState().chatOpen })} aria-label="Toggle chat" className="xl:hidden p-2 rounded-lg text-[#5a5852] hover:bg-[#f7f7f4]">
+      <button onClick={() => useUi.getState().set({ chatOpen: !useUi.getState().chatOpen })} aria-label="Toggle chat" className="xl:hidden p-2 rounded-lg text-body hover:bg-canvas">
         <MessageSquare className="w-[18px] h-[18px]" />
       </button>
 
       <div ref={menuRef} className="relative">
-        <button onClick={() => setMenu((o) => !o)} aria-label="Account" aria-haspopup="menu" aria-expanded={menu} title={email ?? 'Account'} className="rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f54e00]">
+        <button onClick={() => setMenu((o) => !o)} aria-label="Account" aria-haspopup="menu" aria-expanded={menu} title={email ?? 'Account'} className="rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
           <Avatar />
         </button>
         {menu && (
           <div role="menu" className={`${MENU_PANEL} right-0 top-full mt-2 w-64`}>
             <div className="px-2.5 py-2">
-              <div className="text-[13px] font-medium text-[#26251e] truncate">{email}</div>
-              <div className="text-[12px] text-[#807d72]">Signed in</div>
+              <div className="text-[13px] font-medium text-ink truncate">{email}</div>
+              <div className="text-[12px] text-muted">Signed in</div>
             </div>
+            <button
+              onClick={() => {
+                setMenu(false);
+                useUi.getState().set({ settingsOpen: true });
+              }}
+              className={MENU_ITEM}
+            >
+              <Settings className="w-4 h-4 text-body" /> Settings
+            </button>
             {keyMode !== 'server' && (
               <button
                 onClick={() => {
@@ -124,7 +148,7 @@ export const TopBar: React.FC = () => {
                 }}
                 className={MENU_ITEM}
               >
-                <KeyRound className="w-4 h-4 text-[#5a5852]" /> {keySource === 'NONE' ? 'Add AI key' : 'AI key'}
+                <KeyRound className="w-4 h-4 text-body" /> {keySource === 'NONE' ? 'Add AI key' : 'AI key'}
               </button>
             )}
             <button
@@ -134,7 +158,7 @@ export const TopBar: React.FC = () => {
               }}
               className={MENU_ITEM}
             >
-              <LogOut className="w-4 h-4 text-[#5a5852]" /> Sign out
+              <LogOut className="w-4 h-4 text-body" /> Sign out
             </button>
           </div>
         )}

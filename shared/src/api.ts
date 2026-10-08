@@ -97,8 +97,16 @@ const usageSchema = z.strictObject({ used: z.number().int().min(0), limit: z.num
 export const quotaSchema = z.strictObject({ resetsAt: z.iso.datetime(), ai: usageSchema, voice: usageSchema });
 export type Quota = z.infer<typeof quotaSchema>;
 
+/** PUT /v1/me/avatar: a small picture, base64 in JSON. The server checks the real bytes (PNG, JPEG or WebP, at most 256 KB and 1024 px a side). */
+export const AVATAR_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+export const putAvatarRequestSchema = z.strictObject({ contentType: z.enum(AVATAR_TYPES), data: z.string().min(8).max(360_000).regex(/^[A-Za-z0-9+/]+={0,2}$/, 'not base64') });
+export type PutAvatarRequest = z.infer<typeof putAvatarRequestSchema>;
+export const avatarResponseSchema = z.strictObject({ contentType: z.enum(AVATAR_TYPES), data: z.string(), updatedAt: z.iso.datetime() });
+export type AvatarResponse = z.infer<typeof avatarResponseSchema>;
+export const deleteAvatarResponseSchema = z.strictObject({ deleted: z.literal(true) });
+
 export const meResponseSchema = z.strictObject({
-  user: z.strictObject({ id: uuidSchema, email: z.string().nullable(), displayName: z.string().nullable() }),
+  user: z.strictObject({ id: uuidSchema, email: z.string().nullable(), displayName: z.string().nullable(), avatarUpdatedAt: z.iso.datetime().nullable() }),
   workspaces: z.array(workspaceSummarySchema),
   /** What this server can do right now; the UI enables features from this, never from guesses. */
   /**

@@ -10,12 +10,12 @@ const NavRow: React.FC<{ icon: React.ReactNode; label: string; count?: number | 
   <button
     onClick={onClick}
     aria-expanded={open}
-    className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-[14px] font-medium transition-colors ${active ? 'bg-[#fdebe3] text-[#f54e00]' : 'text-[#26251e] hover:bg-[#f7f7f4]'}`}
+    className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-[14px] font-medium transition-colors ${active ? 'bg-primary-tint text-primary' : 'text-ink hover:bg-canvas'}`}
   >
-    <span className={active ? 'text-[#f54e00]' : 'text-[#5a5852]'}>{icon}</span>
+    <span className={active ? 'text-primary' : 'text-body'}>{icon}</span>
     <span className="flex-1 text-left">{label}</span>
-    {count !== undefined && <span className={`font-mono text-[11px] ${active ? 'text-[#f54e00]/80' : 'text-[#807d72]'}`}>{count}</span>}
-    {open !== undefined && (open ? <ChevronDown className="w-3.5 h-3.5 text-[#807d72]" /> : <ChevronRight className="w-3.5 h-3.5 text-[#807d72]" />)}
+    {count !== undefined && <span className={`font-mono text-[11px] ${active ? 'text-primary/80' : 'text-muted'}`}>{count}</span>}
+    {open !== undefined && (open ? <ChevronDown className="w-3.5 h-3.5 text-muted" /> : <ChevronRight className="w-3.5 h-3.5 text-muted" />)}
   </button>
 );
 
@@ -28,16 +28,16 @@ export const LeftNav: React.FC<{ overlay?: boolean }> = ({ overlay = false }) =>
   const closeOverlay = () => overlay && useUi.getState().set({ navOpen: false });
 
   return (
-    <nav aria-label="Workspace" className="h-full w-[264px] flex-shrink-0 flex flex-col bg-white border-r border-[#e6e5e0] overflow-hidden">
+    <nav aria-label="Workspace" className="h-full w-[264px] flex-shrink-0 flex flex-col bg-surface border-r border-line overflow-hidden">
       {overlay && (
-        <div className="flex items-center justify-between px-4 h-12 border-b border-[#e6e5e0] lg:hidden">
+        <div className="flex items-center justify-between px-4 h-12 border-b border-line lg:hidden">
           <span className="text-[14px] font-semibold">Navigation</span>
-          <button onClick={closeOverlay} aria-label="Close navigation" className="p-1.5 rounded-lg hover:bg-[#f7f7f4]"><X className="w-4 h-4" /></button>
+          <button onClick={closeOverlay} aria-label="Close navigation" className="p-1.5 rounded-lg hover:bg-canvas"><X className="w-4 h-4" /></button>
         </div>
       )}
       <div className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 pb-3">
         <NavRow icon={<LayoutGrid className="w-[18px] h-[18px]" />} label="Diagrams" count={diagrams.length} active onClick={() => undefined} />
-        <div className="mt-1 mb-2 ml-[22px] pl-3 border-l border-[#e6e5e0] space-y-0.5">
+        <div className="mt-1 mb-2 ml-[22px] pl-3 border-l border-line space-y-0.5">
           {diagrams.map((d) => {
             const active = d.id === currentId;
             return (
@@ -49,7 +49,7 @@ export const LeftNav: React.FC<{ overlay?: boolean }> = ({ overlay = false }) =>
                   }}
                   aria-current={active ? 'true' : undefined}
                   title={d.name}
-                  className={`w-full flex items-center gap-2 h-8 px-2.5 rounded-md text-[13.5px] text-left transition-colors ${active ? 'text-[#f54e00] font-medium' : 'text-[#5a5852] hover:text-[#26251e] hover:bg-[#f7f7f4]'}`}
+                  className={`w-full flex items-center gap-2 h-8 px-2.5 rounded-md text-[13.5px] text-left transition-colors ${active ? 'text-primary font-medium' : 'text-body hover:text-ink hover:bg-canvas'}`}
                 >
                   <FileText className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
                   <span className="truncate">{d.name}</span>
@@ -61,7 +61,7 @@ export const LeftNav: React.FC<{ overlay?: boolean }> = ({ overlay = false }) =>
                     }}
                     aria-label={`Delete ${d.name}`}
                     title="Delete this diagram"
-                    className="absolute right-1.5 top-1.5 p-1 rounded-md text-[#807d72] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-[#cf2d56] hover:bg-[#cf2d56]/10"
+                    className="absolute right-1.5 top-1.5 p-1 rounded-md text-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-danger hover:bg-danger/10"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -69,7 +69,7 @@ export const LeftNav: React.FC<{ overlay?: boolean }> = ({ overlay = false }) =>
               </div>
             );
           })}
-          <button onClick={() => void useWorkspaceStore.getState().createDiagram()} className="w-full flex items-center gap-2 h-8 px-2.5 rounded-md text-[13.5px] text-[#807d72] hover:text-[#f54e00] hover:bg-[#f7f7f4]">
+          <button onClick={() => void useWorkspaceStore.getState().createDiagram()} className="w-full flex items-center gap-2 h-8 px-2.5 rounded-md text-[13.5px] text-muted hover:text-primary hover:bg-canvas">
             <Plus className="w-3.5 h-3.5" /> New diagram
           </button>
         </div>
@@ -82,7 +82,7 @@ export const LeftNav: React.FC<{ overlay?: boolean }> = ({ overlay = false }) =>
           onClick={() => useUi.getState().set({ versionsOpen: !versionsOpen })}
         />
         {versionsOpen && (
-          <div className="mt-1 mb-2 h-80 rounded-xl border border-[#e6e5e0] bg-white overflow-hidden flex flex-col">
+          <div className="mt-1 mb-2 h-80 rounded-xl border border-line bg-surface overflow-hidden flex flex-col">
             <VersionsPanel />
           </div>
         )}

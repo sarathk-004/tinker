@@ -17,6 +17,7 @@ import { FloatingEdge } from './FloatingEdge';
 import { useDiagramStore } from '../diagram/store';
 import { EmptyCanvas } from './EmptyCanvas';
 import { useUi } from '../shell/uiStore';
+import { useTheme } from '../theme/theme';
 import { COMPONENT_DRAG_TYPE, useAddComponent } from '../shell/addComponent';
 import { PALETTE } from '../shell/palette';
 import { NoteNode } from './NoteNode';
@@ -60,6 +61,7 @@ const noteNodes = (notes: readonly Note[]): Node[] =>
 /** The React Flow provider lives in the app shell, so the toolbar can zoom and frame the same canvas. */
 export const DiagramCanvas: React.FC = () => {
   const tool = useUi((s) => s.tool);
+  const theme = useTheme((s) => s.resolved);
   const addComponent = useAddComponent();
   const storeNodes = useDiagramStore((state) => state.nodes);
   const storeEdges = useDiagramStore((state) => state.edges);
@@ -222,12 +224,13 @@ export const DiagramCanvas: React.FC = () => {
   );
 
   return (
-    <div className="relative w-full h-full bg-[#f7f7f4]" onDragOver={onDragOver} onDrop={onDrop}>
+    <div className="relative w-full h-full bg-canvas" onDragOver={onDragOver} onDrop={onDrop}>
       {isEmpty && diagramId && <EmptyCanvas />}
 
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        colorMode={theme}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         // Loose: a connection can start or end on any of a component's four points, top and bottom included.
@@ -263,7 +266,7 @@ export const DiagramCanvas: React.FC = () => {
         proOptions={{ hideAttribution: true }}
         className="touch-none"
       >
-        <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} color="#cfcdc4" />
+        <Background variant={BackgroundVariant.Dots} gap={24} size={1.5} color="rgb(var(--line-strong))" />
       </ReactFlow>
     </div>
   );

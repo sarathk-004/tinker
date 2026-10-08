@@ -13,8 +13,8 @@ import { useUi } from './uiStore';
 export const SaveStatus: React.FC = () => {
   const { status, pending } = useDiagramStore((s) => s.doc);
   const base = 'flex items-center gap-1.5 text-[13px] whitespace-nowrap';
-  if (status === 'conflict') return <span className={`${base} text-[#cf2d56] font-medium`}><AlertTriangle className="w-4 h-4" />Changed elsewhere</span>;
-  if (status === 'blocked') return <span className={`${base} text-[#cf2d56] font-medium`}><CloudOff className="w-4 h-4" />Unavailable</span>;
+  if (status === 'conflict') return <span className={`${base} text-danger font-medium`}><AlertTriangle className="w-4 h-4" />Changed elsewhere</span>;
+  if (status === 'blocked') return <span className={`${base} text-danger font-medium`}><CloudOff className="w-4 h-4" />Unavailable</span>;
   if (status === 'failed') {
     return (
       <button onClick={() => session.retry()} title="Retry saving now" className={`${base} text-[#8a5a12] font-medium hover:underline`}>
@@ -22,8 +22,8 @@ export const SaveStatus: React.FC = () => {
       </button>
     );
   }
-  if (status === 'saving' || pending > 0) return <span className={`${base} text-[#5a5852]`}><Loader2 className="w-4 h-4 animate-spin" />Saving{pending > 1 ? ` (${pending})` : '…'}</span>;
-  return <span className={`${base} text-[#5a5852]`}><Cloud className="w-4 h-4 text-[#1f8a65]" /><span>All saved</span></span>;
+  if (status === 'saving' || pending > 0) return <span className={`${base} text-body`}><Loader2 className="w-4 h-4 animate-spin" />Saving{pending > 1 ? ` (${pending})` : '…'}</span>;
+  return <span className={`${base} text-body`}><Cloud className="w-4 h-4 text-success" /><span>All saved</span></span>;
 };
 
 const FORMATS: Array<[ExportFormat, string, string, React.ReactNode]> = [
@@ -58,22 +58,22 @@ const ExportMenu: React.FC = () => {
         disabled={!hasDiagram}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-2 h-9 px-3.5 rounded-lg border border-[#e6e5e0] bg-white hover:border-[#cfcdc4] hover:bg-[#fafaf7] text-[13.5px] font-medium text-[#26251e] disabled:opacity-40"
+        className="flex items-center gap-2 h-9 px-3.5 rounded-lg border border-line bg-surface hover:border-line-strong hover:bg-soft text-[13.5px] font-medium text-ink disabled:opacity-40"
       >
-        <Download className="w-4 h-4 text-[#5a5852]" /> Export
+        <Download className="w-4 h-4 text-body" /> Export
       </button>
       {open && (
         <div role="menu" className={`${MENU_PANEL} right-0 top-full mt-2 w-72`}>
           {FORMATS.map(([format, title, hint, icon]) => (
             <button key={format} role="menuitem" onClick={() => void run(format)} disabled={busy !== null} className={MENU_ITEM}>
-              <span className="text-[#5a5852]">{busy === format ? <Loader2 className="w-4 h-4 animate-spin" /> : icon}</span>
+              <span className="text-body">{busy === format ? <Loader2 className="w-4 h-4 animate-spin" /> : icon}</span>
               <span className="flex-1">
                 <span className="block font-medium">{title}</span>
-                <span className="block text-[12px] text-[#807d72]">{hint}</span>
+                <span className="block text-[12px] text-muted">{hint}</span>
               </span>
             </button>
           ))}
-          {error && <p className="px-2.5 py-1.5 text-[12px] text-[#cf2d56]">{error}</p>}
+          {error && <p className="px-2.5 py-1.5 text-[12px] text-danger">{error}</p>}
         </div>
       )}
     </div>
@@ -94,9 +94,9 @@ export const CanvasHeader: React.FC = () => {
   };
 
   return (
-    <div className="flex items-end justify-between gap-4 px-6 pt-4 pb-3 flex-shrink-0 bg-white">
+    <div className="flex items-end justify-between gap-4 px-6 pt-4 pb-3 flex-shrink-0 bg-surface">
       <div className="min-w-0">
-        <div className="flex items-center gap-1.5 text-[12.5px] text-[#807d72] mb-0.5">
+        <div className="flex items-center gap-1.5 text-[12.5px] text-muted mb-0.5">
           <span className="truncate max-w-[200px]">{workspace?.name ?? 'Workspace'}</span>
           <ChevronRight className="w-3 h-3 flex-shrink-0" />
           <span className="truncate max-w-[260px]">{diagram?.name ?? 'No diagram'}</span>
@@ -114,7 +114,7 @@ export const CanvasHeader: React.FC = () => {
                 if (e.key === 'Escape') setEditing(false);
               }}
               aria-label="Diagram name"
-              className="min-w-0 w-[min(480px,60vw)] text-[24px] font-semibold tracking-[-0.025em] text-[#26251e] bg-white border border-[#26251e] rounded-lg px-2 -ml-2 outline-none"
+              className="min-w-0 w-[min(480px,60vw)] text-[24px] font-semibold tracking-[-0.025em] text-ink bg-surface border border-ink rounded-lg px-2 -ml-2 outline-none"
             />
           ) : (
             <button
@@ -124,7 +124,7 @@ export const CanvasHeader: React.FC = () => {
               }}
               disabled={!diagram}
               title="Rename diagram"
-              className="min-w-0 text-left text-[24px] font-semibold tracking-[-0.025em] text-[#26251e] truncate rounded-lg px-2 -ml-2 hover:bg-[#f7f7f4]"
+              className="min-w-0 text-left text-[24px] font-semibold tracking-[-0.025em] text-ink truncate rounded-lg px-2 -ml-2 hover:bg-canvas"
             >
               {diagram?.name ?? 'No diagram'}
             </button>
@@ -134,7 +134,7 @@ export const CanvasHeader: React.FC = () => {
               onClick={() => useUi.getState().set({ versionsOpen: !versionsOpen, navOpen: true })}
               title="Version history"
               aria-label={`Version ${diagram.version}. Open version history`}
-              className="flex items-center gap-1 h-6 px-2 rounded-md bg-[#efeee8] hover:bg-[#e6e5e0] font-mono text-[11.5px] text-[#5a5852] flex-shrink-0"
+              className="flex items-center gap-1 h-6 px-2 rounded-md bg-fill hover:bg-line font-mono text-[11.5px] text-body flex-shrink-0"
             >
               v{diagram.version} <ChevronDown className="w-3 h-3" />
             </button>

@@ -148,7 +148,7 @@ export async function playFlow(host: FlowHost, sequence?: string[]): Promise<voi
               animated: true,
               style: {
                 ...e.style,
-                stroke: isThisEdge ? '#f54e00' : isHistorical ? '#26251e' : '#cfcdc4',
+                stroke: isThisEdge ? '#f54e00' : isHistorical ? 'rgb(var(--ink))' : 'rgb(var(--line-strong))',
                 strokeWidth: isThisEdge ? 3 : isHistorical ? 2 : 1.2,
                 opacity: isThisEdge ? 1 : isHistorical ? 0.7 : 0.2,
               },
@@ -180,7 +180,7 @@ export async function playFlow(host: FlowHost, sequence?: string[]): Promise<voi
             animated: true,
             style: {
               ...e.style,
-              stroke: isThisEdge ? '#f54e00' : isHistorical ? '#26251e' : '#cfcdc4',
+              stroke: isThisEdge ? '#f54e00' : isHistorical ? 'rgb(var(--ink))' : 'rgb(var(--line-strong))',
               strokeWidth: isThisEdge ? 3 : isHistorical ? 2 : 1.2,
               opacity: isThisEdge ? 1 : isHistorical ? 0.8 : 0.2,
             },

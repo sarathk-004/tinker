@@ -114,3 +114,4 @@ None observed (build passes). Gaps: no automated tests, no lint, no CI, 526 kB b
 - `src/advisor/useAdvisor.ts`: the architecture advisor (suggestions and readiness), shown in the left column.
 - `src/components/`: AWSArchitectureNode (node card), DiagramCanvas (React Flow, provider lives in AppShell), EmptyCanvas, LoginScreen, StatusBanners, NodeEditModal, AiKeyDialog, VersionsPanel, icons.
 - Server: `modules/workspaces/workspace-service.ts` (`POST /v1/workspaces`), `modules/usage/daily-usage.ts` (daily allowance), `modules/ai/application/confirm.ts` (yes/no replies and stored proposals).
+- Theme and profile (2026-10-08): `src/theme/` (tokens.css, theme.ts), `public/theme-init.js`, `src/components/SettingsDialog.tsx` (Profile, Security, Appearance, Preferences), `src/auth/account.ts` (name, password, email, avatar helpers). Server: `modules/profile/{image,avatar}.ts`, migration `1764000000000_user_avatars.sql`, routes `GET/PUT/DELETE /v1/me/avatar`.

@@ -1,5 +1,9 @@
 /** @type {import('tailwindcss').Config} */
+// Colours by meaning (values in src/theme/tokens.css, light and dark). `bg-primary/10` works because each is an rgb triplet.
+const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
+
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -7,6 +11,37 @@ export default {
   theme: {
     extend: {
       colors: {
+        canvas: token('canvas'),
+        surface: token('surface'),
+        soft: token('soft'),
+        fill: token('fill'),
+        bubble: token('bubble'),
+        line: token('line'),
+        'line-strong': token('line-strong'),
+        ink: token('ink'),
+        body: token('body'),
+        muted: token('muted'),
+        faint: token('faint'),
+        inverse: token('inverse'),
+        'on-inverse': token('on-inverse'),
+        scrim: token('scrim'),
+        primary: token('primary'),
+        'primary-hover': token('primary-hover'),
+        'primary-tint': token('primary-tint'),
+        'primary-soft': token('primary-soft'),
+        danger: token('danger'),
+        'danger-ink': token('danger-ink'),
+        success: token('success'),
+        'success-ink': token('success-ink'),
+        'success-tint': token('success-tint'),
+        warn: token('warn'),
+        'warn-ink': token('warn-ink'),
+        question: token('question'),
+        'question-line': token('question-line'),
+        info: token('info'),
+        'info-line': token('info-line'),
+        note: token('note'),
+        'note-line': token('note-line'),
         // Cursor Design System Palette
         cursor: {
           primary: '#f54e00',

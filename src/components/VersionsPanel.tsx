@@ -30,51 +30,51 @@ export const VersionsPanel: React.FC = () => {
   const me = useWorkspaceStore((s) => s.user?.id);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-white">
-      <div className="px-3 py-1.5 border-b border-[#e6e5e0] bg-[#fafaf7] flex-shrink-0 text-[10px] font-mono text-[#807d72]">
+    <div className="flex-1 flex flex-col min-h-0 bg-surface">
+      <div className="px-3 py-1.5 border-b border-line bg-soft flex-shrink-0 text-[10px] font-mono text-muted">
         Restoring never deletes anything: it is saved as a new version, so you can go forward again. Keeps your latest {retention.keepLatest} versions and everything from the last {retention.keepDays} days.
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-        {error && <div className="p-2 rounded-md border border-[#cf2d56]/30 bg-[#cf2d56]/5 text-[11px] text-[#7a1530]">{error}</div>}
-        {revisions.length === 0 && !loading && <div className="p-3 text-xs text-[#807d72]">No saved versions yet. Make a change and it will appear here.</div>}
+        {error && <div className="p-2 rounded-md border border-danger/30 bg-danger/5 text-[11px] text-danger-ink">{error}</div>}
+        {revisions.length === 0 && !loading && <div className="p-3 text-xs text-muted">No saved versions yet. Make a change and it will appear here.</div>}
         {revisions.map((r) => {
           const current = r.version === currentSource;
           return (
-            <div key={r.version} className={`p-2 rounded-md border text-xs ${current ? 'border-[#f54e00]/50 bg-[#f54e00]/5' : 'border-[#e6e5e0] bg-white'}`}>
+            <div key={r.version} className={`p-2 rounded-md border text-xs ${current ? 'border-primary/50 bg-primary/5' : 'border-line bg-surface'}`}>
               <div className="flex items-center justify-between gap-2">
-                <span className="font-medium text-[#26251e]">
-                  {REASON_LABEL[r.reason]} <span className="font-mono text-[10px] text-[#807d72]">v{r.version}</span>
+                <span className="font-medium text-ink">
+                  {REASON_LABEL[r.reason]} <span className="font-mono text-[10px] text-muted">v{r.version}</span>
                 </span>
                 {current ? (
-                  <span className="text-[10px] font-mono text-[#f54e00]">Showing now</span>
+                  <span className="text-[10px] font-mono text-primary">Showing now</span>
                 ) : (
                   <button
                     onClick={() => void useHistoryStore.getState().restore(r.version)}
                     disabled={busy}
                     title="Make the diagram look like this version (saved as a new version)"
-                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#fafaf7] hover:bg-white border border-[#e6e5e0] hover:border-[#26251e] text-[11px] text-[#26251e] disabled:opacity-40"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-soft hover:bg-surface border border-line hover:border-ink text-[11px] text-ink disabled:opacity-40"
                   >
                     {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
                     Restore
                   </button>
                 )}
               </div>
-              <div className="mt-0.5 text-[11px] text-[#5a5852]">
+              <div className="mt-0.5 text-[11px] text-body">
                 {plural(r.nodeCount, 'component')} · {plural(r.edgeCount, 'connection')}
               </div>
-              <div className="text-[10px] text-[#807d72]">
+              <div className="text-[10px] text-muted">
                 {timeAgo(r.createdAt)} · {r.createdBy.id === me ? 'You' : (r.createdBy.name ?? 'A collaborator')}
               </div>
             </div>
           );
         })}
         {loading && (
-          <div className="flex items-center gap-2 px-2 py-1 text-[11px] text-[#5a5852]">
+          <div className="flex items-center gap-2 px-2 py-1 text-[11px] text-body">
             <Loader2 className="w-3 h-3 animate-spin" /> Loading…
           </div>
         )}
         {hasMore && !loading && (
-          <button onClick={() => void useHistoryStore.getState().loadMore()} className="w-full py-1.5 text-[11px] text-[#5a5852] hover:text-[#26251e] border border-dashed border-[#e6e5e0] rounded-md">
+          <button onClick={() => void useHistoryStore.getState().loadMore()} className="w-full py-1.5 text-[11px] text-body hover:text-ink border border-dashed border-line rounded-md">
             Show older versions
           </button>
         )}

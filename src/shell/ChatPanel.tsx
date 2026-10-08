@@ -31,17 +31,17 @@ const pick = (option: string) => {
 
 const ShowOnDiagram: React.FC<{ ids: string[] }> = ({ ids }) => (
   <div className="mt-2.5 flex gap-2">
-    <button onClick={() => showOnDiagram(ids)} className="h-8 px-3 rounded-lg border border-[#e6e5e0] bg-white hover:border-[#26251e] text-[12.5px] font-medium">Show on diagram</button>
-    <button onClick={() => useDiagramStore.getState().clearHighlight()} className="h-8 px-3 rounded-lg border border-[#e6e5e0] bg-white hover:border-[#26251e] text-[12.5px] text-[#5a5852]">Clear</button>
+    <button onClick={() => showOnDiagram(ids)} className="h-8 px-3 rounded-lg border border-line bg-surface hover:border-ink text-[12.5px] font-medium">Show on diagram</button>
+    <button onClick={() => useDiagramStore.getState().clearHighlight()} className="h-8 px-3 rounded-lg border border-line bg-surface hover:border-ink text-[12.5px] text-body">Clear</button>
   </div>
 );
 
 const AssistantHeader: React.FC<{ turn: ConversationTurn }> = ({ turn }) => (
   <div className="flex items-center gap-2 mb-1.5">
     <TinkerLogo size={18} />
-    <span className="text-[13.5px] font-semibold text-[#26251e]">Tinker</span>
-    <span className="font-mono text-[10.5px] text-[#a09c92]">{clock(turn.timestamp)}</span>
-    {turn.source === 'AI' && <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded-md bg-[#efeee8] text-[#5a5852]">AI</span>}
+    <span className="text-[13.5px] font-semibold text-ink">Tinker</span>
+    <span className="font-mono text-[10.5px] text-faint">{clock(turn.timestamp)}</span>
+    {turn.source === 'AI' && <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded-md bg-fill text-body">AI</span>}
   </div>
 );
 
@@ -49,12 +49,12 @@ const AssistantHeader: React.FC<{ turn: ConversationTurn }> = ({ turn }) => (
 const TurnView: React.FC<{ turn: ConversationTurn }> = ({ turn }) => {
   if (turn.role === 'user') {
     return (
-      <div className={`rounded-xl bg-[#f5f4f0] px-4 py-3 ${turn.kind === 'sending' ? 'opacity-60' : ''}`}>
+      <div className={`rounded-xl bg-bubble px-4 py-3 ${turn.kind === 'sending' ? 'opacity-60' : ''}`}>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[13px] font-semibold text-[#26251e]">You</span>
-          <span className="font-mono text-[10.5px] text-[#a09c92]">{clock(turn.timestamp)}</span>
+          <span className="text-[13px] font-semibold text-ink">You</span>
+          <span className="font-mono text-[10.5px] text-faint">{clock(turn.timestamp)}</span>
         </div>
-        <p className="text-[14.5px] leading-[1.55] text-[#26251e] whitespace-pre-wrap break-words">{turn.text}</p>
+        <p className="text-[14.5px] leading-[1.55] text-ink whitespace-pre-wrap break-words">{turn.text}</p>
       </div>
     );
   }
@@ -63,7 +63,7 @@ const TurnView: React.FC<{ turn: ConversationTurn }> = ({ turn }) => {
     return (
       <div>
         <AssistantHeader turn={turn} />
-        <div className="rounded-xl border border-[#cf2d56]/25 bg-[#cf2d56]/5 px-4 py-3 text-[14px] leading-[1.55] text-[#7a1530] whitespace-pre-wrap break-words">{turn.text}</div>
+        <div className="rounded-xl border border-danger/25 bg-danger/5 px-4 py-3 text-[14px] leading-[1.55] text-danger-ink whitespace-pre-wrap break-words">{turn.text}</div>
       </div>
     );
   }
@@ -72,12 +72,12 @@ const TurnView: React.FC<{ turn: ConversationTurn }> = ({ turn }) => {
     return (
       <div>
         <AssistantHeader turn={turn} />
-        <div className="rounded-xl bg-[#f3f1e8] border border-[#e6e1cf] px-4 py-3.5">
-          <div className="flex items-center gap-2 mb-1.5 text-[#b25a00]">
+        <div className="rounded-xl bg-question border border-question-line px-4 py-3.5">
+          <div className="flex items-center gap-2 mb-1.5 text-warn-ink">
             <HelpCircle className="w-4 h-4" />
             <span className="text-[13px] font-semibold">One question</span>
           </div>
-          <p className="text-[14.5px] leading-[1.55] text-[#26251e] whitespace-pre-wrap break-words">{turn.text}</p>
+          <p className="text-[14.5px] leading-[1.55] text-ink whitespace-pre-wrap break-words">{turn.text}</p>
           {turn.options && turn.options.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
               {turn.options.map((option) => {
@@ -87,7 +87,7 @@ const TurnView: React.FC<{ turn: ConversationTurn }> = ({ turn }) => {
                     key={option}
                     onClick={() => pick(option)}
                     title={isReplyOption(option) ? 'Send this answer' : 'Put this in the message box'}
-                    className={`h-8 px-3.5 rounded-lg text-[13px] font-medium transition-colors ${yes ? 'bg-[#f54e00] hover:bg-[#d04200] text-white' : 'bg-white border border-[#e6e5e0] hover:border-[#26251e] text-[#26251e]'}`}
+                    className={`h-8 px-3.5 rounded-lg text-[13px] font-medium transition-colors ${yes ? 'bg-primary hover:bg-primary-hover text-white' : 'bg-surface border border-line hover:border-ink text-ink'}`}
                   >
                     {option}
                   </button>
@@ -105,26 +105,26 @@ const TurnView: React.FC<{ turn: ConversationTurn }> = ({ turn }) => {
     return (
       <div>
         <AssistantHeader turn={turn} />
-        <p className="text-[14.5px] leading-[1.55] text-[#26251e] whitespace-pre-wrap break-words">{turn.text}</p>
+        <p className="text-[14.5px] leading-[1.55] text-ink whitespace-pre-wrap break-words">{turn.text}</p>
         {n > 1 && (
           <ul className="mt-2.5 space-y-1.5">
             {turn.actions!.map((a, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-[13.5px] leading-snug text-[#26251e]">
-                <Check className="w-4 h-4 mt-px text-[#1f8a65] flex-shrink-0" />
+              <li key={i} className="flex items-start gap-2.5 text-[13.5px] leading-snug text-ink">
+                <Check className="w-4 h-4 mt-px text-success flex-shrink-0" />
                 <span>{a}</span>
               </li>
             ))}
           </ul>
         )}
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[#c9d6ef] bg-[#eef3fc] px-4 py-3">
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-info-line bg-info px-4 py-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 text-[14px] font-semibold text-[#26251e]"><Sparkles className="w-4 h-4 text-[#f54e00]" /> {n > 1 ? `${n} changes applied` : 'Change applied'}</div>
-            <button onClick={() => useUi.getState().set({ versionsOpen: true, navOpen: true })} className="mt-1 inline-flex items-center gap-1 text-[12.5px] font-medium text-[#f54e00] hover:text-[#d04200]">
+            <div className="flex items-center gap-2 text-[14px] font-semibold text-ink"><Sparkles className="w-4 h-4 text-primary" /> {n > 1 ? `${n} changes applied` : 'Change applied'}</div>
+            <button onClick={() => useUi.getState().set({ versionsOpen: true, navOpen: true })} className="mt-1 inline-flex items-center gap-1 text-[12.5px] font-medium text-primary hover:text-primary-hover">
               View changes <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
           </div>
           {turn.version !== undefined && (
-            <span className="font-mono text-[11px] text-[#5a5852] whitespace-nowrap">v{Math.max(1, turn.version - 1)} → v{turn.version}</span>
+            <span className="font-mono text-[11px] text-body whitespace-nowrap">v{Math.max(1, turn.version - 1)} → v{turn.version}</span>
           )}
         </div>
       </div>
@@ -134,7 +134,7 @@ const TurnView: React.FC<{ turn: ConversationTurn }> = ({ turn }) => {
   return (
     <div>
       <AssistantHeader turn={turn} />
-      <p className="text-[14.5px] leading-[1.55] text-[#26251e] whitespace-pre-wrap break-words">{turn.text}</p>
+      <p className="text-[14.5px] leading-[1.55] text-ink whitespace-pre-wrap break-words">{turn.text}</p>
       {turn.kind === 'advice' && turn.highlight && turn.highlight.length > 0 && <ShowOnDiagram ids={turn.highlight} />}
     </div>
   );
@@ -144,13 +144,13 @@ const examples = ['Put Redis between Orders and PostgreSQL', 'Add an API Gateway
 
 const EmptyState: React.FC<{ canType: boolean }> = ({ canType }) => (
   <div className="h-full flex flex-col items-center justify-center text-center px-6">
-    <span className="w-11 h-11 rounded-xl bg-[#fafaf7] border border-[#e6e5e0] flex items-center justify-center mb-3"><TinkerLogo size={26} /></span>
-    <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-[#26251e]">Tell Tinker what to build</h2>
-    <p className="mt-1.5 text-[13.5px] leading-relaxed text-[#5a5852] max-w-[17rem]">Describe a change in plain words, or ask a question about the diagram. Every change is saved as a version you can go back to.</p>
+    <span className="w-11 h-11 rounded-xl bg-soft border border-line flex items-center justify-center mb-3"><TinkerLogo size={26} /></span>
+    <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-ink">Tell Tinker what to build</h2>
+    <p className="mt-1.5 text-[13.5px] leading-relaxed text-body max-w-[17rem]">Describe a change in plain words, or ask a question about the diagram. Every change is saved as a version you can go back to.</p>
     {canType && (
       <div className="mt-4 flex flex-col gap-2 w-full max-w-[19rem]">
         {examples.map((ex) => (
-          <button key={ex} onClick={() => useConversationStore.getState().setDraft(ex)} className="px-3.5 py-2.5 rounded-xl border border-[#e6e5e0] bg-[#fafaf7] hover:border-[#cfcdc4] text-left text-[13px] text-[#26251e]">
+          <button key={ex} onClick={() => useConversationStore.getState().setDraft(ex)} className="px-3.5 py-2.5 rounded-xl border border-line bg-soft hover:border-line-strong text-left text-[13px] text-ink">
             {ex}
           </button>
         ))}
@@ -174,7 +174,7 @@ const MoreMenu: React.FC = () => {
   ];
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => setOpen((o) => !o)} aria-label="More" aria-haspopup="menu" aria-expanded={open} className="p-2 rounded-lg text-[#5a5852] hover:bg-[#f7f7f4] hover:text-[#26251e]">
+      <button onClick={() => setOpen((o) => !o)} aria-label="More" aria-haspopup="menu" aria-expanded={open} className="p-2 rounded-lg text-body hover:bg-canvas hover:text-ink">
         <MoreHorizontal className="w-[18px] h-[18px]" />
       </button>
       {open && (
@@ -193,10 +193,10 @@ const MoreMenu: React.FC = () => {
               }}
               className={MENU_ITEM}
             >
-              <span className="w-4">{current === value && <Check className="w-4 h-4 text-[#f54e00]" />}</span>
+              <span className="w-4">{current === value && <Check className="w-4 h-4 text-primary" />}</span>
               <span>
                 <span className="block font-medium">{label}</span>
-                <span className="block text-[12px] text-[#807d72]">{enabled ? hint : 'Not available on this server.'}</span>
+                <span className="block text-[12px] text-muted">{enabled ? hint : 'Not available on this server.'}</span>
               </span>
             </button>
           ))}
@@ -241,22 +241,22 @@ const HistoryMenu: React.FC = () => {
 
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => void toggle()} disabled={!diagramId} aria-haspopup="menu" aria-expanded={open} className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[12.5px] font-medium text-[#5a5852] hover:bg-[#f7f7f4] hover:text-[#26251e] disabled:opacity-40">
+      <button onClick={() => void toggle()} disabled={!diagramId} aria-haspopup="menu" aria-expanded={open} className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[12.5px] font-medium text-body hover:bg-canvas hover:text-ink disabled:opacity-40">
         <History className="w-4 h-4" /> History
       </button>
       {open && (
         <div role="menu" className={`${MENU_PANEL} left-0 top-full mt-1 w-80 max-h-96 overflow-y-auto`}>
           <div className={`px-2.5 pt-1.5 pb-1 ${MONO_LABEL}`}>Your chats about this diagram</div>
-          {error && <p className="px-2.5 py-2 text-[12.5px] text-[#cf2d56]">{error}</p>}
-          {!error && chats === null && <p className="px-2.5 py-3 text-[12.5px] text-[#807d72] flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</p>}
-          {chats?.length === 0 && <p className="px-2.5 py-3 text-[12.5px] text-[#807d72]">No earlier chats yet. They appear here as you talk to Tinker.</p>}
+          {error && <p className="px-2.5 py-2 text-[12.5px] text-danger">{error}</p>}
+          {!error && chats === null && <p className="px-2.5 py-3 text-[12.5px] text-muted flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</p>}
+          {chats?.length === 0 && <p className="px-2.5 py-3 text-[12.5px] text-muted">No earlier chats yet. They appear here as you talk to Tinker.</p>}
           {chats?.map((c) => (
-            <button key={c.id} role="menuitem" onClick={() => void openChat(c.id)} className={`${MENU_ITEM} items-start ${c.id === current ? 'bg-[#fdebe3]' : ''}`}>
+            <button key={c.id} role="menuitem" onClick={() => void openChat(c.id)} className={`${MENU_ITEM} items-start ${c.id === current ? 'bg-primary-tint' : ''}`}>
               <span className="flex-1 min-w-0">
                 <span className="block truncate font-medium">{c.title}</span>
-                <span className="block text-[11.5px] text-[#807d72]">{timeAgo(c.updatedAt)} · {c.messageCount} message{c.messageCount === 1 ? '' : 's'}</span>
+                <span className="block text-[11.5px] text-muted">{timeAgo(c.updatedAt)} · {c.messageCount} message{c.messageCount === 1 ? '' : 's'}</span>
               </span>
-              {c.id === current && <Check className="w-4 h-4 text-[#f54e00] mt-0.5" />}
+              {c.id === current && <Check className="w-4 h-4 text-primary mt-0.5" />}
             </button>
           ))}
         </div>
@@ -291,7 +291,7 @@ export const ChatBody: React.FC = () => {
 
   return (
     <>
-      <div className="h-11 flex-shrink-0 flex items-center justify-between px-3 border-b border-[#efeee8]">
+      <div className="h-11 flex-shrink-0 flex items-center justify-between px-3 border-b border-fill">
         <HistoryMenu />
         <div className="flex items-center">
           <button
@@ -299,7 +299,7 @@ export const ChatBody: React.FC = () => {
             disabled={turns.length === 0}
             title="New chat (this one stays in History)"
             aria-label="New chat"
-            className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[12.5px] font-medium text-[#5a5852] hover:bg-[#f7f7f4] hover:text-[#26251e] disabled:opacity-35 disabled:hover:bg-transparent"
+            className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[12.5px] font-medium text-body hover:bg-canvas hover:text-ink disabled:opacity-35 disabled:hover:bg-transparent"
           >
             <Plus className="w-4 h-4" /> New chat
           </button>
@@ -321,7 +321,7 @@ export const ChatBody: React.FC = () => {
               </div>
             ))}
             {pending && (
-              <div className="flex items-center gap-2 text-[13px] text-[#5a5852]">
+              <div className="flex items-center gap-2 text-[13px] text-body">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" /> Working on it…
               </div>
             )}

@@ -84,19 +84,19 @@ export const NodeEditModal: React.FC<NodeEditModalProps> = ({ nodeId, onClose })
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-[2px] p-4 animate-fade-in">
-      <div className="w-full max-w-md rounded-lg bg-white border border-[#e6e5e0] shadow-md overflow-hidden">
+      <div className="w-full max-w-md rounded-lg bg-surface border border-line shadow-md overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e6e5e0]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-line">
           <div className="flex items-center gap-2.5">
             <AWSIcon name={selectedAwsIcon} type={selectedType} size={22} />
             <div>
-              <h3 className="text-sm font-semibold text-[#26251e] tracking-tight">Edit Component</h3>
-              <p className="text-[11px] font-mono text-[#807d72]">{nodeId.slice(0, 8)}</p>
+              <h3 className="text-sm font-semibold text-ink tracking-tight">Edit Component</h3>
+              <p className="text-[11px] font-mono text-muted">{nodeId.slice(0, 8)}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-[#807d72] hover:text-[#26251e] hover:bg-[#fafaf7] transition-colors"
+            className="p-1 rounded-md text-muted hover:text-ink hover:bg-soft transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -106,38 +106,38 @@ export const NodeEditModal: React.FC<NodeEditModalProps> = ({ nodeId, onClose })
         <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
           {/* Label / Rename */}
           <div>
-            <label className="block text-xs font-medium text-[#26251e] mb-1.5">
+            <label className="block text-xs font-medium text-ink mb-1.5">
               Component Name (Rename)
             </label>
             <input
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-md bg-[#fafaf7] border border-[#e6e5e0] focus:border-[#26251e] focus:bg-white text-[#26251e] outline-none font-medium transition-all"
+              className="w-full px-3 py-2 text-xs rounded-md bg-soft border border-line focus:border-ink focus:bg-surface text-ink outline-none font-medium transition-all"
               placeholder="e.g. Auth Service"
             />
           </div>
 
           {/* Subtitle / Spec */}
           <div>
-            <label className="block text-xs font-medium text-[#26251e] mb-1.5">
+            <label className="block text-xs font-medium text-ink mb-1.5">
               Service Subtype / Specification
             </label>
             <input
               type="text"
               value={subType}
               onChange={(e) => setSubType(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-md bg-[#fafaf7] border border-[#e6e5e0] focus:border-[#26251e] focus:bg-white text-[#26251e] outline-none transition-all"
+              className="w-full px-3 py-2 text-xs rounded-md bg-soft border border-line focus:border-ink focus:bg-surface text-ink outline-none transition-all"
               placeholder="e.g. Amazon EC2 / Node.js 20"
             />
           </div>
 
           {/* AWS Service Picker */}
           <div>
-            <label className="block text-xs font-medium text-[#26251e] mb-2">
+            <label className="block text-xs font-medium text-ink mb-2">
               Select AWS Component
             </label>
-            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto p-1 border border-[#e6e5e0] rounded-md bg-[#fafaf7]">
+            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto p-1 border border-line rounded-md bg-soft">
               {AWS_OPTIONS.map((opt) => {
                 const isSelected = selectedAwsIcon === opt.icon;
                 return (
@@ -153,8 +153,8 @@ export const NodeEditModal: React.FC<NodeEditModalProps> = ({ nodeId, onClose })
                     }}
                     className={`flex items-center gap-2 p-2 rounded-md text-left text-xs transition-all ${
                       isSelected
-                        ? 'bg-white border border-[#f54e00] shadow-xs text-[#26251e] font-medium'
-                        : 'hover:bg-white border border-transparent text-[#5a5852]'
+                        ? 'bg-surface border border-primary shadow-xs text-ink font-medium'
+                        : 'hover:bg-surface border border-transparent text-body'
                     }`}
                   >
                     <AWSIcon name={opt.icon} type={opt.type} size={18} />
@@ -168,15 +168,15 @@ export const NodeEditModal: React.FC<NodeEditModalProps> = ({ nodeId, onClose })
           {/* Quick Connect to Another Node */}
           {otherNodes.length > 0 && (
             <div>
-              <label className="block text-xs font-medium text-[#26251e] mb-1.5">
+              <label className="block text-xs font-medium text-ink mb-1.5">
                 Connect Outgoing Arrow To:
               </label>
               <div className="flex items-center gap-2">
-                <ArrowRight className="w-4 h-4 text-[#807d72] flex-shrink-0" />
+                <ArrowRight className="w-4 h-4 text-muted flex-shrink-0" />
                 <select
                   value={targetConnectId}
                   onChange={(e) => setTargetConnectId(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-md bg-[#fafaf7] border border-[#e6e5e0] text-[#26251e] outline-none"
+                  className="w-full px-3 py-2 text-xs rounded-md bg-soft border border-line text-ink outline-none"
                 >
                   <option value="">-- No connection --</option>
                   {otherNodes.map((n) => (
@@ -191,10 +191,10 @@ export const NodeEditModal: React.FC<NodeEditModalProps> = ({ nodeId, onClose })
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3.5 bg-[#fafaf7] border-t border-[#e6e5e0]">
+        <div className="flex items-center justify-between px-5 py-3.5 bg-soft border-t border-line">
           <button
             onClick={handleDelete}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[#cf2d56] hover:bg-[#cf2d56]/10 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-danger hover:bg-danger/10 transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Delete</span>
@@ -203,13 +203,13 @@ export const NodeEditModal: React.FC<NodeEditModalProps> = ({ nodeId, onClose })
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-3 py-1.5 rounded-md text-xs font-medium text-[#5a5852] hover:text-[#26251e] hover:bg-white border border-transparent hover:border-[#e6e5e0] transition-all"
+              className="px-3 py-1.5 rounded-md text-xs font-medium text-body hover:text-ink hover:bg-surface border border-transparent hover:border-line transition-all"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-medium bg-[#f54e00] hover:bg-[#d04200] text-white transition-all shadow-xs"
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-medium bg-primary hover:bg-primary-hover text-white transition-all shadow-xs"
             >
               <Check className="w-3.5 h-3.5" />
               <span>Save Changes</span>

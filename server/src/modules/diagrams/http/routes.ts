@@ -12,6 +12,7 @@ import {
   idempotencyKeySchema,
   presentationPatchRequestSchema,
   putAiKeyRequestSchema,
+  putAvatarRequestSchema,
   renameDiagramRequestSchema,
   restoreRequestSchema,
   revisionListQuerySchema,
@@ -27,6 +28,8 @@ import type { RateLimiter } from '../../../infrastructure/http/rate-limiter.ts';
 import type { RunResult, TestHooks } from '../../../infrastructure/idempotency/mutation-requests.ts';
 import { listWorkspaces } from '../../workspaces/access.ts';
 import { createWorkspace } from '../../workspaces/workspace-service.ts';
+import { avatarUpdatedAt, deleteAvatar, getAvatar, putAvatar } from '../../profile/avatar.ts';
+import { createRateLimiter } from '../../../infrastructure/http/rate-limiter.ts';
 import { askAdvice } from '../../ai/application/advice-service.ts';
 import { getRevisionDetail, listRevisions, restoreRevision } from '../../history/application/history-service.ts';
 import { speakMessage } from '../../voice/speak-service.ts';
@@ -120,10 +123,27 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
     });
     app.delete(`${API_PREFIX}/me/ai-key`, async (request) => deps.ai.access.remove(request.auth!.userId));
 
+    // Profile picture. Own picture only; validated by its real bytes; writes are limited so nobody can use this as free storage.
+    const avatarWriteLimiter = createRateLimiter({ limit: 6 });
+    app.get(`${API_PREFIX}/me/avatar`, async (request) => {
+      const avatar = await getAvatar(pool, request.auth!.userId);
+      if (!avatar) throw new AppError('NOT_FOUND', 'No profile picture.');
+      return avatar;
+    });
+    app.put(`${API_PREFIX}/me/avatar`, async (request) => {
+      const body = parseOrThrow(putAvatarRequestSchema, request.body, 'INVALID_REQUEST', 'That does not look like a picture.');
+      avatarWriteLimiter.check(request.auth!.userId);
+      return putAvatar(pool, request.auth!.userId, body.contentType, body.data);
+    });
+    app.delete(`${API_PREFIX}/me/avatar`, async (request) => {
+      await deleteAvatar(pool, request.auth!.userId);
+      return { deleted: true as const };
+    });
+
     app.get(`${API_PREFIX}/me`, async (request): Promise<MeResponse> => {
       const auth = request.auth!;
       return {
-        user: { id: auth.userId, email: auth.email, displayName: auth.displayName },
+        user: { id: auth.userId, email: auth.email, displayName: auth.displayName, avatarUpdatedAt: await avatarUpdatedAt(pool, auth.userId) },
         workspaces: await listWorkspaces(pool, auth.userId),
         features: await featuresFor(auth.userId),
         quota: await deps.ai.usage.snapshot(auth.userId),

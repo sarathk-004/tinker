@@ -8,8 +8,8 @@ import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { MONO_LABEL } from './Popover';
 import { openRightTab } from './uiStore';
 
-const DOT: Record<Severity, string> = { critical: 'bg-[#cf2d56]', high: 'bg-[#e0662a]', medium: 'bg-[#c08532]', low: 'bg-[#8a8f98]' };
-const TEXT: Record<Severity, string> = { critical: 'text-[#cf2d56]', high: 'text-[#c24f12]', medium: 'text-[#9a6a1f]', low: 'text-[#6b6f76]' };
+const DOT: Record<Severity, string> = { critical: 'bg-danger', high: 'bg-[#e0662a]', medium: 'bg-warn', low: 'bg-[#8a8f98]' };
+const TEXT: Record<Severity, string> = { critical: 'text-danger', high: 'text-[#c24f12]', medium: 'text-[#9a6a1f]', low: 'text-[#6b6f76]' };
 
 /** What the AI is asked when the person wants a second opinion. It sees the real diagram (the server adds it), and the answer lands in the chat. */
 export const AI_REVIEW_QUESTION = 'Review this architecture like a senior engineer. List the most important risks for security, reliability, scalability and cost. Name the specific components involved and give a concrete fix for each, most serious first.';
@@ -18,29 +18,29 @@ const FindingCard: React.FC<{ f: Finding; onDismiss: () => void }> = ({ f, onDis
   const [open, setOpen] = useState(f.severity === 'critical' || f.severity === 'high');
   const [busy, setBusy] = useState(false);
   return (
-    <div className="rounded-xl bg-white border border-[#e6e5e0] p-3">
+    <div className="rounded-xl bg-surface border border-line p-3">
       <div className="flex items-start gap-2">
         <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${DOT[f.severity]}`} />
         <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex-1 min-w-0 text-left">
-          <div className="text-[13px] font-medium text-[#26251e] leading-snug">{f.title}</div>
+          <div className="text-[13px] font-medium text-ink leading-snug">{f.title}</div>
           <div className={`mt-0.5 flex items-center gap-1.5 ${MONO_LABEL}`}>
             <span className={TEXT[f.severity]}>{SEVERITY_LABEL[f.severity]}</span>
             <span aria-hidden>·</span>
             <span>{f.category}</span>
           </div>
         </button>
-        <button onClick={onDismiss} title="Dismiss. It comes back only if the problem changes" aria-label={`Dismiss: ${f.title}`} className="p-1 -mr-1 rounded-md text-[#a09c92] hover:text-[#26251e] hover:bg-[#f7f7f4]">
+        <button onClick={onDismiss} title="Dismiss. It comes back only if the problem changes" aria-label={`Dismiss: ${f.title}`} className="p-1 -mr-1 rounded-md text-faint hover:text-ink hover:bg-canvas">
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
       {open && (
-        <div className="mt-2 space-y-2 text-[12.5px] leading-relaxed text-[#5a5852]">
+        <div className="mt-2 space-y-2 text-[12.5px] leading-relaxed text-body">
           <p>{f.why}</p>
-          <p><span className="font-medium text-[#26251e]">What to do: </span>{f.fix}</p>
+          <p><span className="font-medium text-ink">What to do: </span>{f.fix}</p>
         </div>
       )}
       <div className="mt-2.5 flex items-center gap-2">
-        <button onClick={() => showOnDiagram(f.nodeIds)} className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-[#e6e5e0] bg-[#fafaf7] hover:border-[#26251e] text-[12px] font-medium text-[#26251e]">
+        <button onClick={() => showOnDiagram(f.nodeIds)} className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-line bg-soft hover:border-ink text-[12px] font-medium text-ink">
           <Eye className="w-3.5 h-3.5" /> Show
         </button>
         {f.action && (
@@ -52,7 +52,7 @@ const FindingCard: React.FC<{ f: Finding; onDismiss: () => void }> = ({ f, onDis
             }}
             disabled={busy}
             title={f.action.label}
-            className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-[#e6e5e0] bg-[#fafaf7] hover:bg-[#f54e00] hover:border-[#f54e00] hover:text-white text-[12px] font-medium text-[#26251e] transition-colors disabled:opacity-60 min-w-0"
+            className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-line bg-soft hover:bg-primary hover:border-primary hover:text-white text-[12px] font-medium text-ink transition-colors disabled:opacity-60 min-w-0"
           >
             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" /> : <PlusCircle className="w-3.5 h-3.5 flex-shrink-0" />}
             <span className="truncate">Apply fix</span>
@@ -83,11 +83,11 @@ export const AdvisorPanel: React.FC = () => {
   };
 
   return (
-    <div className="flex-shrink-0 border-t border-[#e6e5e0] px-3 pt-3 pb-3 max-h-[52%] overflow-y-auto">
+    <div className="flex-shrink-0 border-t border-line px-3 pt-3 pb-3 max-h-[52%] overflow-y-auto">
       <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="w-full flex items-center justify-between px-1 mb-2">
         <span className={`flex items-center gap-1.5 ${MONO_LABEL}`}>
           {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          <Lightbulb className="w-3.5 h-3.5 text-[#f54e00]" /> Review
+          <Lightbulb className="w-3.5 h-3.5 text-primary" /> Review
         </span>
         {componentCount > 0 && (
           <span className="font-mono text-[11px] px-2 py-0.5 rounded-md" style={{ color, background: `${color}1a` }}>
@@ -98,22 +98,22 @@ export const AdvisorPanel: React.FC = () => {
 
       {open &&
         (componentCount === 0 ? (
-          <p className="px-1 text-[12.5px] leading-relaxed text-[#807d72]">Add components and connect them. The review reads the real connections and points out what a careful engineer would.</p>
+          <p className="px-1 text-[12.5px] leading-relaxed text-muted">Add components and connect them. The review reads the real connections and points out what a careful engineer would.</p>
         ) : (
           <div className="space-y-2">
-            <div className="rounded-xl bg-[#fafaf7] border border-[#e6e5e0] p-3">
+            <div className="rounded-xl bg-soft border border-line p-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[12.5px] font-medium text-[#26251e]">Production readiness</span>
+                <span className="text-[12.5px] font-medium text-ink">Production readiness</span>
                 <span className="font-mono text-[12px] font-semibold" style={{ color }}>{readiness}%</span>
               </div>
-              <div className="h-1.5 rounded-full bg-[#efeee8] overflow-hidden"><div className="h-full rounded-full transition-all duration-300" style={{ width: `${readiness}%`, background: color }} /></div>
-              <p className="mt-2 text-[11.5px] leading-snug text-[#807d72]">Worked out from your components and connections. No AI needed.</p>
+              <div className="h-1.5 rounded-full bg-fill overflow-hidden"><div className="h-full rounded-full transition-all duration-300" style={{ width: `${readiness}%`, background: color }} /></div>
+              <p className="mt-2 text-[11.5px] leading-snug text-muted">Worked out from your components and connections. No AI needed.</p>
             </div>
 
             {findings.length === 0 ? (
-              <div className="flex items-start gap-2 rounded-xl bg-[#e7f5ec] border border-[#1f8a65]/20 p-3">
-                <CheckCircle2 className="w-4 h-4 text-[#1f8a65] mt-0.5 flex-shrink-0" />
-                <p className="text-[12.5px] leading-snug text-[#26251e]">{componentCount < 3 ? 'Nothing to flag yet. The review gets more useful as the diagram grows.' : 'Nothing to flag in what the diagram shows. That is not a guarantee: ask for an AI review for a second opinion.'}</p>
+              <div className="flex items-start gap-2 rounded-xl bg-success-tint border border-success/20 p-3">
+                <CheckCircle2 className="w-4 h-4 text-success mt-0.5 flex-shrink-0" />
+                <p className="text-[12.5px] leading-snug text-ink">{componentCount < 3 ? 'Nothing to flag yet. The review gets more useful as the diagram grows.' : 'Nothing to flag in what the diagram shows. That is not a guarantee: ask for an AI review for a second opinion.'}</p>
               </div>
             ) : (
               findings.map((f) => <FindingCard key={f.id} f={f} onDismiss={() => dismiss(f.id)} />)
@@ -121,15 +121,15 @@ export const AdvisorPanel: React.FC = () => {
 
             {dismissed.length > 0 && (
               <div className="px-1">
-                <button onClick={() => setShowDismissed((v) => !v)} className="text-[12px] text-[#807d72] hover:text-[#26251e]">
+                <button onClick={() => setShowDismissed((v) => !v)} className="text-[12px] text-muted hover:text-ink">
                   {dismissed.length} dismissed {showDismissed ? '· hide' : '· show'}
                 </button>
                 {showDismissed && (
                   <ul className="mt-1.5 space-y-1">
                     {dismissed.map((f) => (
-                      <li key={f.id} className="text-[12px] text-[#807d72] truncate" title={f.title}>{f.title}</li>
+                      <li key={f.id} className="text-[12px] text-muted truncate" title={f.title}>{f.title}</li>
                     ))}
-                    <li><button onClick={restoreAll} className="text-[12px] font-medium text-[#f54e00] hover:text-[#d04200]">Bring them all back</button></li>
+                    <li><button onClick={restoreAll} className="text-[12px] font-medium text-primary hover:text-primary-hover">Bring them all back</button></li>
                   </ul>
                 )}
               </div>
@@ -140,9 +140,9 @@ export const AdvisorPanel: React.FC = () => {
                 onClick={() => void askAi()}
                 disabled={out || pending}
                 title={out ? 'No AI requests left today' : 'Asks the AI to review this diagram and answers in the chat. Uses 1 AI request.'}
-                className="w-full h-9 rounded-lg border border-[#e6e5e0] bg-white hover:border-[#26251e] disabled:opacity-50 text-[12.5px] font-medium text-[#26251e] flex items-center justify-center gap-1.5"
+                className="w-full h-9 rounded-lg border border-line bg-surface hover:border-ink disabled:opacity-50 text-[12.5px] font-medium text-ink flex items-center justify-center gap-1.5"
               >
-                <Sparkles className="w-3.5 h-3.5 text-[#f54e00]" /> Ask AI for a deeper review
+                <Sparkles className="w-3.5 h-3.5 text-primary" /> Ask AI for a deeper review
               </button>
             )}
           </div>

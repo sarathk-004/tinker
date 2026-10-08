@@ -23,6 +23,7 @@ interface UiState {
   editingGroupPath: string | null;
   selectedGroupPath: string | null;
   helpOpen: boolean;
+  settingsOpen: boolean;
   set(patch: Partial<Omit<UiState, 'set'>>): void;
 }
 
@@ -38,6 +39,7 @@ export const useUi = create<UiState>((set) => ({
   editingGroupPath: null,
   selectedGroupPath: null,
   helpOpen: false,
+  settingsOpen: false,
   set: (patch) => set(patch),
 }));
 

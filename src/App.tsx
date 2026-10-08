@@ -8,7 +8,7 @@ import { useWorkspaceStore } from './workspace/workspaceStore';
 import { historyKeyHandler, watchHistory } from './history/history';
 
 const Splash: React.FC<{ text: string }> = ({ text }) => (
-  <div className="min-h-screen w-screen flex items-center justify-center bg-[#f7f7f4] text-[#5a5852] text-sm gap-2">
+  <div className="min-h-screen w-screen flex items-center justify-center bg-canvas text-body text-sm gap-2">
     <Loader2 className="w-4 h-4 animate-spin" />
     {text}
   </div>
@@ -68,15 +68,15 @@ export const App: React.FC = () => {
   if (phase === 'idle' || phase === 'loading') return <Splash text="Loading your diagrams…" />;
   if (phase === 'error') {
     return (
-      <div className="min-h-screen w-screen flex items-center justify-center bg-[#f7f7f4] px-4">
-        <div className="max-w-sm rounded-lg bg-white border border-[#e6e5e0] p-6 text-sm text-[#26251e]">
+      <div className="min-h-screen w-screen flex items-center justify-center bg-canvas px-4">
+        <div className="max-w-sm rounded-lg bg-surface border border-line p-6 text-sm text-ink">
           <p className="font-semibold mb-1">Could not load your diagrams</p>
-          <p className="text-[#5a5852] mb-4">{error}</p>
+          <p className="text-body mb-4">{error}</p>
           <div className="flex gap-2">
-            <button onClick={() => useWorkspaceStore.setState({ phase: 'idle', error: null })} className="px-3 py-1.5 rounded-md bg-[#f54e00] text-white text-xs font-medium">
+            <button onClick={() => useWorkspaceStore.setState({ phase: 'idle', error: null })} className="px-3 py-1.5 rounded-md bg-primary text-white text-xs font-medium">
               Try again
             </button>
-            <button onClick={() => void signOut()} className="px-3 py-1.5 rounded-md border border-[#e6e5e0] text-xs">
+            <button onClick={() => void signOut()} className="px-3 py-1.5 rounded-md border border-line text-xs">
               Sign out
             </button>
           </div>

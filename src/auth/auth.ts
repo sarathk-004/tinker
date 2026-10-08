@@ -68,7 +68,7 @@ export function supabaseConnection(): SupabaseConnection | null {
 
 let client: SupabaseClient | null = null;
 let clientFor = '';
-function supabase(): SupabaseClient | null {
+export function supabase(): SupabaseClient | null {
   const conn = supabaseConnection();
   if (!conn) return null;
   const id = `${conn.url}|${conn.key}`;

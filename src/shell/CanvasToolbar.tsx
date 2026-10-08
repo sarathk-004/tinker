@@ -20,15 +20,15 @@ const IconButton: React.FC<{ label: string; onClick: () => void; disabled?: bool
     aria-label={label}
     aria-pressed={active}
     className={`relative w-9 h-9 flex items-center justify-center rounded-lg transition-colors disabled:opacity-35 disabled:hover:bg-transparent ${
-      active ? 'bg-[#fdebe3] text-[#f54e00]' : danger ? 'text-[#5a5852] hover:text-[#cf2d56] hover:bg-[#cf2d56]/10' : 'text-[#5a5852] hover:text-[#26251e] hover:bg-[#f7f7f4]'
+      active ? 'bg-primary-tint text-primary' : danger ? 'text-body hover:text-danger hover:bg-danger/10' : 'text-body hover:text-ink hover:bg-canvas'
     }`}
   >
     {children}
-    {badge ? <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#cf2d56] text-white font-mono text-[9.5px] leading-4 text-center">{badge}</span> : null}
+    {badge ? <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-danger text-white font-mono text-[9.5px] leading-4 text-center">{badge}</span> : null}
   </button>
 );
 
-const Divider = () => <span className="mx-1.5 h-5 w-px bg-[#e6e5e0]" aria-hidden />;
+const Divider = () => <span className="mx-1.5 h-5 w-px bg-line" aria-hidden />;
 const ICON = 'w-[18px] h-[18px]';
 
 const AddComponent: React.FC = () => {
@@ -40,7 +40,7 @@ const AddComponent: React.FC = () => {
   const categories = [...new Set(PALETTE.map((c) => c.category))];
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => setOpen((o) => !o)} disabled={!hasDiagram} aria-haspopup="menu" aria-expanded={open} className="flex items-center gap-1.5 h-9 pl-3 pr-2.5 rounded-lg bg-[#f54e00] hover:bg-[#d04200] disabled:opacity-50 text-white text-[13.5px] font-medium transition-colors">
+      <button onClick={() => setOpen((o) => !o)} disabled={!hasDiagram} aria-haspopup="menu" aria-expanded={open} className="flex items-center gap-1.5 h-9 pl-3 pr-2.5 rounded-lg bg-primary hover:bg-primary-hover disabled:opacity-50 text-white text-[13.5px] font-medium transition-colors">
         <Plus className="w-4 h-4" /> Add component <ChevronDown className="w-3.5 h-3.5 opacity-80" />
       </button>
       {open && (
@@ -56,12 +56,12 @@ const AddComponent: React.FC = () => {
                     setOpen(false);
                     void add(c);
                   }}
-                  className="w-full flex items-center gap-3 px-2.5 py-1.5 rounded-lg text-left hover:bg-[#f7f7f4]"
+                  className="w-full flex items-center gap-3 px-2.5 py-1.5 rounded-lg text-left hover:bg-canvas"
                 >
-                  <span className="w-8 h-8 rounded-md bg-[#fafaf7] border border-[#e6e5e0] flex items-center justify-center flex-shrink-0"><AWSIcon name={c.awsIcon} type={c.type} size={20} /></span>
+                  <span className="w-8 h-8 rounded-md bg-soft border border-line flex items-center justify-center flex-shrink-0"><AWSIcon name={c.awsIcon} type={c.type} size={20} /></span>
                   <span className="min-w-0">
-                    <span className="block text-[13.5px] font-medium text-[#26251e] truncate">{c.label}</span>
-                    <span className="block text-[11.5px] text-[#807d72] truncate">{c.subType}</span>
+                    <span className="block text-[13.5px] font-medium text-ink truncate">{c.label}</span>
+                    <span className="block text-[11.5px] text-muted truncate">{c.subType}</span>
                   </span>
                 </button>
               ))}
@@ -92,9 +92,9 @@ export const CanvasToolbar: React.FC = () => {
   const setTool = (t: 'pan' | 'select' | 'text') => useUi.getState().set({ tool: t });
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-6 min-h-12 py-1 border-b border-[#e6e5e0] flex-shrink-0 bg-white">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-6 min-h-12 py-1 border-b border-line flex-shrink-0 bg-surface">
       <div className="flex items-stretch h-10 flex-shrink-0">
-        <button className="flex items-center gap-2 px-1 mr-6 h-full text-[14px] font-medium text-[#f54e00] border-b-2 border-[#f54e00] -mb-px" aria-current="page">
+        <button className="flex items-center gap-2 px-1 mr-6 h-full text-[14px] font-medium text-primary border-b-2 border-primary -mb-px" aria-current="page">
           <Shapes className="w-4 h-4" /> Diagram
         </button>
       </div>
@@ -108,7 +108,7 @@ export const CanvasToolbar: React.FC = () => {
         <IconButton label={`Redo (${MOD_KEY} ⇧ Z)`} disabled={!hasDiagram || !canRedo || busy} onClick={() => void useHistoryStore.getState().redo()}><Redo2 className={ICON} /></IconButton>
         <Divider />
         <IconButton label="Zoom out" onClick={() => void flow.zoomOut({ duration: 150 })}><ZoomOut className={ICON} /></IconButton>
-        <button onClick={() => void flow.zoomTo(1, { duration: 150 })} title="Reset zoom to 100%" className="w-12 h-9 rounded-lg font-mono text-[12px] text-[#26251e] hover:bg-[#f7f7f4]">{Math.round(zoom * 100)}%</button>
+        <button onClick={() => void flow.zoomTo(1, { duration: 150 })} title="Reset zoom to 100%" className="w-12 h-9 rounded-lg font-mono text-[12px] text-ink hover:bg-canvas">{Math.round(zoom * 100)}%</button>
         <IconButton label="Zoom in" onClick={() => void flow.zoomIn({ duration: 150 })}><ZoomIn className={ICON} /></IconButton>
         <IconButton label="Resize the view to fit the whole diagram (K)" onClick={() => void flow.fitView({ padding: 0.25, duration: 300, maxZoom: 1 })}><Scan className={ICON} /></IconButton>
         <IconButton label={fullscreen ? 'Leave full screen (F)' : 'Full screen (F)'} active={fullscreen} onClick={() => void toggleFullscreen()}>{fullscreen ? <Minimize className={ICON} /> : <Expand className={ICON} />}</IconButton>

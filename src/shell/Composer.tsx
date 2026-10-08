@@ -98,9 +98,9 @@ export const Composer: React.FC = () => {
     : 'Ask for a change, or describe your system…';
 
   return (
-    <div className="flex-shrink-0 border-t border-[#e6e5e0] bg-white px-4 pt-3 pb-3">
+    <div className="flex-shrink-0 border-t border-line bg-surface px-4 pt-3 pb-3">
       {(voiceStatus !== 'idle' || voiceError || voiceInfo || working) && (
-        <div role="status" aria-live="polite" className={`mb-2.5 rounded-xl border px-3.5 py-2.5 text-[13px] bg-white ${voiceError ? 'border-[#cf2d56]/40 text-[#7a1530]' : 'border-[#e6e5e0] text-[#26251e]'}`}>
+        <div role="status" aria-live="polite" className={`mb-2.5 rounded-xl border px-3.5 py-2.5 text-[13px] bg-surface ${voiceError ? 'border-danger/40 text-danger-ink' : 'border-line text-ink'}`}>
           {voiceError ? (
             voiceError
           ) : working ? (
@@ -110,14 +110,14 @@ export const Composer: React.FC = () => {
           ) : heard ? (
             <span className="italic">“{heard}”</span>
           ) : listening ? (
-            <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#f54e00] animate-pulse" /> Listening… say a command or ask a question.</span>
+            <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-primary animate-pulse" /> Listening… say a command or ask a question.</span>
           ) : (
             voiceInfo
           )}
         </div>
       )}
 
-      <div className="flex items-center gap-1.5 mb-2 text-[12px] text-[#807d72]">
+      <div className="flex items-center gap-1.5 mb-2 text-[12px] text-muted">
         <Link2 className="w-3.5 h-3.5" />
         <span className="truncate">{diagram ? `Using this diagram · ${nodeCount} component${nodeCount === 1 ? '' : 's'}` : 'No diagram open'}</span>
       </div>
@@ -128,7 +128,7 @@ export const Composer: React.FC = () => {
           void send();
         }}
         aria-disabled={disabled}
-        className={`rounded-2xl bg-[#fafaf7] border border-[#e6e5e0] focus-within:bg-white transition-colors focus-within:border-[#26251e] ${disabled ? 'opacity-80' : 'hover:border-[#cfcdc4]'}`}
+        className={`rounded-2xl bg-soft border border-line focus-within:bg-surface transition-colors focus-within:border-ink ${disabled ? 'opacity-80' : 'hover:border-line-strong'}`}
       >
         <textarea
           ref={box}
@@ -145,7 +145,7 @@ export const Composer: React.FC = () => {
               void send();
             }
           }}
-          className="block w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] leading-[1.5] text-[#26251e] placeholder-[#a09c92] outline-none disabled:cursor-not-allowed"
+          className="block w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14.5px] leading-[1.5] text-ink placeholder-faint outline-none disabled:cursor-not-allowed"
         />
         <div className="flex items-center gap-1.5 px-2.5 pb-2.5 pt-1">
           <button
@@ -154,7 +154,7 @@ export const Composer: React.FC = () => {
             disabled={disabled}
             aria-pressed={askMode}
             title={askMode ? 'Ask mode: questions only, the diagram is never changed. Click to switch back to changes.' : 'Change mode. Click for Ask mode (questions only). Anything ending in ? is a question anyway.'}
-            className={`flex items-center gap-1.5 h-8 px-2.5 rounded-lg border text-[12px] font-medium transition-colors ${askMode ? 'bg-[#26251e] border-[#26251e] text-white' : 'bg-[#fafaf7] border-[#e6e5e0] text-[#5a5852] hover:border-[#cfcdc4]'}`}
+            className={`flex items-center gap-1.5 h-8 px-2.5 rounded-lg border text-[12px] font-medium transition-colors ${askMode ? 'bg-inverse border-inverse text-on-inverse' : 'bg-soft border-line text-body hover:border-line-strong'}`}
           >
             {askMode ? <MessageCircleQuestion className="w-3.5 h-3.5" /> : <Command className="w-3.5 h-3.5" />}
             {askMode ? 'Ask' : 'Edit'}
@@ -176,7 +176,7 @@ export const Composer: React.FC = () => {
             aria-label={listening ? 'Stop listening' : 'Hold to talk'}
             title={!voiceAvailable ? 'Voice is not available on this server' : 'Hold to talk, release to send. A quick tap keeps listening until you tap again.'}
             className={`flex items-center gap-1.5 h-8 pl-2.5 pr-3 rounded-lg text-[12.5px] font-medium select-none touch-none transition-colors ${
-              listening ? 'bg-[#f54e00] text-white' : voiceAvailable && !disabled ? 'bg-[#fdebe3] text-[#d04200] hover:bg-[#fbdccd]' : 'bg-[#efeee8] text-[#a09c92] cursor-not-allowed'
+              listening ? 'bg-primary text-white' : voiceAvailable && !disabled ? 'bg-primary-tint text-primary-hover hover:bg-primary-soft' : 'bg-fill text-faint cursor-not-allowed'
             }`}
           >
             {voiceStatus === 'connecting' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : voiceAvailable ? <Mic className={`w-3.5 h-3.5 ${listening ? 'animate-pulse' : ''}`} /> : <MicOff className="w-3.5 h-3.5" />}
@@ -186,7 +186,7 @@ export const Composer: React.FC = () => {
           <span className="flex-1" />
 
           {voiceAvailable && (
-            <span title={`Spoken replies: ${replyVoice === 'gemini' ? 'Gemini voice' : replyVoice === 'browser' ? 'browser voice' : 'off'} (change in the ⋯ menu)`} className="text-[#807d72]">
+            <span title={`Spoken replies: ${replyVoice === 'gemini' ? 'Gemini voice' : replyVoice === 'browser' ? 'browser voice' : 'off'} (change in the ⋯ menu)`} className="text-muted">
               {replyVoice === 'off' ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </span>
           )}
@@ -195,18 +195,18 @@ export const Composer: React.FC = () => {
             type="submit"
             disabled={disabled || pending || !input.trim()}
             aria-label={askMode ? 'Ask' : 'Send'}
-            className="flex items-center justify-center w-9 h-9 rounded-lg bg-[#f54e00] hover:bg-[#d04200] disabled:bg-[#e6e5e0] disabled:text-[#a09c92] disabled:cursor-not-allowed text-white transition-colors"
+            className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary hover:bg-primary-hover disabled:bg-line disabled:text-faint disabled:cursor-not-allowed text-white transition-colors"
           >
             {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-[18px] h-[18px]" />}
           </button>
         </div>
       </form>
 
-      <div className="mt-2 flex items-center justify-between gap-3 px-1 text-[11.5px] text-[#807d72]">
+      <div className="mt-2 flex items-center justify-between gap-3 px-1 text-[11.5px] text-muted">
         <span className="flex items-center gap-2 min-w-0">
-          <span title={modelAvailable ? 'Free-form requests use the Gemini model on the server' : 'No AI model on this server: plain commands only'} className="font-medium text-[#5a5852]">{modelAvailable ? 'Gemini' : 'Plain commands'}</span>
+          <span title={modelAvailable ? 'Free-form requests use the Gemini model on the server' : 'No AI model on this server: plain commands only'} className="font-medium text-body">{modelAvailable ? 'Gemini' : 'Plain commands'}</span>
           {allowance && (
-            <span title="Plain commands are free and never counted. Resets at 00:00 UTC." className={allowance.out ? 'text-[#cf2d56] font-medium' : allowance.low ? 'text-[#b25a00]' : ''}>
+            <span title="Plain commands are free and never counted. Resets at 00:00 UTC." className={allowance.out ? 'text-danger font-medium' : allowance.low ? 'text-warn-ink' : ''}>
               · {allowance.text}
             </span>
           )}
