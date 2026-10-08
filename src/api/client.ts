@@ -7,6 +7,7 @@ import {
   aiAskResponseSchema,
   aiCommandResponseSchema,
   conversationResponseSchema,
+  conversationListResponseSchema,
   speakResponseSchema,
   aiKeyStatusSchema,
   revisionListResponseSchema,
@@ -18,6 +19,7 @@ import {
   type AiCommandResponse,
   type CommandResponse,
   type ConversationResponse,
+  type ConversationListResponse,
   type DeleteDiagramResponse,
   type DiagramDetail,
   type DiagramListResponse,
@@ -202,6 +204,11 @@ export function createApiClient(options: ApiClientOptions) {
   return {
     conversation: (diagramId: string) =>
       request('GET', `/v1/diagrams/${diagramId}/conversation`, undefined, undefined, conversationResponseSchema).then((r) => r.data as ConversationResponse),
+    /** The person's earlier chats about a diagram, and one of them opened. */
+    conversations: (diagramId: string) =>
+      request('GET', `/v1/diagrams/${diagramId}/conversations`, undefined, undefined, conversationListResponseSchema).then((r) => r.data as ConversationListResponse),
+    openConversation: (diagramId: string, conversationId: string) =>
+      request('GET', `/v1/diagrams/${diagramId}/conversations/${conversationId}`, undefined, undefined, conversationResponseSchema).then((r) => r.data as ConversationResponse),
     /** Read-only advice: nothing is mutated, so no idempotency key and a network retry is safe. */
     ask: (diagramId: string, question: string, conversationId?: string) =>
       request('POST', `/v1/diagrams/${diagramId}/ai/ask`, { question, ...(conversationId ? { conversationId } : {}) }, undefined, aiAskResponseSchema, {

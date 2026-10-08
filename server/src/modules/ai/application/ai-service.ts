@@ -9,7 +9,7 @@ import { authorizeDiagram } from '../../workspaces/access.ts';
 import { failure, versionConflict, type Actor, type ServiceDeps } from '../../diagrams/application/diagram-service.ts';
 import { getDiagramRow, insertPlanExecution, insertRevision, lockDiagramRow, updateDocument } from '../../diagrams/persistence/diagrams.ts';
 import { buildAliases, executePlan, type PlanStep } from '../domain/plan.ts';
-import { appendMessages, conversationBelongsTo, createConversation, latestAssistantMessage, latestConversation, recentTurns } from '../persistence/conversations.ts';
+import { appendMessages, conversationBelongsTo, createConversation, getConversation, latestAssistantMessage, latestConversation, listConversations, recentTurns } from '../persistence/conversations.ts';
 import { ProviderError } from '../providers/types.ts';
 import type { AiAccess } from '../../ai-keys/ai-access.ts';
 import type { DailyUsage } from '../../usage/daily-usage.ts';
@@ -250,6 +250,20 @@ export async function executeAiCommand(deps: AiDeps, actor: Actor, diagramId: st
     deps.hooks,
     classify(deps),
   );
+}
+
+/** GET /v1/diagrams/{id}/conversations: the caller's earlier chats about this diagram. */
+export async function listConversationsFor(deps: ServiceDeps, actor: Actor, diagramId: string) {
+  await authorizeDiagram(deps.pool, actor.userId, diagramId, 'view');
+  return listConversations(deps.pool, diagramId, actor.userId);
+}
+
+/** GET /v1/diagrams/{id}/conversations/{conversationId}: one earlier chat. Someone else's chat looks like a chat that does not exist. */
+export async function openConversationFor(deps: ServiceDeps, actor: Actor, diagramId: string, conversationId: string) {
+  await authorizeDiagram(deps.pool, actor.userId, diagramId, 'view');
+  const found = await getConversation(deps.pool, conversationId, diagramId, actor.userId);
+  if (!found) throw new AppError('NOT_FOUND', 'Conversation not found.');
+  return found;
 }
 
 /** GET /v1/diagrams/{id}/conversation: the caller's latest conversation for this diagram. */

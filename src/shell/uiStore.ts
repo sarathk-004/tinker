@@ -1,15 +1,20 @@
 import { create } from 'zustand';
 
+export type Tool = 'pan' | 'select' | 'text';
+export type RightTab = 'chat' | 'components';
+
 /** View-only state of the shell (never saved, never sent to the server). */
 interface UiState {
-  /** Select: drag on empty canvas draws a selection box. Pan: drag moves the canvas (hold Space for this in select mode). */
-  tool: 'select' | 'pan';
+  /** Pan (default): drag on empty canvas moves the view. Select: drag draws a selection box. Text: click the canvas to drop a note. */
+  tool: Tool;
   paletteOpen: boolean;
   /** The "Version history" section of the left column is expanded. */
   versionsOpen: boolean;
-  /** Narrow screens: the left column and the chat panel slide over the canvas instead of sitting beside it. */
+  /** Narrow screens: the left column and the right panel slide over the canvas instead of sitting beside it. */
   navOpen: boolean;
   chatOpen: boolean;
+  /** Which tab of the right panel is showing. */
+  rightTab: RightTab;
   /** The node whose properties dialog is open. */
   editingNodeId: string | null;
   helpOpen: boolean;
@@ -17,12 +22,18 @@ interface UiState {
 }
 
 export const useUi = create<UiState>((set) => ({
-  tool: 'select',
+  tool: 'pan',
   paletteOpen: false,
   versionsOpen: false,
   navOpen: false,
   chatOpen: false,
+  rightTab: 'chat',
   editingNodeId: null,
   helpOpen: false,
   set: (patch) => set(patch),
 }));
+
+/** Show the right panel on a tab, also on narrow screens where it is a drawer. */
+export function openRightTab(tab: RightTab): void {
+  useUi.getState().set({ rightTab: tab, chatOpen: true });
+}

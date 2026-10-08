@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   ReactFlow,
+  ConnectionMode,
   Background,
   BackgroundVariant,
   useNodesState,
@@ -12,18 +13,23 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { AWSArchitectureNode } from './AWSArchitectureNode';
+import { FloatingEdge } from './FloatingEdge';
 import { useDiagramStore } from '../diagram/store';
 import { EmptyCanvas } from './EmptyCanvas';
 import { useUi } from '../shell/uiStore';
+import { COMPONENT_DRAG_TYPE, useAddComponent } from '../shell/addComponent';
+import { PALETTE } from '../shell/palette';
 import type { DiagramNode } from '../types/diagram';
 
 const nodeTypes = {
   awsNode: AWSArchitectureNode,
 };
+const edgeTypes = { floating: FloatingEdge };
 
 /** The React Flow provider lives in the app shell, so the toolbar can zoom and frame the same canvas. */
 export const DiagramCanvas: React.FC = () => {
   const tool = useUi((s) => s.tool);
+  const addComponent = useAddComponent();
   const storeNodes = useDiagramStore((state) => state.nodes);
   const storeEdges = useDiagramStore((state) => state.edges);
   const diagramId = useDiagramStore((state) => state.doc.diagram?.id ?? null);
@@ -106,14 +112,36 @@ export const DiagramCanvas: React.FC = () => {
 
   const isEmpty = storeNodes.length === 0;
 
+  // A component dragged from the Components tab and dropped here is added where it was dropped.
+  const onDragOver = React.useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes(COMPONENT_DRAG_TYPE)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  }, []);
+  const onDrop = React.useCallback(
+    (e: React.DragEvent) => {
+      const label = e.dataTransfer.getData(COMPONENT_DRAG_TYPE);
+      const component = PALETTE.find((c) => c.label === label);
+      if (!component) return;
+      e.preventDefault();
+      void addComponent(component, { clientX: e.clientX, clientY: e.clientY });
+    },
+    [addComponent],
+  );
+
   return (
-    <div className="relative w-full h-full bg-[#f7f7f4]">
+    <div className="relative w-full h-full bg-[#f7f7f4]" onDragOver={onDragOver} onDrop={onDrop}>
       {isEmpty && diagramId && <EmptyCanvas />}
 
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        // Loose: a connection can start or end on any of a component's four points, top and bottom included.
+        connectionMode={ConnectionMode.Loose}
+        connectionRadius={28}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onSelectionChange={({ nodes: selNodes }) => {

@@ -69,24 +69,26 @@ const INK = '#a09c92';
 
 export function toViewEdges(graph: Graph, highlightedIds: readonly string[]): DiagramEdge[] {
   const highlighted = new Set(highlightedIds);
-  const parallel = new Map<string, number>();
-  for (const e of graph.edges) {
-    const pair = `${e.sourceNodeId}|${e.targetNodeId}`;
-    parallel.set(pair, (parallel.get(pair) ?? 0) + 1);
-  }
-  const hasReverse = (e: GraphEdge) => graph.edges.some((o) => o.sourceNodeId === e.targetNodeId && o.targetNodeId === e.sourceNodeId);
+  // Connections between the same two components (either direction) share a pair key, so they can be drawn side by side instead of on top of each other.
+  const pairKey = (e: GraphEdge) => [e.sourceNodeId, e.targetNodeId].sort().join('|');
+  const pairCount = new Map<string, number>();
+  for (const e of graph.edges) pairCount.set(pairKey(e), (pairCount.get(pairKey(e)) ?? 0) + 1);
+  const pairSeen = new Map<string, number>();
   return graph.edges.map((edge) => {
     const lit = highlighted.has(edge.sourceNodeId) && highlighted.has(edge.targetNodeId);
     const dim = highlighted.size > 0 && !lit;
     const bidirectional = edge.metadata['bidirectional'] === true;
-    const crowded = (parallel.get(`${edge.sourceNodeId}|${edge.targetNodeId}`) ?? 0) > 1 || hasReverse(edge);
+    const key = pairKey(edge);
+    const index = pairSeen.get(key) ?? 0;
+    pairSeen.set(key, index + 1);
     const color = lit ? '#f54e00' : dim ? '#cfcdc4' : INK;
     return {
       id: edge.id,
       source: edge.sourceNodeId,
       target: edge.targetNodeId,
       ...(edge.relationship ? { label: edge.relationship } : {}),
-      type: crowded ? 'default' : 'smoothstep',
+      type: 'floating',
+      data: { index, count: pairCount.get(key) ?? 1 },
       animated: lit,
       style: { stroke: color, strokeWidth: lit ? 2.25 : 1.5, opacity: dim ? 0.3 : 1 },
       labelStyle: { fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 10.5, fill: lit ? '#d04200' : '#5a5852', letterSpacing: '0.02em' },
@@ -106,6 +108,8 @@ export interface NewNodeSpec {
   awsIcon?: AWSServiceIcon;
   subType?: string;
   description?: string;
+  /** Where to put it (canvas coordinates); without one the server picks a free spot. */
+  position?: { x: number; y: number };
 }
 
 export function newNodeFields(spec: NewNodeSpec) {
@@ -122,7 +126,11 @@ export function newNodeFields(spec: NewNodeSpec) {
   };
 }
 
-export const addNodeCommand = (spec: NewNodeSpec): Extract<DiagramCommand, { type: 'ADD_NODE' }> => ({ type: 'ADD_NODE', node: newNodeFields(spec) });
+export const addNodeCommand = (spec: NewNodeSpec): Extract<DiagramCommand, { type: 'ADD_NODE' }> => ({
+  type: 'ADD_NODE',
+  node: newNodeFields(spec),
+  ...(spec.position ? { position: { x: Math.round(spec.position.x), y: Math.round(spec.position.y) } } : {}),
+});
 
 export const insertBetweenCommand = (
   sourceNodeId: string,

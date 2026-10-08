@@ -40,6 +40,8 @@ interface ConversationState {
   reset(diagramId?: string | null): void;
   /** Clear the visible turns only; the saved conversation stays on the server. */
   hideAll(): void;
+  /** Begin a new chat: the next message starts a fresh conversation. The earlier one stays in the history list. */
+  startNew(): void;
 }
 
 const asString = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
@@ -78,4 +80,5 @@ export const useConversationStore = create<ConversationState>((set) => ({
   setDraft: (draft) => set({ draft }),
   reset: (diagramId = null) => set({ diagramId, conversationId: null, turns: [], pending: false, draft: '' }),
   hideAll: () => set({ turns: [] }),
+  startNew: () => set({ turns: [], conversationId: null, draft: '' }),
 }));

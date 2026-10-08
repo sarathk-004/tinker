@@ -51,8 +51,9 @@ export const AWSArchitectureNode: React.FC<NodeProps<DiagramNode>> = memo(({ dat
         </button>
       </div>
 
-      <Handle type="target" position={Position.Left} className={handle} />
-      <Handle type="target" position={Position.Top} className={handle} />
+      {/* Four connection points. In loose mode any of them can start or end a connection; the line itself picks the facing sides. */}
+      <Handle id="top" type="source" position={Position.Top} className={handle} />
+      <Handle id="left" type="source" position={Position.Left} className={handle} />
 
       <div className="flex items-center gap-2 mb-2">
         <AWSIcon name={awsIcon} type={type} size={20} />
@@ -64,8 +65,8 @@ export const AWSArchitectureNode: React.FC<NodeProps<DiagramNode>> = memo(({ dat
       <div className="text-[17px] font-semibold tracking-[-0.02em] leading-[1.2] text-[#26251e] truncate">{label}</div>
       {detail && <div className="mt-1 font-mono text-[11px] leading-snug text-[#807d72] truncate">{detail}</div>}
 
-      <Handle type="source" position={Position.Right} className={handle} />
-      <Handle type="source" position={Position.Bottom} className={handle} />
+      <Handle id="right" type="source" position={Position.Right} className={handle} />
+      <Handle id="bottom" type="source" position={Position.Bottom} className={handle} />
     </div>
   );
 });

@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { ArrowUpRight, Check, HelpCircle, Loader2, MoreHorizontal, Plus, Sparkles, X } from 'lucide-react';
+import { ArrowUpRight, Check, HelpCircle, History, Loader2, MoreHorizontal, Plus, Sparkles } from 'lucide-react';
 import { showOnDiagram, submitAiCommand } from '../ai/aiCommands';
 import { useConversationStore, type ConversationTurn } from '../ai/conversationStore';
 import { isReplyOption } from '../ai/replies';
+import { api } from '../document/instance';
+import type { ConversationSummary } from '../contracts';
+import { timeAgo } from '../components/VersionsPanel';
 import { useDiagramStore } from '../diagram/store';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { useSpeechSettings, effectiveVoice, stopSpeaking, type ReplyVoice } from '../voice/speech';
@@ -203,12 +206,70 @@ const MoreMenu: React.FC = () => {
   );
 };
 
-/** The right column: the conversation with Tinker and the box to type or speak into. */
-export const ChatPanel: React.FC<{ overlay?: boolean }> = ({ overlay = false }) => {
+/** "History": the person's earlier chats about this diagram. Opening one shows it and continues it. */
+const HistoryMenu: React.FC = () => {
+  const [open, setOpen] = React.useState(false);
+  const [chats, setChats] = React.useState<ConversationSummary[] | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const diagramId = useDiagramStore((s) => s.doc.diagram?.id ?? null);
+  const current = useConversationStore((s) => s.conversationId);
+  const close = React.useCallback(() => setOpen(false), []);
+  const ref = useDismiss(open, close);
+
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    if (!next || !diagramId) return;
+    setError(null);
+    try {
+      setChats((await api.conversations(diagramId)).conversations);
+    } catch {
+      setError('Could not load your earlier chats.');
+    }
+  };
+
+  const openChat = async (id: string) => {
+    if (!diagramId) return;
+    setOpen(false);
+    try {
+      const chat = await api.openConversation(diagramId, id);
+      useConversationStore.getState().load(diagramId, { conversationId: chat.conversationId, messages: chat.messages });
+    } catch {
+      useConversationStore.getState().append([{ id: `local-${crypto.randomUUID()}`, timestamp: Date.now(), role: 'assistant', kind: 'error', text: 'That chat could not be opened.' }]);
+    }
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => void toggle()} disabled={!diagramId} aria-haspopup="menu" aria-expanded={open} className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[12.5px] font-medium text-[#5a5852] hover:bg-[#f7f7f4] hover:text-[#26251e] disabled:opacity-40">
+        <History className="w-4 h-4" /> History
+      </button>
+      {open && (
+        <div role="menu" className={`${MENU_PANEL} left-0 top-full mt-1 w-80 max-h-96 overflow-y-auto`}>
+          <div className={`px-2.5 pt-1.5 pb-1 ${MONO_LABEL}`}>Your chats about this diagram</div>
+          {error && <p className="px-2.5 py-2 text-[12.5px] text-[#cf2d56]">{error}</p>}
+          {!error && chats === null && <p className="px-2.5 py-3 text-[12.5px] text-[#807d72] flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</p>}
+          {chats?.length === 0 && <p className="px-2.5 py-3 text-[12.5px] text-[#807d72]">No earlier chats yet. They appear here as you talk to Tinker.</p>}
+          {chats?.map((c) => (
+            <button key={c.id} role="menuitem" onClick={() => void openChat(c.id)} className={`${MENU_ITEM} items-start ${c.id === current ? 'bg-[#fdebe3]' : ''}`}>
+              <span className="flex-1 min-w-0">
+                <span className="block truncate font-medium">{c.title}</span>
+                <span className="block text-[11.5px] text-[#807d72]">{timeAgo(c.updatedAt)} · {c.messageCount} message{c.messageCount === 1 ? '' : 's'}</span>
+              </span>
+              {c.id === current && <Check className="w-4 h-4 text-[#f54e00] mt-0.5" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** The Tinker tab: history and new chat, the conversation, and the box to type or speak into. */
+export const ChatBody: React.FC = () => {
   const turns = useConversationStore((s) => s.turns);
   const pending = useConversationStore((s) => s.pending);
   const aiAvailable = useWorkspaceStore((s) => s.features.aiCommands);
-  const modelAvailable = useWorkspaceStore((s) => s.features.aiModel);
   const hasDiagram = useDiagramStore((s) => s.doc.diagram !== null);
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -229,27 +290,20 @@ export const ChatPanel: React.FC<{ overlay?: boolean }> = ({ overlay = false }) 
   }, [turns]);
 
   return (
-    <aside aria-label="Tinker" className="h-full w-[392px] max-w-full flex-shrink-0 flex flex-col bg-white border-l border-[#e6e5e0]">
-      <div className="h-12 flex-shrink-0 flex items-center justify-between pl-5 pr-2 border-b border-[#e6e5e0]">
-        <div className="flex items-center gap-2">
-          <TinkerLogo size={20} />
-          <span className="text-[15px] font-semibold tracking-[-0.01em] text-[#26251e]">Tinker</span>
-          <span title={modelAvailable ? 'AI is on' : 'Plain commands only (no AI model on this server)'} className={`w-1.5 h-1.5 rounded-full ${modelAvailable ? 'bg-[#1f8a65]' : 'bg-[#a09c92]'}`} />
-        </div>
+    <>
+      <div className="h-11 flex-shrink-0 flex items-center justify-between px-3 border-b border-[#efeee8]">
+        <HistoryMenu />
         <div className="flex items-center">
           <button
-            onClick={() => useConversationStore.getState().hideAll()}
+            onClick={() => useConversationStore.getState().startNew()}
             disabled={turns.length === 0}
-            title="Clear this view (the saved conversation stays on the server)"
-            aria-label="Clear the conversation view"
-            className="p-2 rounded-lg text-[#5a5852] hover:bg-[#f7f7f4] hover:text-[#26251e] disabled:opacity-35 disabled:hover:bg-transparent"
+            title="New chat (this one stays in History)"
+            aria-label="New chat"
+            className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[12.5px] font-medium text-[#5a5852] hover:bg-[#f7f7f4] hover:text-[#26251e] disabled:opacity-35 disabled:hover:bg-transparent"
           >
-            <Plus className="w-[18px] h-[18px]" />
+            <Plus className="w-4 h-4" /> New chat
           </button>
           <MoreMenu />
-          {overlay && (
-            <button onClick={() => useUi.getState().set({ chatOpen: false })} aria-label="Close chat" className="p-2 rounded-lg text-[#5a5852] hover:bg-[#f7f7f4] xl:hidden"><X className="w-[18px] h-[18px]" /></button>
-          )}
         </div>
       </div>
 
@@ -276,7 +330,6 @@ export const ChatPanel: React.FC<{ overlay?: boolean }> = ({ overlay = false }) 
       </div>
 
       <Composer />
-    </aside>
+    </>
   );
 };
-

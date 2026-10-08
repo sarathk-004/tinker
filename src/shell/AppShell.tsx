@@ -6,7 +6,8 @@ import { NodeEditModal } from '../components/NodeEditModal';
 import { StatusBanners } from '../components/StatusBanners';
 import { CanvasHeader } from './CanvasHeader';
 import { CanvasToolbar } from './CanvasToolbar';
-import { ChatPanel } from './ChatPanel';
+import { RightPanel } from './RightPanel';
+import { useShortcuts } from './shortcuts';
 import { CommandPalette } from './CommandPalette';
 import { LeftNav } from './LeftNav';
 import { NodeBar, StatusFooter } from './NodeBar';
@@ -17,7 +18,15 @@ import { useUi } from './uiStore';
  * The signed-in app: top bar, left column (diagrams, versions, advisor), the canvas with its header and tools, and the chat on the right.
  * Below 1024 px the left column and below 1280 px the chat slide over the canvas instead of sitting beside it.
  */
-export const AppShell: React.FC = () => {
+/** The provider lives here so everything inside (toolbar, search, shortcuts) can move and measure the same canvas. */
+export const AppShell: React.FC = () => (
+  <ReactFlowProvider>
+    <ShellBody />
+  </ReactFlowProvider>
+);
+
+const ShellBody: React.FC = () => {
+  useShortcuts();
   const navOpen = useUi((s) => s.navOpen);
   const chatOpen = useUi((s) => s.chatOpen);
   const editingNodeId = useUi((s) => s.editingNodeId);
@@ -35,7 +44,7 @@ export const AppShell: React.FC = () => {
   }, []);
 
   return (
-    <ReactFlowProvider>
+    <>
       <div className="flex flex-col w-screen h-screen bg-[#f7f7f4] text-[#26251e] overflow-hidden select-none font-sans">
         <TopBar />
         <StatusBanners />
@@ -57,7 +66,7 @@ export const AppShell: React.FC = () => {
           </main>
 
           <div className="hidden xl:block h-full flex-shrink-0">
-            <ChatPanel />
+            <RightPanel />
           </div>
         </div>
 
@@ -70,13 +79,13 @@ export const AppShell: React.FC = () => {
         {chatOpen && (
           <div className="fixed inset-0 z-40 flex justify-end xl:hidden" role="dialog" aria-modal="true" aria-label="Chat">
             <button aria-label="Close chat" className="flex-1 bg-[#26251e]/25" onClick={() => useUi.getState().set({ chatOpen: false })} />
-            <div className="h-full shadow-2xl animate-fade-in max-w-full"><ChatPanel overlay /></div>
+            <div className="h-full shadow-2xl animate-fade-in max-w-full"><RightPanel overlay /></div>
           </div>
         )}
 
         <CommandPalette />
         {editingNodeId && <NodeEditModal nodeId={editingNodeId} onClose={() => useUi.getState().set({ editingNodeId: null })} />}
       </div>
-    </ReactFlowProvider>
+    </>
   );
 };

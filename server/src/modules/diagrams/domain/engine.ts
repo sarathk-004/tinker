@@ -88,7 +88,7 @@ function addNode(doc: DiagramDoc, c: Cmd<'ADD_NODE'>, newId: NewId): DomainResul
   const limited = nodeLimit(doc, 1, 0);
   if (limited) return limited;
   const node = buildNode(c.node, newId());
-  return ok(withGraph(doc, [...doc.graph.nodes, node], [...doc.graph.edges], [node.id]));
+  return ok(withGraph(doc, [...doc.graph.nodes, node], [...doc.graph.edges], [node.id], c.position ? { [node.id]: c.position } : {}));
 }
 
 /** Decision P1: plain removal. The node, every incident edge and its position go; no bridging edges are created. */

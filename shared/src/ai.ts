@@ -72,6 +72,17 @@ export const conversationResponseSchema = z.strictObject({
 });
 export type ConversationResponse = z.infer<typeof conversationResponseSchema>;
 
+/** GET /v1/diagrams/{id}/conversations: the caller's earlier chats about this diagram, newest first. The title is the first thing they said. */
+export const conversationSummarySchema = z.strictObject({
+  id: uuidSchema,
+  title: z.string(),
+  updatedAt: z.iso.datetime(),
+  messageCount: z.number().int().min(0),
+});
+export const conversationListResponseSchema = z.strictObject({ conversations: z.array(conversationSummarySchema) });
+export type ConversationSummary = z.infer<typeof conversationSummarySchema>;
+export type ConversationListResponse = z.infer<typeof conversationListResponseSchema>;
+
 /** POST /v1/diagrams/{id}/ai/ask (LLD section 10): read-only advice. Never changes the diagram. */
 export const aiAskRequestSchema = z.strictObject({
   conversationId: uuidSchema.optional(),

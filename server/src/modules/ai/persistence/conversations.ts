@@ -1,4 +1,4 @@
-import type { ChatMessage } from '@tinker/shared';
+import type { ChatMessage, ConversationListResponse } from '@tinker/shared';
 import type { Queryable } from '../../../infrastructure/database/pool.ts';
 import type { HistoryTurn } from '../application/prompt.ts';
 
@@ -61,6 +61,44 @@ export async function appendMessages(db: Queryable, conversationId: string, mess
   }
   await db.query(`UPDATE conversations SET updated_at = clock_timestamp() WHERE id = $1`, [conversationId]);
   return saved;
+}
+
+const TITLE_CHARS = 80;
+
+/** The caller's chats about a diagram, newest first (only ones that have messages). The title is their first message, shortened. */
+export async function listConversations(db: Queryable, diagramId: string, userId: string, limit = 50): Promise<ConversationListResponse> {
+  const { rows } = await db.query<{ id: string; updated_at: Date; title: string | null; n: number }>(
+    `SELECT c.id, c.updated_at,
+            (SELECT m.content FROM conversation_messages m WHERE m.conversation_id = c.id AND m.role = 'USER' ORDER BY m.created_at ASC, m.id ASC LIMIT 1) AS title,
+            (SELECT count(*)::int FROM conversation_messages m WHERE m.conversation_id = c.id) AS n
+       FROM conversations c
+      WHERE c.diagram_id = $1 AND c.user_id = $2
+        AND EXISTS (SELECT 1 FROM conversation_messages m WHERE m.conversation_id = c.id)
+      ORDER BY c.updated_at DESC, c.id
+      LIMIT $3`,
+    [diagramId, userId, limit],
+  );
+  return {
+    conversations: rows.map((r) => {
+      const text = (r.title ?? 'Conversation').replace(/\s+/g, ' ').trim();
+      return { id: r.id, title: text.length > TITLE_CHARS ? `${text.slice(0, TITLE_CHARS - 1).trimEnd()}…` : text, updatedAt: r.updated_at.toISOString(), messageCount: r.n };
+    }),
+  };
+}
+
+/** One of the caller's conversations for this diagram (null when it is not theirs or not about this diagram), oldest message first. */
+export async function getConversation(db: Queryable, conversationId: string, diagramId: string, userId: string, limit = 200): Promise<{ conversationId: string; messages: ChatMessage[] } | null> {
+  if (!(await conversationBelongsTo(db, conversationId, diagramId, userId))) return null;
+  const { rows } = await db.query<{ id: string; role: 'USER' | 'ASSISTANT'; content: string; metadata: Record<string, unknown>; created_at: Date }>(
+    `SELECT id, role, content, metadata, created_at FROM (
+        SELECT * FROM conversation_messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2
+     ) t ORDER BY created_at ASC, id ASC`,
+    [conversationId, limit],
+  );
+  return {
+    conversationId,
+    messages: rows.map((r) => ({ id: r.id, role: r.role, content: r.content, createdAt: r.created_at.toISOString(), metadata: r.metadata as ChatMessage['metadata'] })),
+  };
 }
 
 /** The caller's most recent conversation for a diagram, oldest message first (capped). */

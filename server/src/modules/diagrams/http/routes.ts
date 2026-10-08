@@ -30,7 +30,7 @@ import { createWorkspace } from '../../workspaces/workspace-service.ts';
 import { askAdvice } from '../../ai/application/advice-service.ts';
 import { getRevisionDetail, listRevisions, restoreRevision } from '../../history/application/history-service.ts';
 import { speakMessage } from '../../voice/speak-service.ts';
-import { executeAiCommand, loadConversation, type AiRuntime } from '../../ai/application/ai-service.ts';
+import { executeAiCommand, listConversationsFor, loadConversation, openConversationFor, type AiRuntime } from '../../ai/application/ai-service.ts';
 import {
   createDiagram,
   deleteDiagram,
@@ -219,6 +219,16 @@ export async function registerApiRoutes(root: FastifyInstance, deps: ApiDeps): P
       const body = parseOrThrow(speakRequestSchema, request.body, 'INVALID_REQUEST', 'Invalid request.');
       const aiDeps = { ...svc, ai: deps.ai, log: (message: string, data: Record<string, unknown>) => request.log.warn(data, message), metric: (message: string, data: Record<string, unknown>) => request.log.info(data, message) };
       return speakMessage(aiDeps, actorOf(request), diagramId, body);
+    });
+
+    app.get(`${API_PREFIX}/diagrams/:diagramId/conversations`, async (request) => {
+      const { diagramId } = parseOrThrow(diagramParams, request.params, 'INVALID_REQUEST', 'Invalid diagram id.');
+      return listConversationsFor(svc, actorOf(request), diagramId);
+    });
+
+    app.get(`${API_PREFIX}/diagrams/:diagramId/conversations/:conversationId`, async (request) => {
+      const { diagramId, conversationId } = parseOrThrow(z.object({ diagramId: uuidSchema, conversationId: uuidSchema }), request.params, 'INVALID_REQUEST', 'Invalid conversation.');
+      return openConversationFor(svc, actorOf(request), diagramId, conversationId);
     });
 
     app.get(`${API_PREFIX}/diagrams/:diagramId/conversation`, async (request) => {

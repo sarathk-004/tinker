@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { LIMITS } from './limits.ts';
 import { metadataSchema, nodeNameSchema, relationshipSchema, technologySchema, uuidSchema } from './graph.ts';
 import { nodeKindSchema } from './node-kind.ts';
+import { positionSchema } from './presentation.ts';
 
 /** Fields a client may supply for a new node. The server assigns the UUID (D04). */
 export const newNodeSchema = z.strictObject({
@@ -14,6 +15,8 @@ export const newNodeSchema = z.strictObject({
 export const addNodeCommandSchema = z.strictObject({
   type: z.literal('ADD_NODE'),
   node: newNodeSchema,
+  /** Where the person wants it (a drop point, the middle of the screen). The server keeps it unless another component is already there. */
+  position: positionSchema.optional(),
 });
 
 /** Plain removal: node, incident edges and presentation entry (decision P1). No bridging. */

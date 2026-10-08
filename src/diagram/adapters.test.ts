@@ -39,11 +39,12 @@ describe('canonical -> canvas', () => {
     expect([tb.sourcePosition, tb.targetPosition]).toEqual(['bottom', 'top']);
   });
 
-  it('edges keep their canonical ids, show the relationship, mark bidirectional via metadata, and use distinct curves when crowded', () => {
+  it('edges keep their canonical ids, show the relationship, mark bidirectional via metadata, and share a pair so crowded connections can be drawn apart', () => {
     const g = graph([node(1, 'A'), node(2, 'B')], [edge(10, 1, 2, { relationship: 'HTTP' }), edge(11, 2, 1, { metadata: { bidirectional: true } })]);
     const edges = toViewEdges(g, []);
     expect(edges.map((e) => e.id)).toEqual([U(10), U(11)]);
-    expect(edges[0]).toMatchObject({ source: U(1), target: U(2), label: 'HTTP', type: 'default' });
+    expect(edges[0]).toMatchObject({ source: U(1), target: U(2), label: 'HTTP', type: 'floating', data: { index: 0, count: 2 } });
+    expect(edges[1]).toMatchObject({ data: { index: 1, count: 2 } }); // one each way between the same two components: drawn side by side
     expect(edges[1]).toHaveProperty('markerStart');
     expect(edges[0]).not.toHaveProperty('markerStart');
   });

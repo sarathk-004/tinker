@@ -5,6 +5,7 @@ import { useAiKeyStore } from '../ai/aiKey';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { TinkerLogo } from '../components/TinkerLogo';
 import { MENU_ITEM, MENU_PANEL, MONO_LABEL, useDismiss } from './Popover';
+import { SHORTCUT_KEYS } from './shortcuts';
 import { useUi } from './uiStore';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
@@ -33,9 +34,9 @@ export const Avatar: React.FC<{ size?: number; className?: string }> = ({ size =
 
 const SHORTCUTS: Array<[string, string]> = [
   [`${MOD_KEY} K`, 'Search diagrams, components and actions'],
+  ...SHORTCUT_KEYS.map((s): [string, string] => [s.key, s.label]),
   [`${MOD_KEY} Z`, 'Undo (saved as a new version)'],
   [`${MOD_KEY} ⇧ Z`, 'Redo'],
-  ['Space + drag', 'Pan the canvas'],
   ['Scroll', 'Zoom'],
   ['Delete', 'Remove the selected components'],
   ['Enter', 'Send a message to Tinker'],
