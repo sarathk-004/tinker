@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptyGraph, emptyPresentation, type Graph } from '../contracts';
-import { escapeXml, safeFileName, toJson, toMarkdown, toSvg, type ExportDoc } from './exportDiagram';
+import { safeFileName, toJson, toMarkdown, type ExportDoc } from './exportDiagram';
+import { dataUrlToBlob } from './exportImage';
 import { rankItems, scoreText, type PaletteItem } from './search';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -84,21 +85,19 @@ describe('export', () => {
     expect(md).toContain(String.raw`- Orders \| API → PostgreSQL`);
   });
 
-  it('SVG is well-formed, escapes names, draws every component and connection, and sizes itself to the content', () => {
-    const { svg, width, height } = toSvg(doc());
-    expect(svg.startsWith('<svg')).toBe(true);
-    expect(svg).toContain('Web &amp; &lt;Client&gt;');
-    expect(svg).not.toContain('Web & <Client>');
-    expect((svg.match(/marker-end="url\(#arrow\)"/g) ?? []).length).toBe(2);
-    expect((svg.match(/rx="10"/g) ?? []).length).toBe(3);
-    expect(width).toBeGreaterThan(640 + 232);
-    expect(height).toBeGreaterThan(76);
-    expect(escapeXml(`a"b'c`)).toBe('a&quot;b&apos;c');
-  });
-
   it('an empty diagram still exports', () => {
     const empty: ExportDoc = { name: 'Empty', version: 1, graph: emptyGraph(), presentation: emptyPresentation() };
-    expect(toSvg(empty).svg).toContain('Empty');
     expect(toMarkdown(empty)).toContain('0 components, 0 connections');
+  });
+});
+
+describe('image data', () => {
+  it('turns a data address into a Blob without fetching it (base64 and plain forms)', async () => {
+    const b64 = dataUrlToBlob(`data:image/png;base64,${btoa('PNGDATA')}`);
+    expect(b64.type).toBe('image/png');
+    expect(await b64.text()).toBe('PNGDATA');
+    const plain = dataUrlToBlob(`data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg a="1"/>')}`);
+    expect(plain.type).toBe('image/svg+xml');
+    expect(await plain.text()).toBe('<svg a="1"/>');
   });
 });

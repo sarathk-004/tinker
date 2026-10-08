@@ -44,8 +44,8 @@ export function buildPolicy(settings) {
   return [
     "default-src 'self'",
     `script-src 'self'${turnstile ? ` ${turnstile}` : ''}`,
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // React Flow positions nodes with inline styles
-    "font-src 'self' https://fonts.gstatic.com data:",
+    "style-src 'self' 'unsafe-inline'", // React Flow positions nodes with inline styles
+    "font-src 'self' data:",
     "img-src 'self' data: blob:",
     `connect-src ${[...connect].join(' ')}`,
     `frame-src ${turnstile ?? "'none'"}`,

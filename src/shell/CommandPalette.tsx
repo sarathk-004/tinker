@@ -78,10 +78,10 @@ export const CommandPalette: React.FC = () => {
       ['redo', 'Redo', `${MOD_KEY} ⇧ Z`, <Redo2 key="c" className="w-4 h-4" />, () => void useHistoryStore.getState().redo(), hasDiagram],
       ['layout', 'Tidy the layout', 'Re-arrange every component (saved as a position update)', <LayoutGrid key="d" className="w-4 h-4" />, () => void useDiagramStore.getState().applyLayout(), hasDiagram && nodes.length > 0],
       ['versions', 'Version history', 'See and restore earlier versions', <History key="e" className="w-4 h-4" />, () => useUi.getState().set({ versionsOpen: true, navOpen: true }), hasDiagram],
-      ['png', 'Export as PNG image', undefined as unknown as string, <Download key="f" className="w-4 h-4" />, () => void exportCurrent('png'), hasDiagram],
-      ['svg', 'Export as SVG', undefined as unknown as string, <Download key="g" className="w-4 h-4" />, () => void exportCurrent('svg'), hasDiagram],
-      ['json', 'Export as JSON', undefined as unknown as string, <Download key="h" className="w-4 h-4" />, () => void exportCurrent('json'), hasDiagram],
-      ['md', 'Export as Markdown summary', undefined as unknown as string, <Download key="i" className="w-4 h-4" />, () => void exportCurrent('md'), hasDiagram],
+      ['png', 'Export as PNG image', undefined as unknown as string, <Download key="f" className="w-4 h-4" />, () => void exportCurrent('png', flow), hasDiagram],
+      ['svg', 'Export as SVG', undefined as unknown as string, <Download key="g" className="w-4 h-4" />, () => void exportCurrent('svg', flow), hasDiagram],
+      ['json', 'Export as JSON', undefined as unknown as string, <Download key="h" className="w-4 h-4" />, () => void exportCurrent('json', flow), hasDiagram],
+      ['md', 'Export as Markdown summary', undefined as unknown as string, <Download key="i" className="w-4 h-4" />, () => void exportCurrent('md', flow), hasDiagram],
     ];
     for (const [id, title, subtitle, , run, enabled] of actions) {
       if (enabled) list.push({ id: `a:${id}`, group: 'Actions', title, ...(subtitle ? { subtitle } : {}), keywords: 'export download', run });

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronRight, Cloud, CloudOff, Download, FileJson, FileText, Image as ImageIcon, Loader2, Shapes } from 'lucide-react';
+import { useReactFlow } from '@xyflow/react';
 import { useDiagramStore } from '../diagram/store';
 import { session } from '../document/instance';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
@@ -33,6 +34,7 @@ const FORMATS: Array<[ExportFormat, string, string, React.ReactNode]> = [
 ];
 
 const ExportMenu: React.FC = () => {
+  const flow = useReactFlow();
   const hasDiagram = useDiagramStore((s) => s.doc.diagram !== null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<ExportFormat | null>(null);
@@ -43,7 +45,7 @@ const ExportMenu: React.FC = () => {
   const run = async (format: ExportFormat) => {
     setBusy(format);
     setError(null);
-    const problem = await exportCurrent(format);
+    const problem = await exportCurrent(format, flow);
     setBusy(null);
     if (problem) setError(problem);
     else setOpen(false);
