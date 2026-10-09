@@ -1,6 +1,7 @@
 import type { NodeKind } from '@tinker/shared';
 import type { DiagramDoc } from '../../diagrams/domain/index.ts';
 import { buildAliases, type AliasMap, type PlanStep } from '../domain/plan.ts';
+import { WIRING_EXPLANATION, suggestWiring } from '../domain/wiring.ts';
 
 /**
  * Deterministic parser: the fast path for plain commands ("put Redis between Orders and PostgreSQL"). It never calls a model.
@@ -12,7 +13,8 @@ import { buildAliases, type AliasMap, type PlanStep } from '../domain/plan.ts';
  * database). Nothing is applied: the user is asked first, and the plan is kept by the server so that "yes" applies exactly that.
  */
 export type ParseResult =
-  | { kind: 'steps'; steps: PlanStep[] }
+  /** `note`: something worth telling the person after the change (what was guessed, what could not be placed). */
+  | { kind: 'steps'; steps: PlanStep[]; note?: string }
   | { kind: 'clarify'; question: string; options: string[] }
   | { kind: 'propose'; question: string; steps: PlanStep[] }
   | { kind: 'none' };
@@ -234,6 +236,9 @@ export function parseCommand(doc: DiagramDoc, input: string): ParseResult {
 
   let m: RegExpExecArray | null;
 
+  // --- connect everything: "connect the components logically", "wire everything up", "link them together" ---
+  if (asksToWireEverything(text)) return wireEverything(doc, aliases);
+
   // --- reset (never executed from text) ---
   if (
     /^(?:reset|clear|wipe|start over|delete everything|clear everything)(?:\s+(?:the\s+)?(?:diagram|canvas|everything|all|board))?$/i.test(text) ||
@@ -355,4 +360,35 @@ export function parseCommand(doc: DiagramDoc, input: string): ParseResult {
   }
 
   return { kind: 'none' };
+}
+
+const WIRE_VERB = /^(?:please\s+)?(?:auto[- ]?)?(?:connect|link|wire|join|hook|map|attach|tie|lay out|arrange|organi[sz]e)\b/i;
+const WIRE_OBJECT = /\b(?:components?|nodes?|boxes|blocks|services|everything|them|these|those|all|it all|diagram|architecture|system|canvas|design)\b/i;
+/** Words that may appear in such a request without naming a specific pair ("connect all the components logically for me"). */
+const WIRE_FILLER = new Set(
+  'connect link wire join hook map attach tie lay out arrange organise organize auto autoconnect all the my these those every everything components component nodes node boxes blocks services them it up together logically properly sensibly correctly automatically for me please in a logical sensible way diagram architecture system canvas design here on and then to each other one another with'.split(' '),
+);
+
+/** "Connect everything logically" and its many phrasings, but not "connect Orders to Billing" (that names a pair and has its own rule). */
+function asksToWireEverything(text: string): boolean {
+  if (!WIRE_VERB.test(text) || !WIRE_OBJECT.test(text)) return false;
+  const rest = text.toLowerCase().replace(/[^a-z\s-]+/g, ' ').split(/\s+/).filter(Boolean);
+  if (!rest.every((w) => WIRE_FILLER.has(w))) return false;
+  // "connect all to X" names a target: leave that to the pair rule.
+  return !/\b(?:to|with)\s+(?!each other|one another|them|it|everything|all)\w/i.test(text);
+}
+
+/** Connect the components that are not connected yet, by the rules in `wiring.ts`. Only adds; never removes or changes anything. */
+function wireEverything(doc: DiagramDoc, aliases: AliasMap): ParseResult {
+  if (doc.graph.nodes.length < 2) return { kind: 'clarify', question: 'There is nothing to connect yet: add at least two components first.', options: [] };
+  const result = suggestWiring(doc);
+  if (result.edges.length === 0) {
+    const unplaced = result.unplaced.length > 0 ? ` I could not tell where ${result.unplaced.slice(0, 4).join(', ')} belong${result.unplaced.length === 1 ? 's' : ''}: connect ${result.unplaced.length === 1 ? 'it' : 'them'} yourself, or tell me how.` : '';
+    return { kind: 'clarify', question: `Everything I can place is already connected.${unplaced}`, options: [] };
+  }
+  const steps: PlanStep[] = result.edges.map((e) => ({ type: 'CONNECT', source: aliases.nodeToAlias.get(e.source)!, target: aliases.nodeToAlias.get(e.target)!, relationship: e.relationship }));
+  const notes = [WIRING_EXPLANATION];
+  if (result.guessed.length > 0) notes.push(`Where names did not say, I paired ${result.guessed.slice(0, 3).join('; ')}. Check those.`);
+  if (result.unplaced.length > 0) notes.push(`Not connected: ${result.unplaced.slice(0, 4).join(', ')}.`);
+  return { kind: 'steps', steps, note: notes.join(' ') };
 }

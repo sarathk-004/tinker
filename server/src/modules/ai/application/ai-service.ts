@@ -161,7 +161,7 @@ export async function executeAiCommand(deps: AiDeps, actor: Actor, diagramId: st
       const dry = executePlan(doc, interpretation.steps, buildAliases(doc), newId);
       if (!dry.ok && dry.kind === 'CLARIFY') return clarification(interpretation.source, dry.question, dry.options, current.version);
       if (!dry.ok) return refusal(interpretation.source, dry.error.message, { reason: dry.error.reason, stepIndex: dry.stepIndex, ...dry.error.details });
-      return commit(interpretation.source, interpretation.steps);
+      return commit(interpretation.source, interpretation.steps, interpretation.note);
     }
   };
 
@@ -201,7 +201,7 @@ export async function executeAiCommand(deps: AiDeps, actor: Actor, diagramId: st
     };
 
   const commit =
-    (source: AiSource, steps: PlanStep[]): Finish =>
+    (source: AiSource, steps: PlanStep[], note?: string): Finish =>
     async (tx, mutationRequestId) => {
       await authorizeDiagram(tx, actor.userId, diagramId, 'modify'); // access may have been revoked while we interpreted
       const locked = await lockDiagramRow(tx, diagramId);
@@ -229,7 +229,7 @@ export async function executeAiCommand(deps: AiDeps, actor: Actor, diagramId: st
         diagramId,
         userId: actor.userId,
         userText: text,
-        assistantText: `${planned.summaries.map((s) => s.summary).join('. ')}.`,
+        assistantText: `${planned.summaries.map((s) => s.summary).join('. ')}.${note ? ` ${note}` : ''}`,
         metadata: { source, status: 'APPLIED', commandExecutionId: executionId, diagramVersion: updated.version },
       });
       const body: AiAppliedResponse = {

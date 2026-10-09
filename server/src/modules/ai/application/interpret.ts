@@ -9,7 +9,7 @@ import { SYSTEM_INSTRUCTION, buildPrompt, type HistoryTurn } from './prompt.ts';
 export type AiSource = 'PARSER' | 'AI';
 
 export type Interpretation =
-  | { kind: 'plan'; source: AiSource; steps: PlanStep[] }
+  | { kind: 'plan'; source: AiSource; steps: PlanStep[]; note?: string }
   /** Nothing to do yet: the request is ambiguous, refers to something unknown, or is not an edit. Ask, do not guess. */
   | { kind: 'clarify'; source: AiSource; question: string; options: string[] }
   /** The request needs something that does not exist yet. Nothing is applied: the user is asked, and "yes" applies exactly this plan. */
@@ -48,7 +48,7 @@ export interface InterpretInput {
  */
 export async function interpretRequest(input: InterpretInput): Promise<Interpretation> {
   const parsed = parseCommand(input.doc, input.text);
-  if (parsed.kind === 'steps') return { kind: 'plan', source: 'PARSER', steps: parsed.steps };
+  if (parsed.kind === 'steps') return { kind: 'plan', source: 'PARSER', steps: parsed.steps, ...(parsed.note ? { note: parsed.note } : {}) };
   if (parsed.kind === 'clarify') return { kind: 'clarify', source: 'PARSER', question: parsed.question, options: parsed.options };
   if (parsed.kind === 'propose') return { kind: 'propose', source: 'PARSER', question: parsed.question, steps: parsed.steps };
 

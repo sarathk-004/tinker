@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useReactFlow } from '@xyflow/react';
-import { Box, CornerDownLeft, Download, FileText, History, LayoutGrid, Plus, Redo2, Search, Undo2, Users } from 'lucide-react';
+import { Box, CornerDownLeft, Download, FileText, History, LayoutGrid, Network, Plus, Redo2, Search, Undo2, Users } from 'lucide-react';
+import { submitAiCommand } from '../ai/aiCommands';
 import { useDiagramStore } from '../diagram/store';
 import { useHistoryStore } from '../history/history';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
@@ -76,6 +77,7 @@ export const CommandPalette: React.FC = () => {
       ['new', 'New diagram', 'Start an empty diagram in this workspace', <Plus key="a" className="w-4 h-4" />, () => void useWorkspaceStore.getState().newDiagramInEditor(), true],
       ['undo', 'Undo', `${MOD_KEY} Z`, <Undo2 key="b" className="w-4 h-4" />, () => void useHistoryStore.getState().undo(), hasDiagram],
       ['redo', 'Redo', `${MOD_KEY} ⇧ Z`, <Redo2 key="c" className="w-4 h-4" />, () => void useHistoryStore.getState().redo(), hasDiagram],
+      ['wire', 'Connect everything logically', 'tinker wires the unconnected components the usual way (no AI allowance used)', <Network key="w" className="w-4 h-4" />, () => void submitAiCommand('Connect the components logically'), hasDiagram && nodes.length >= 2],
       ['layout', 'Tidy the layout', 'Re-arrange every component (saved as a position update)', <LayoutGrid key="d" className="w-4 h-4" />, () => void useDiagramStore.getState().applyLayout(), hasDiagram && nodes.length > 0],
       ['versions', 'Version history', 'See and restore earlier versions', <History key="e" className="w-4 h-4" />, () => useUi.getState().set({ versionsOpen: true, navOpen: true }), hasDiagram],
       ['png', 'Export as PNG image', undefined as unknown as string, <Download key="f" className="w-4 h-4" />, () => void exportCurrent('png', flow), hasDiagram],
